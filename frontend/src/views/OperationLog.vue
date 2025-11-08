@@ -7,7 +7,7 @@
 
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="操作类型">
-          <el-select v-model="searchForm.operateType" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.operateType" placeholder="请选择" clearable style="width: 200px">
             <el-option label="新增" value="ADD" />
             <el-option label="编辑" value="EDIT" />
             <el-option label="删除" value="DELETE" />

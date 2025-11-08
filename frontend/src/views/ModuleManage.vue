@@ -13,7 +13,7 @@
           <el-input v-model="searchForm.moduleName" placeholder="请输入模块名称" clearable />
         </el-form-item>
         <el-form-item label="模块类型">
-          <el-select v-model="searchForm.moduleType" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.moduleType" placeholder="请选择" clearable style="width: 200px">
             <el-option
               v-for="type in moduleTypes"
               :key="type.typeCode"
@@ -23,7 +23,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable>
+          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 200px">
             <el-option label="启用" :value="1" />
             <el-option label="禁用" :value="0" />
           </el-select>
