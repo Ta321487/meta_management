@@ -57,5 +57,15 @@
         SELECT COUNT(*) FROM metadata_table_relation WHERE relation_code = #{relationCode}
     </select>
 
+    <select id="count" resultType="Long">
+        SELECT COUNT(*) FROM metadata_table_relation
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation
+        ORDER BY create_time DESC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
 </mapper>
 

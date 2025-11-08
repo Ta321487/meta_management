@@ -1,6 +1,8 @@
 package com.metadata.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.mapper.MetadataBusinessRuleMapper;
 import com.metadata.util.CodeValidator;
@@ -62,6 +64,15 @@ public class MetadataBusinessRuleService {
      */
     public List<MetadataBusinessRule> listByModuleCode(String moduleCode) {
         return ruleMapper.selectByModuleCode(moduleCode);
+    }
+
+    /**
+     * 分页查询模块的规则
+     */
+    public PageResult<MetadataBusinessRule> pageByModuleCode(String moduleCode, PageRequest pageRequest) {
+        Long total = ruleMapper.countByModuleCode(moduleCode);
+        List<MetadataBusinessRule> records = ruleMapper.selectPageByModuleCode(moduleCode, pageRequest);
+        return new PageResult<>(total, records);
     }
 }
 

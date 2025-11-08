@@ -1,5 +1,6 @@
 package com.metadata.mapper;
 
+import com.metadata.common.PageRequest;
 import com.metadata.entity.MetadataOperationLog;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -13,5 +14,14 @@ public interface MetadataOperationLogMapper {
                                          @Param("operateType") String operateType,
                                          @Param("startTime") String startTime,
                                          @Param("endTime") String endTime);
+    Long count(@Param("operateUser") String operateUser,
+               @Param("operateType") String operateType,
+               @Param("startTime") String startTime,
+               @Param("endTime") String endTime);
+    List<MetadataOperationLog> selectPage(@Param("operateUser") String operateUser,
+                                         @Param("operateType") String operateType,
+                                         @Param("startTime") String startTime,
+                                         @Param("endTime") String endTime,
+                                         @Param("pageRequest") PageRequest pageRequest);
 }
 

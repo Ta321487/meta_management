@@ -20,7 +20,6 @@ export const addTable = (data) => request.post('/table/add', data)
 export const updateTable = (data) => request.post('/table/update', data)
 export const deleteTable = (data) => request.post('/table/delete', data)
 export const getTablesByModule = (moduleCode) => request.get(`/table/listByModule/${moduleCode}`)
-export const getAllRelations = () => request.get('/relation/list')
 
 // 字段相关
 export const getFieldList = (tableCode) => request.get(`/field/list/${tableCode}`)
@@ -29,14 +28,14 @@ export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (data) => request.post('/field/delete', data)
 
 // 功能节点相关
-export const getNodeList = (moduleCode) => request.get(`/node/list/${moduleCode}`)
+export const getNodeList = (moduleCode, params) => request.get(`/node/list/${moduleCode}`, { params })
 export const addNode = (data) => request.post('/node/add', data)
 export const updateNode = (data) => request.post('/node/update', data)
 export const deleteNode = (data) => request.post('/node/delete', data)
 export const updateNodeSort = (data) => request.post('/node/updateSort', data)
 
 // 业务规则相关
-export const getRuleList = (moduleCode) => request.get(`/rule/list/${moduleCode}`)
+export const getRuleList = (moduleCode, params) => request.get(`/rule/list/${moduleCode}`, { params })
 export const addRule = (data) => request.post('/rule/add', data)
 export const updateRule = (data) => request.post('/rule/update', data)
 export const deleteRule = (data) => request.post('/rule/delete', data)
@@ -44,6 +43,7 @@ export const deleteRule = (data) => request.post('/rule/delete', data)
 // 表关联关系相关
 export const getRelationsByMain = (mainTableCode) => request.get(`/relation/listByMain/${mainTableCode}`)
 export const getRelationsBySlave = (slaveTableCode) => request.get(`/relation/listBySlave/${slaveTableCode}`)
+export const getAllRelations = (params) => request.get('/relation/list', { params })
 export const addRelation = (data) => request.post('/relation/add', data)
 export const updateRelation = (data) => request.post('/relation/update', data)
 export const deleteRelation = (data) => request.post('/relation/delete', data)

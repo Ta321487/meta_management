@@ -29,7 +29,12 @@ public class CodeGeneratorService {
 
     public CodeGeneratorService() {
         freemarkerConfig = new Configuration(Configuration.VERSION_2_3_32);
-        freemarkerConfig.setClassForTemplateLoading(this.getClass(), "/templates");
+        // 使用 ClassLoader 加载模板，更可靠
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        if (classLoader == null) {
+            classLoader = CodeGeneratorService.class.getClassLoader();
+        }
+        freemarkerConfig.setClassLoaderForTemplateLoading(classLoader, "templates");
         freemarkerConfig.setDefaultEncoding("UTF-8");
     }
 

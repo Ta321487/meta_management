@@ -1,5 +1,6 @@
 package com.metadata.mapper;
 
+import com.metadata.common.PageRequest;
 import com.metadata.entity.MetadataFunctionNode;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -15,5 +16,8 @@ public interface MetadataFunctionNodeMapper {
     MetadataFunctionNode selectByCode(@Param("moduleCode") String moduleCode, @Param("nodeCode") String nodeCode);
     List<MetadataFunctionNode> selectByModuleCode(String moduleCode);
     int updateSort(@Param("id") Long id, @Param("sort") Integer sort);
+    Long countByModuleCode(String moduleCode);
+    List<MetadataFunctionNode> selectPageByModuleCode(@Param("moduleCode") String moduleCode, 
+                                                       @Param("pageRequest") PageRequest pageRequest);
 }
 

@@ -51,6 +51,26 @@
         SELECT COUNT(*) FROM metadata_table WHERE table_code = #{tableCode}
     </select>
 
+    <select id="count" resultType="Long">
+        SELECT COUNT(*) FROM metadata_table
+        <where>
+            <if test="tableName != null and tableName != ''">
+                AND table_name LIKE CONCAT('%', #{tableName}, '%')
+            </if>
+        </where>
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table
+        <where>
+            <if test="tableName != null and tableName != ''">
+                AND table_name LIKE CONCAT('%', #{tableName}, '%')
+            </if>
+        </where>
+        ORDER BY create_time DESC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
     <select id="selectByModuleCode" resultMap="BaseResultMap">
         SELECT t.* FROM metadata_table t
         INNER JOIN metadata_module_table mt ON t.table_code = mt.table_code

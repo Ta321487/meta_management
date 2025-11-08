@@ -57,5 +57,16 @@
         ORDER BY sort ASC, create_time ASC
     </select>
 
+    <select id="countByModuleCode" resultType="Long">
+        SELECT COUNT(*) FROM metadata_function_node WHERE module_code = #{moduleCode}
+    </select>
+
+    <select id="selectPageByModuleCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_function_node 
+        WHERE module_code = #{moduleCode}
+        ORDER BY sort ASC, create_time ASC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
 </mapper>
 

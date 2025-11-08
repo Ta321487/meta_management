@@ -36,5 +36,43 @@
         ORDER BY operate_time DESC
     </select>
 
+    <select id="count" resultType="Long">
+        SELECT COUNT(*) FROM metadata_operation_log
+        <where>
+            <if test="operateUser != null and operateUser != ''">
+                AND operate_user = #{operateUser}
+            </if>
+            <if test="operateType != null and operateType != ''">
+                AND operate_type = #{operateType}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND operate_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND operate_time &lt;= #{endTime}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM metadata_operation_log
+        <where>
+            <if test="operateUser != null and operateUser != ''">
+                AND operate_user = #{operateUser}
+            </if>
+            <if test="operateType != null and operateType != ''">
+                AND operate_type = #{operateType}
+            </if>
+            <if test="startTime != null and startTime != ''">
+                AND operate_time &gt;= #{startTime}
+            </if>
+            <if test="endTime != null and endTime != ''">
+                AND operate_time &lt;= #{endTime}
+            </if>
+        </where>
+        ORDER BY operate_time DESC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
 </mapper>
 

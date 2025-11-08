@@ -27,6 +27,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total || 0"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框 -->
@@ -113,6 +125,11 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增关联')
     const formRef = ref(null)
+    const pagination = reactive({
+      current: 1,
+      size: 10,
+      total: 0
+    })
     const form = reactive({
       id: null,
       relationCode: '',
@@ -146,14 +163,38 @@ export default {
 
     const loadRelations = async () => {
       try {
-        const res = await getAllRelations()
+        const params = {
+          current: pagination.current,
+          size: pagination.size
+        }
+        const res = await getAllRelations(params)
         if (res.code === 200) {
-          relationData.value = res.data || []
+          if (res.data && res.data.records) {
+            // 分页数据
+            relationData.value = res.data.records
+            pagination.total = Number(res.data.total) || 0
+          } else {
+            // 兼容旧接口（非分页数据）
+            relationData.value = res.data || []
+            pagination.total = Number(res.data?.length) || 0
+          }
         }
       } catch (error) {
         ElMessage.error('加载关联关系失败')
         relationData.value = []
+        pagination.total = 0
       }
+    }
+
+    const handleSizeChange = (val) => {
+      pagination.size = val
+      pagination.current = 1
+      loadRelations()
+    }
+
+    const handleCurrentChange = (val) => {
+      pagination.current = val
+      loadRelations()
     }
 
     const handleMainTableChange = async (tableCode) => {
@@ -272,10 +313,13 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
+      pagination,
       form,
       rules,
       handleMainTableChange,
       handleSlaveTableChange,
+      handleSizeChange,
+      handleCurrentChange,
       handleAdd,
       handleEdit,
       handleSubmit,

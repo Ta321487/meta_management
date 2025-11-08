@@ -40,6 +40,18 @@
         </el-table-column>
         <el-table-column prop="errorMsg" label="错误信息" show-overflow-tooltip />
       </el-table>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total || 0"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
   </div>
 </template>
@@ -54,6 +66,11 @@ export default {
   setup() {
     const tableData = ref([])
     const loading = ref(false)
+    const pagination = reactive({
+      current: 1,
+      size: 10,
+      total: 0
+    })
     const searchForm = reactive({
       operateType: '',
       startTime: '',
@@ -102,7 +119,10 @@ export default {
     const loadData = async () => {
       loading.value = true
       try {
-        const params = {}
+        const params = {
+          current: pagination.current,
+          size: pagination.size
+        }
         if (searchForm.operateType) {
           params.operateType = searchForm.operateType
         }
@@ -115,21 +135,46 @@ export default {
         
         const res = await getOperationLogList(params)
         if (res.code === 200) {
-          // 格式化数据
-          tableData.value = res.data.map(item => ({
-            ...item,
-            operateType: formatOperateType(item.operateType),
-            operateTime: formatDateTime(item.operateTime)
-          }))
+          if (res.data && res.data.records) {
+            // 分页数据
+            tableData.value = res.data.records.map(item => ({
+              ...item,
+              operateType: formatOperateType(item.operateType),
+              operateTime: formatDateTime(item.operateTime)
+            }))
+            pagination.total = Number(res.data.total) || 0
+          } else {
+            // 兼容旧接口（非分页数据）
+            tableData.value = (res.data || []).map(item => ({
+              ...item,
+              operateType: formatOperateType(item.operateType),
+              operateTime: formatDateTime(item.operateTime)
+            }))
+            pagination.total = Number(res.data?.length) || 0
+          }
         }
       } catch (error) {
         ElMessage.error('加载操作日志失败：' + (error.message || '未知错误'))
+        tableData.value = []
+        pagination.total = 0
       } finally {
         loading.value = false
       }
     }
 
+    const handleSizeChange = (val) => {
+      pagination.size = val
+      pagination.current = 1
+      loadData()
+    }
+
+    const handleCurrentChange = (val) => {
+      pagination.current = val
+      loadData()
+    }
+
     const handleSearch = () => {
+      pagination.current = 1
       loadData()
     }
 
@@ -137,6 +182,7 @@ export default {
       searchForm.operateType = ''
       searchForm.startTime = ''
       searchForm.endTime = ''
+      pagination.current = 1
       loadData()
     }
 
@@ -148,8 +194,11 @@ export default {
       tableData,
       loading,
       searchForm,
+      pagination,
       handleSearch,
-      handleReset
+      handleReset,
+      handleSizeChange,
+      handleCurrentChange
     }
   }
 }

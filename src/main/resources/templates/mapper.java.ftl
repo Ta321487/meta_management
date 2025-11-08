@@ -1,5 +1,6 @@
 package ${packageName}.mapper;
 
+import ${packageName}.common.PageRequest;
 import ${packageName}.entity.${className};
 import org.apache.ibatis.annotations.Mapper;
 
@@ -35,5 +36,15 @@ public interface ${className}Mapper {
      * 查询所有
      */
     List<${className}> selectAll();
+
+    /**
+     * 查询总数
+     */
+    Long count();
+
+    /**
+     * 分页查询
+     */
+    List<${className}> selectPage(PageRequest pageRequest);
 }
 

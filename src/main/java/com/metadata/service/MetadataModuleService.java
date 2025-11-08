@@ -116,6 +116,15 @@ public class MetadataModuleService {
     }
 
     /**
+     * 分页查询模块
+     */
+    public PageResult<MetadataModule> page(String moduleName, String moduleType, Integer status, PageRequest pageRequest) {
+        Long total = moduleMapper.count(moduleName, moduleType, status);
+        List<MetadataModule> records = moduleMapper.selectPage(moduleName, moduleType, status, pageRequest);
+        return new PageResult<>(total, records);
+    }
+
+    /**
      * 启用/禁用模块
      */
     public void updateStatus(Long id, Integer status) {

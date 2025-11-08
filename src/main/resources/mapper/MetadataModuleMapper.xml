@@ -59,5 +59,37 @@
         SELECT COUNT(*) FROM metadata_module WHERE module_code = #{moduleCode}
     </select>
 
+    <select id="count" resultType="Long">
+        SELECT COUNT(*) FROM metadata_module
+        <where>
+            <if test="moduleName != null and moduleName != ''">
+                AND module_name LIKE CONCAT('%', #{moduleName}, '%')
+            </if>
+            <if test="moduleType != null and moduleType != ''">
+                AND module_type = #{moduleType}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module
+        <where>
+            <if test="moduleName != null and moduleName != ''">
+                AND module_name LIKE CONCAT('%', #{moduleName}, '%')
+            </if>
+            <if test="moduleType != null and moduleType != ''">
+                AND module_type = #{moduleType}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
 </mapper>
 

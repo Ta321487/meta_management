@@ -30,6 +30,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total || 0"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框 -->
@@ -76,6 +88,11 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增表')
     const formRef = ref(null)
+    const pagination = reactive({
+      current: 1,
+      size: 10,
+      total: 0
+    })
     const searchForm = reactive({
       tableName: ''
     })
@@ -94,21 +111,49 @@ export default {
 
     const loadData = async () => {
       try {
-        const res = await getTableList(searchForm)
+        const params = {
+          ...searchForm,
+          current: pagination.current,
+          size: pagination.size
+        }
+        const res = await getTableList(params)
         if (res.code === 200) {
-          tableData.value = res.data
+          if (res.data && res.data.records) {
+            // 分页数据
+            tableData.value = res.data.records
+            pagination.total = Number(res.data.total) || 0
+          } else {
+            // 兼容旧接口（非分页数据）
+            tableData.value = res.data || []
+            pagination.total = Number(res.data?.length) || 0
+          }
         }
       } catch (error) {
         ElMessage.error('加载数据失败')
+        tableData.value = []
+        pagination.total = 0
       }
     }
 
+    const handleSizeChange = (val) => {
+      pagination.size = val
+      pagination.current = 1
+      loadData()
+    }
+
+    const handleCurrentChange = (val) => {
+      pagination.current = val
+      loadData()
+    }
+
     const handleSearch = () => {
+      pagination.current = 1
       loadData()
     }
 
     const handleReset = () => {
       searchForm.tableName = ''
+      pagination.current = 1
       loadData()
     }
 
@@ -184,11 +229,14 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
+      pagination,
       searchForm,
       form,
       rules,
       handleSearch,
       handleReset,
+      handleSizeChange,
+      handleCurrentChange,
       handleAdd,
       handleEdit,
       handleSubmit,

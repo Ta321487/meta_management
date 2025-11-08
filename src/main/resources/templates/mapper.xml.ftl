@@ -48,5 +48,14 @@
         SELECT * FROM ${tableName} ORDER BY id DESC
     </select>
 
+    <select id="count" resultType="Long">
+        SELECT COUNT(*) FROM ${tableName}
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM ${tableName} ORDER BY id DESC
+        LIMIT <#noparse>#{offset}, #{size}</#noparse>
+    </select>
+
 </mapper>
 

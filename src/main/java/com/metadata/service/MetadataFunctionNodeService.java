@@ -1,6 +1,8 @@
 package com.metadata.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.util.CodeValidator;
@@ -63,6 +65,15 @@ public class MetadataFunctionNodeService {
      */
     public List<MetadataFunctionNode> listByModuleCode(String moduleCode) {
         return nodeMapper.selectByModuleCode(moduleCode);
+    }
+
+    /**
+     * 分页查询模块的节点
+     */
+    public PageResult<MetadataFunctionNode> pageByModuleCode(String moduleCode, PageRequest pageRequest) {
+        Long total = nodeMapper.countByModuleCode(moduleCode);
+        List<MetadataFunctionNode> records = nodeMapper.selectPageByModuleCode(moduleCode, pageRequest);
+        return new PageResult<>(total, records);
     }
 
     /**
