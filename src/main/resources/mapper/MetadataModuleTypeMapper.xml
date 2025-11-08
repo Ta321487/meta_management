@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataModuleTypeMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataModuleType">
+        <id column="id" property="id"/>
+        <result column="type_code" property="typeCode"/>
+        <result column="type_name" property="typeName"/>
+        <result column="default_nodes" property="defaultNodes"/>
+        <result column="description" property="description"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataModuleType" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_module_type (type_code, type_name, default_nodes, description)
+        VALUES (#{typeCode}, #{typeName}, #{defaultNodes}, #{description})
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataModuleType">
+        UPDATE metadata_module_type
+        SET type_name = #{typeName},
+            default_nodes = #{defaultNodes},
+            description = #{description}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_module_type WHERE id = #{id}
+    </delete>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module_type WHERE type_code = #{typeCode}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module_type ORDER BY id
+    </select>
+
+</mapper>
+

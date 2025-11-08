@@ -1,0 +1,265 @@
+<template>
+  <div class="rule-manage">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>业务规则管理</span>
+          <div>
+            <el-select v-model="selectedModuleCode" placeholder="请选择模块" style="width: 200px; margin-right: 10px" @change="loadRules">
+              <el-option
+                v-for="module in modules"
+                :key="module.moduleCode"
+                :label="module.moduleName"
+                :value="module.moduleCode"
+              />
+            </el-select>
+            <el-button type="primary" @click="handleAdd" :disabled="!selectedModuleCode">新增规则</el-button>
+          </div>
+        </div>
+      </template>
+
+      <el-table :data="ruleData" border style="width: 100%" v-loading="loading">
+        <el-table-column prop="ruleCode" label="规则编码" width="150" />
+        <el-table-column prop="ruleType" label="规则类型" width="150" />
+        <el-table-column prop="description" label="描述" show-overflow-tooltip />
+        <el-table-column label="规则内容" min-width="200">
+          <template #default="{ row }">
+            <el-button type="text" @click="handlePreview(row)">预览</el-button>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 新增/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="700px"
+      @close="handleDialogClose"
+    >
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+        <el-form-item label="规则编码" prop="ruleCode" v-if="!form.id">
+          <el-input v-model="form.ruleCode" placeholder="如：RULE_001" />
+        </el-form-item>
+        <el-form-item label="规则类型" prop="ruleType">
+          <el-select v-model="form.ruleType" placeholder="请选择" style="width: 100%">
+            <el-option label="流程规则" value="PROCESS_RULE" />
+            <el-option label="报表规则" value="REPORT_RULE" />
+            <el-option label="批量操作规则" value="BATCH_RULE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="规则内容" prop="ruleContent">
+          <el-input v-model="form.ruleContent" type="textarea" :rows="10" placeholder="请输入JSON格式的规则内容" />
+        </el-form-item>
+        <el-form-item label="描述" prop="description">
+          <el-input v-model="form.description" type="textarea" :rows="3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 预览对话框 -->
+    <el-dialog v-model="previewVisible" title="规则预览" width="600px">
+      <pre>{{ previewContent }}</pre>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getModuleList, getRuleList, addRule, updateRule, deleteRule } from '../api'
+
+export default {
+  name: 'RuleManage',
+  setup() {
+    const modules = ref([])
+    const ruleData = ref([])
+    const selectedModuleCode = ref('')
+    const loading = ref(false)
+    const dialogVisible = ref(false)
+    const dialogTitle = ref('新增规则')
+    const previewVisible = ref(false)
+    const previewContent = ref('')
+    const formRef = ref(null)
+    const form = reactive({
+      id: null,
+      ruleCode: '',
+      moduleCode: '',
+      ruleType: '',
+      ruleContent: '',
+      description: ''
+    })
+    const rules = {
+      ruleCode: [{ required: true, message: '请输入规则编码', trigger: 'blur' }],
+      ruleType: [{ required: true, message: '请选择规则类型', trigger: 'change' }],
+      ruleContent: [{ required: true, message: '请输入规则内容', trigger: 'blur' }]
+    }
+
+    const loadModules = async () => {
+      try {
+        const res = await getModuleList({})
+        if (res.code === 200) {
+          modules.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载模块列表失败')
+      }
+    }
+
+    const loadRules = async () => {
+      if (!selectedModuleCode.value) {
+        ruleData.value = []
+        return
+      }
+      loading.value = true
+      try {
+        const res = await getRuleList(selectedModuleCode.value)
+        if (res.code === 200) {
+          ruleData.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载规则列表失败')
+      } finally {
+        loading.value = false
+      }
+    }
+
+    const handleAdd = () => {
+      dialogTitle.value = '新增规则'
+      Object.assign(form, {
+        id: null,
+        ruleCode: '',
+        moduleCode: selectedModuleCode.value,
+        ruleType: '',
+        ruleContent: '',
+        description: ''
+      })
+      dialogVisible.value = true
+    }
+
+    const handleEdit = (row) => {
+      dialogTitle.value = '编辑规则'
+      Object.assign(form, {
+        id: row.id,
+        ruleCode: row.ruleCode,
+        moduleCode: row.moduleCode,
+        ruleType: row.ruleType,
+        ruleContent: row.ruleContent,
+        description: row.description || ''
+      })
+      dialogVisible.value = true
+    }
+
+    const handlePreview = (row) => {
+      try {
+        const content = JSON.parse(row.ruleContent)
+        previewContent.value = JSON.stringify(content, null, 2)
+      } catch (error) {
+        previewContent.value = row.ruleContent
+      }
+      previewVisible.value = true
+    }
+
+    const handleSubmit = async () => {
+      await formRef.value.validate(async (valid) => {
+        if (valid) {
+          // 验证JSON格式
+          try {
+            JSON.parse(form.ruleContent)
+          } catch (error) {
+            ElMessage.error('规则内容必须是有效的JSON格式')
+            return
+          }
+          try {
+            if (form.id) {
+              await updateRule(form)
+            } else {
+              await addRule(form)
+            }
+            ElMessage.success('操作成功')
+            dialogVisible.value = false
+            loadRules()
+          } catch (error) {
+            ElMessage.error('操作失败')
+          }
+        }
+      })
+    }
+
+    const handleDelete = (row) => {
+      ElMessageBox.confirm('确定要删除该规则吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await deleteRule({ id: row.id })
+          ElMessage.success('删除成功')
+          loadRules()
+        } catch (error) {
+          ElMessage.error('删除失败')
+        }
+      })
+    }
+
+    const handleDialogClose = () => {
+      formRef.value?.resetFields()
+    }
+
+    onMounted(() => {
+      loadModules()
+    })
+
+    return {
+      modules,
+      ruleData,
+      selectedModuleCode,
+      loading,
+      dialogVisible,
+      dialogTitle,
+      previewVisible,
+      previewContent,
+      formRef,
+      form,
+      rules,
+      loadRules,
+      handleAdd,
+      handleEdit,
+      handlePreview,
+      handleSubmit,
+      handleDelete,
+      handleDialogClose
+    }
+  }
+}
+</script>
+
+<style scoped>
+.rule-manage {
+  height: 100%;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+pre {
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  overflow-x: auto;
+}
+</style>
+

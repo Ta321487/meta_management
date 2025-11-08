@@ -1,0 +1,185 @@
+<template>
+  <div class="${componentName?lower_case}-list">
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>${table.tableName}</span>
+          <el-button type="primary" @click="handleAdd">新增</el-button>
+        </div>
+      </template>
+
+      <el-table :data="tableData" border style="width: 100%">
+<#list fields as field>
+        <el-table-column prop="${field.camelCaseName}" label="${field.field.label}" />
+</#list>
+        <el-table-column label="操作" width="200" fixed="right">
+          <template #default="{ row }">
+            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-card>
+
+    <!-- 新增/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="dialogTitle"
+      width="600px"
+      @close="handleDialogClose"
+    >
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+<#list fields as field>
+        <#if field.field.fieldName != "id">
+        <el-form-item label="${field.field.label}" prop="${field.camelCaseName}">
+          <#if field.field.formComponent == "input">
+          <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
+          <#elseif field.field.formComponent == "select">
+          <el-select v-model="form.${field.camelCaseName}" placeholder="请选择" style="width: 100%">
+            <el-option label="选项1" value="1" />
+          </el-select>
+          <#elseif field.field.formComponent == "datepicker">
+          <el-date-picker v-model="form.${field.camelCaseName}" type="date" placeholder="请选择日期" style="width: 100%" />
+          <#elseif field.field.formComponent == "number">
+          <el-input-number v-model="form.${field.camelCaseName}" style="width: 100%" />
+          <#elseif field.field.formComponent == "textarea">
+          <el-input v-model="form.${field.camelCaseName}" type="textarea" :rows="3" />
+          <#else>
+          <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
+          </#if>
+        </el-form-item>
+        </#if>
+</#list>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">确定</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { ${componentName}Api } from '../api'
+
+export default {
+  name: '${componentName}List',
+  setup() {
+    const tableData = ref([])
+    const dialogVisible = ref(false)
+    const dialogTitle = ref('新增')
+    const formRef = ref(null)
+    const form = reactive({
+<#list fields as field>
+      ${field.camelCaseName}: <#if field.field.fieldType?contains("int")>null<#elseif field.field.fieldType?contains("date")>null<#else>''</#if>,
+</#list>
+    })
+    const rules = {
+<#list fields as field>
+      <#if field.field.isRequired == 1 && field.field.fieldName != "id">
+      ${field.camelCaseName}: [{ required: true, message: '请输入${field.field.label}', trigger: 'blur' }],
+      </#if>
+</#list>
+    }
+
+    const loadData = async () => {
+      try {
+        const res = await ${componentName}Api.list()
+        if (res.code === 200) {
+          tableData.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载数据失败')
+      }
+    }
+
+    const handleAdd = () => {
+      dialogTitle.value = '新增'
+      Object.assign(form, {
+<#list fields as field>
+        ${field.camelCaseName}: <#if field.field.fieldType?contains("int")>null<#elseif field.field.fieldType?contains("date")>null<#else>''</#if>,
+</#list>
+      })
+      dialogVisible.value = true
+    }
+
+    const handleEdit = (row) => {
+      dialogTitle.value = '编辑'
+      Object.assign(form, row)
+      dialogVisible.value = true
+    }
+
+    const handleSubmit = async () => {
+      await formRef.value.validate(async (valid) => {
+        if (valid) {
+          try {
+            if (form.id) {
+              await ${componentName}Api.update(form)
+            } else {
+              await ${componentName}Api.add(form)
+            }
+            ElMessage.success('操作成功')
+            dialogVisible.value = false
+            loadData()
+          } catch (error) {
+            ElMessage.error('操作失败')
+          }
+        }
+      })
+    }
+
+    const handleDelete = (row) => {
+      ElMessageBox.confirm('确定要删除该记录吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await ${componentName}Api.delete({ id: row.id })
+          ElMessage.success('删除成功')
+          loadData()
+        } catch (error) {
+          ElMessage.error('删除失败')
+        }
+      })
+    }
+
+    const handleDialogClose = () => {
+      formRef.value?.resetFields()
+    }
+
+    onMounted(() => {
+      loadData()
+    })
+
+    return {
+      tableData,
+      dialogVisible,
+      dialogTitle,
+      formRef,
+      form,
+      rules,
+      handleAdd,
+      handleEdit,
+      handleSubmit,
+      handleDelete,
+      handleDialogClose
+    }
+  }
+}
+</script>
+
+<style scoped>
+.${componentName?lower_case}-list {
+  height: 100%;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+</style>
+

@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataBusinessRuleMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataBusinessRule">
+        <id column="id" property="id"/>
+        <result column="rule_code" property="ruleCode"/>
+        <result column="module_code" property="moduleCode"/>
+        <result column="rule_type" property="ruleType"/>
+        <result column="rule_content" property="ruleContent"/>
+        <result column="description" property="description"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessRule" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_business_rule (rule_code, module_code, rule_type, rule_content, description)
+        VALUES (#{ruleCode}, #{moduleCode}, #{ruleType}, #{ruleContent}, #{description})
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataBusinessRule">
+        UPDATE metadata_business_rule
+        SET rule_type = #{ruleType},
+            rule_content = #{ruleContent},
+            description = #{description}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_business_rule WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByModuleCode">
+        DELETE FROM metadata_business_rule WHERE module_code = #{moduleCode}
+    </delete>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_rule 
+        WHERE module_code = #{moduleCode} AND rule_code = #{ruleCode}
+    </select>
+
+    <select id="selectByModuleCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_rule 
+        WHERE module_code = #{moduleCode}
+        ORDER BY create_time DESC
+    </select>
+
+</mapper>
+

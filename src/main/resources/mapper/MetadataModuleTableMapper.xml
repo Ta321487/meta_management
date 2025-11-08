@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataModuleTableMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataModuleTable">
+        <id column="id" property="id"/>
+        <result column="module_code" property="moduleCode"/>
+        <result column="table_code" property="tableCode"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataModuleTable" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_module_table (module_code, table_code)
+        VALUES (#{moduleCode}, #{tableCode})
+    </insert>
+
+    <delete id="deleteByModuleCode">
+        DELETE FROM metadata_module_table WHERE module_code = #{moduleCode}
+    </delete>
+
+    <delete id="deleteByTableCode">
+        DELETE FROM metadata_module_table WHERE table_code = #{tableCode}
+    </delete>
+
+    <delete id="delete">
+        DELETE FROM metadata_module_table 
+        WHERE module_code = #{moduleCode} AND table_code = #{tableCode}
+    </delete>
+
+    <select id="selectTableCodesByModuleCode" resultType="string">
+        SELECT table_code FROM metadata_module_table WHERE module_code = #{moduleCode}
+    </select>
+
+    <select id="selectModuleCodesByTableCode" resultType="string">
+        SELECT module_code FROM metadata_module_table WHERE table_code = #{tableCode}
+    </select>
+
+</mapper>
+

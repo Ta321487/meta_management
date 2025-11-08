@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataTableMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataTable">
+        <id column="id" property="id"/>
+        <result column="table_code" property="tableCode"/>
+        <result column="table_name" property="tableName"/>
+        <result column="pk_strategy" property="pkStrategy"/>
+        <result column="description" property="description"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataTable" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description)
+        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description})
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataTable">
+        UPDATE metadata_table
+        SET table_name = #{tableName},
+            pk_strategy = #{pkStrategy},
+            description = #{description}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_table WHERE id = #{id}
+    </delete>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table WHERE table_code = #{tableCode}
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table
+        <where>
+            <if test="tableName != null and tableName != ''">
+                AND table_name LIKE CONCAT('%', #{tableName}, '%')
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="countByCode" resultType="int">
+        SELECT COUNT(*) FROM metadata_table WHERE table_code = #{tableCode}
+    </select>
+
+    <select id="selectByModuleCode" resultMap="BaseResultMap">
+        SELECT t.* FROM metadata_table t
+        INNER JOIN metadata_module_table mt ON t.table_code = mt.table_code
+        WHERE mt.module_code = #{moduleCode}
+        ORDER BY t.create_time DESC
+    </select>
+
+</mapper>
+

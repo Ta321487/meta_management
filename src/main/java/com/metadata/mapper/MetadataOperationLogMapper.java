@@ -1,0 +1,17 @@
+package com.metadata.mapper;
+
+import com.metadata.entity.MetadataOperationLog;
+import org.apache.ibatis.annotations.Param;
+import java.util.List;
+
+/**
+ * 操作日志Mapper
+ */
+public interface MetadataOperationLogMapper {
+    int insert(MetadataOperationLog log);
+    List<MetadataOperationLog> selectAll(@Param("operateUser") String operateUser,
+                                         @Param("operateType") String operateType,
+                                         @Param("startTime") String startTime,
+                                         @Param("endTime") String endTime);
+}
+

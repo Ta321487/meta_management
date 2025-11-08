@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataTableRelationMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataTableRelation">
+        <id column="id" property="id"/>
+        <result column="relation_code" property="relationCode"/>
+        <result column="main_table_code" property="mainTableCode"/>
+        <result column="slave_table_code" property="slaveTableCode"/>
+        <result column="main_field_code" property="mainFieldCode"/>
+        <result column="slave_field_code" property="slaveFieldCode"/>
+        <result column="relation_type" property="relationType"/>
+        <result column="relation_name" property="relationName"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataTableRelation" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_table_relation (relation_code, main_table_code, slave_table_code,
+                                             main_field_code, slave_field_code, relation_type, relation_name)
+        VALUES (#{relationCode}, #{mainTableCode}, #{slaveTableCode},
+                #{mainFieldCode}, #{slaveFieldCode}, #{relationType}, #{relationName})
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataTableRelation">
+        UPDATE metadata_table_relation
+        SET main_table_code = #{mainTableCode},
+            slave_table_code = #{slaveTableCode},
+            main_field_code = #{mainFieldCode},
+            slave_field_code = #{slaveFieldCode},
+            relation_type = #{relationType},
+            relation_name = #{relationName}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_table_relation WHERE id = #{id}
+    </delete>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation WHERE relation_code = #{relationCode}
+    </select>
+
+    <select id="selectByMainTableCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation WHERE main_table_code = #{mainTableCode}
+    </select>
+
+    <select id="selectBySlaveTableCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation WHERE slave_table_code = #{slaveTableCode}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation ORDER BY create_time DESC
+    </select>
+
+    <select id="countByCode" resultType="int">
+        SELECT COUNT(*) FROM metadata_table_relation WHERE relation_code = #{relationCode}
+    </select>
+
+</mapper>
+

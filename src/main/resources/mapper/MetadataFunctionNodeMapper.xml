@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataFunctionNodeMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataFunctionNode">
+        <id column="id" property="id"/>
+        <result column="node_code" property="nodeCode"/>
+        <result column="node_name" property="nodeName"/>
+        <result column="module_code" property="moduleCode"/>
+        <result column="node_type" property="nodeType"/>
+        <result column="related_table_code" property="relatedTableCode"/>
+        <result column="jump_relation" property="jumpRelation"/>
+        <result column="sort" property="sort"/>
+        <result column="is_enabled" property="isEnabled"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataFunctionNode" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_function_node (node_code, node_name, module_code, node_type, 
+                                           related_table_code, jump_relation, sort, is_enabled)
+        VALUES (#{nodeCode}, #{nodeName}, #{moduleCode}, #{nodeType},
+                #{relatedTableCode}, #{jumpRelation}, #{sort}, #{isEnabled})
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataFunctionNode">
+        UPDATE metadata_function_node
+        SET node_name = #{nodeName},
+            node_type = #{nodeType},
+            related_table_code = #{relatedTableCode},
+            jump_relation = #{jumpRelation},
+            sort = #{sort},
+            is_enabled = #{isEnabled}
+        WHERE id = #{id}
+    </update>
+
+    <update id="updateSort">
+        UPDATE metadata_function_node SET sort = #{sort} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_function_node WHERE id = #{id}
+    </delete>
+
+    <delete id="deleteByModuleCode">
+        DELETE FROM metadata_function_node WHERE module_code = #{moduleCode}
+    </delete>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_function_node 
+        WHERE module_code = #{moduleCode} AND node_code = #{nodeCode}
+    </select>
+
+    <select id="selectByModuleCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_function_node 
+        WHERE module_code = #{moduleCode}
+        ORDER BY sort ASC, create_time ASC
+    </select>
+
+</mapper>
+

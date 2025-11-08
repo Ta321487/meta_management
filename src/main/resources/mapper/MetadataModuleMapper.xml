@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataModuleMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataModule">
+        <id column="id" property="id"/>
+        <result column="module_code" property="moduleCode"/>
+        <result column="module_name" property="moduleName"/>
+        <result column="module_type" property="moduleType"/>
+        <result column="description" property="description"/>
+        <result column="status" property="status"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataModule" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_module (module_code, module_name, module_type, description, status)
+        VALUES (#{moduleCode}, #{moduleName}, #{moduleType}, #{description}, #{status})
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataModule">
+        UPDATE metadata_module
+        SET module_name = #{moduleName},
+            module_type = #{moduleType},
+            description = #{description},
+            status = #{status}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_module WHERE id = #{id}
+    </delete>
+
+    <select id="selectByCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module WHERE module_code = #{moduleCode}
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module
+        <where>
+            <if test="moduleName != null and moduleName != ''">
+                AND module_name LIKE CONCAT('%', #{moduleName}, '%')
+            </if>
+            <if test="moduleType != null and moduleType != ''">
+                AND module_type = #{moduleType}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+        </where>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="countByCode" resultType="int">
+        SELECT COUNT(*) FROM metadata_module WHERE module_code = #{moduleCode}
+    </select>
+
+</mapper>
+
