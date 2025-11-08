@@ -91,6 +91,10 @@ public class CodeGeneratorService {
      */
     private Map<String, Object> parseValidationRule(String validateRule) {
         Map<String, Object> rules = new HashMap<>();
+        // 初始化默认值，避免模板访问时出错
+        rules.put("hasPattern", false);
+        rules.put("hasOptions", false);
+        
         if (validateRule == null || validateRule.trim().isEmpty()) {
             return rules;
         }

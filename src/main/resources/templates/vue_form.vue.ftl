@@ -1,3 +1,11 @@
+<#-- 辅助函数：转义正则表达式字符串 -->
+<#function escapeRegexPattern pattern>
+  <#return pattern?replace("\\", "\\\\")?replace("'", "\\'")?replace("\"", "\\\"")?replace("\n", "\\n")?replace("\r", "\\r")?replace("\t", "\\t")>
+</#function>
+<#function escapeJsString str>
+  <#return str?replace("\\", "\\\\")?replace("'", "\\'")?replace("\"", "\\\"")?replace("\n", "\\n")?replace("\r", "\\r")?replace("\t", "\\t")>
+</#function>
+
 <template>
   <div class="${componentName?lower_case}-form">
     <el-card>
@@ -15,7 +23,7 @@
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
           <#elseif field.field.formComponent == "select">
           <el-select v-model="form.${field.camelCaseName}" placeholder="请选择" style="width: 100%">
-            <#if field.validationRules.hasOptions>
+            <#if (field.validationRules?? && field.validationRules.hasOptions!false)>
               <#if field.validationRules.options?is_sequence>
                 <#list field.validationRules.options as option>
                   <#if option?is_string>
@@ -68,25 +76,18 @@ export default {
       ${field.camelCaseName}: <#if field.field.fieldType?contains("int")>null<#elseif field.field.fieldType?contains("date")>null<#else>''</#if>,
 </#list>
     })
-    <#-- 辅助函数：转义正则表达式字符串 -->
-    <#function escapeRegexPattern pattern>
-      <#return pattern?replace("\\", "\\\\")?replace("'", "\\'")?replace("\"", "\\\"")?replace("\n", "\\n")?replace("\r", "\\r")?replace("\t", "\\t")>
-    </#function>
-    <#function escapeJsString str>
-      <#return str?replace("\\", "\\\\")?replace("'", "\\'")?replace("\"", "\\\"")?replace("\n", "\\n")?replace("\r", "\\r")?replace("\t", "\\t")>
-    </#function>
     
     const rules = {
 <#list fields as field>
-      <#if field.field.fieldName != "id" && (field.field.isRequired == 1 || field.validationRules.hasPattern)>
+      <#if field.field.fieldName != "id" && (field.field.isRequired == 1 || (field.validationRules?? && field.validationRules.hasPattern!false))>
       ${field.camelCaseName}: [
         <#if field.field.isRequired == 1>
-        { required: true, message: '请输入${field.field.label}', trigger: 'blur' }<#if field.validationRules.hasPattern>,</#if>
+        { required: true, message: '请输入${field.field.label}', trigger: 'blur' }<#if (field.validationRules?? && field.validationRules.hasPattern!false)>,</#if>
         </#if>
-        <#if field.validationRules.hasPattern>
+        <#if (field.validationRules?? && field.validationRules.hasPattern!false)>
         { 
-          pattern: new RegExp('${escapeRegexPattern(field.validationRules.pattern)}'), 
-          message: '${escapeJsString(field.validationRules.patternMessage)}', 
+          pattern: new RegExp('${escapeRegexPattern(field.validationRules.pattern!)}'), 
+          message: '${escapeJsString(field.validationRules.patternMessage!"格式不正确")}', 
           trigger: 'blur' 
         }
         </#if>

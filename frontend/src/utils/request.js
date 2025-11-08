@@ -26,14 +26,14 @@ service.interceptors.response.use(
       router.push('/login')
       return Promise.reject(new Error('未登录'))
     }
+    // 不在这里自动显示错误消息，让各个组件自己处理
     if (res.code !== 200) {
-      ElMessage.error(res.message || '请求失败')
       return Promise.reject(new Error(res.message || '请求失败'))
     }
     return res
   },
   error => {
-    ElMessage.error(error.message || '请求失败')
+    // 网络错误等异常情况，也不自动显示，让组件处理
     return Promise.reject(error)
   }
 )

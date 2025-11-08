@@ -12,7 +12,7 @@
 </#list>
     </resultMap>
 
-    <insert id="insert" parameterType="${packageName}.entity.${className}" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="${packageName}.entity.${className}" useGeneratedKeys="true" keyProperty="<#noparse>id</#noparse>">
         INSERT INTO ${tableName} (
 <#list fields as field>
             <#if field.field.fieldName != "id">${field.field.fieldName}<#if field_has_next>,</#if>
@@ -20,7 +20,7 @@
 </#list>
         ) VALUES (
 <#list fields as field>
-            <#if field.field.fieldName != "id">#{${field.camelCaseName}}<#if field_has_next>,</#if>
+            <#if field.field.fieldName != "id">${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
             </#if>
 </#list>
         )
@@ -30,18 +30,18 @@
         UPDATE ${tableName}
         SET
 <#list fields as field>
-            <#if field.field.fieldName != "id">${field.field.fieldName} = #{${field.camelCaseName}}<#if field_has_next>,</#if>
+            <#if field.field.fieldName != "id">${field.field.fieldName} = ${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
             </#if>
 </#list>
-        WHERE id = #{id}
+        WHERE id = <#noparse>#{id}</#noparse>
     </update>
 
     <delete id="deleteById">
-        DELETE FROM ${tableName} WHERE id = #{id}
+        DELETE FROM ${tableName} WHERE id = <#noparse>#{id}</#noparse>
     </delete>
 
     <select id="selectById" resultMap="BaseResultMap">
-        SELECT * FROM ${tableName} WHERE id = #{id}
+        SELECT * FROM ${tableName} WHERE id = <#noparse>#{id}</#noparse>
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
