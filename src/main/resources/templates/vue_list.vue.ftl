@@ -120,7 +120,7 @@
             <el-option label="选项1" value="1" />
             </#if>
           </el-select>
-          <#elseif field.field.formComponent == "datepicker">
+          <#elseif field.field.formComponent == "datepicker" || field.field.formComponent == "date">
           <el-date-picker v-model="form.${field.camelCaseName}" type="date" placeholder="请选择日期" style="width: 100%" />
           <#elseif field.field.formComponent == "number">
           <el-input-number v-model="form.${field.camelCaseName}" style="width: 100%" />

@@ -61,6 +61,9 @@ export const generateVueList = (tableCode) => request.get(`/codegen/vue/list/${t
 export const generateVueForm = (tableCode) => request.get(`/codegen/vue/form/${tableCode}`)
 export const generateAll = (tableCode, packageName) => request.get(`/codegen/all/${tableCode}`, { params: { packageName } })
 
+// 代码测试相关
+export const testCode = (tableCode, packageName) => request.get(`/codetest/test/${tableCode}`, { params: { packageName } })
+
 // 模块类型相关
 export const getModuleTypeList = () => request.get('/moduleType/list')
 

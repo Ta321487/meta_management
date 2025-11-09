@@ -31,10 +31,10 @@ public class CodeGeneratorService {
     public CodeGeneratorService() {
         freemarkerConfig = new Configuration(Configuration.VERSION_2_3_32);
         // 使用 ClassTemplateLoader 从类路径加载模板
-        // 使用当前类确保从类路径根目录开始查找，"/templates" 是相对于类路径根目录的路径
-        ClassTemplateLoader templateLoader = new ClassTemplateLoader(CodeGeneratorService.class, "/templates");
+        // 使用当前线程的类加载器，从类路径根目录开始查找，"/templates" 是相对于类路径根目录的路径
+        ClassTemplateLoader templateLoader = new ClassTemplateLoader(
+            Thread.currentThread().getContextClassLoader(), "/templates");
         freemarkerConfig.setTemplateLoader(templateLoader);
-
 
         freemarkerConfig.setDefaultEncoding("UTF-8");
     }

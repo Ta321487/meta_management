@@ -424,7 +424,7 @@ public class SqlExecuteService {
             upperType.contains("FLOAT") || upperType.contains("DOUBLE")) {
             return "number";
         } else if (upperType.contains("DATE") || upperType.contains("TIME")) {
-            return "date";
+            return "datepicker";
         } else if (upperType.contains("TEXT")) {
             return "textarea";
         } else {
