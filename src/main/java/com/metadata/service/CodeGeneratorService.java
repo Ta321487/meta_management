@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
+import freemarker.cache.ClassTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +30,10 @@ public class CodeGeneratorService {
 
     public CodeGeneratorService() {
         freemarkerConfig = new Configuration(Configuration.VERSION_2_3_32);
-        freemarkerConfig.setClassForTemplateLoading(this.getClass(), "/templates");
+        // 使用 ClassTemplateLoader 从类路径加载模板
+        // 使用当前类确保从类路径根目录开始查找，"/templates" 是相对于类路径根目录的路径
+        ClassTemplateLoader templateLoader = new ClassTemplateLoader(CodeGeneratorService.class, "/templates");
+        freemarkerConfig.setTemplateLoader(templateLoader);
         freemarkerConfig.setDefaultEncoding("UTF-8");
     }
 

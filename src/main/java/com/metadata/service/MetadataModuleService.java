@@ -1,8 +1,6 @@
 package com.metadata.service;
 
 import com.alibaba.fastjson2.JSON;
-import com.metadata.common.PageRequest;
-import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataModule;
 import com.metadata.mapper.MetadataModuleMapper;
 import com.metadata.mapper.MetadataModuleTableMapper;

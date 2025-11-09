@@ -40,12 +40,14 @@ public class SqlExecuteService {
     private MetadataFieldMapper fieldMapper;
 
     /**
-     * 执行SQL语句
+     * 执行SQL语句（内部方法，允许执行DROP TABLE等危险操作）
+     * 仅供内部服务调用，不对外暴露
      * @param sql SQL语句
+     * @param skipSafetyCheck 是否跳过安全检查
      * @return 执行结果
      */
     @Transactional
-    public Map<String, Object> executeSql(String sql) {
+    private Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck) {
         Map<String, Object> result = new HashMap<>();
         
         if (sql == null || sql.trim().isEmpty()) {
@@ -59,11 +61,26 @@ public class SqlExecuteService {
         
         // 检查是否为危险操作（DROP、TRUNCATE等）
         String upperSql = sql.toUpperCase().trim();
-        if (upperSql.startsWith("DROP") || upperSql.startsWith("TRUNCATE") || 
-            upperSql.startsWith("DELETE FROM") || upperSql.startsWith("ALTER TABLE DROP")) {
-            result.put("success", false);
-            result.put("message", "禁止执行DROP、TRUNCATE、DELETE等危险操作");
-            return result;
+        
+        if (!skipSafetyCheck) {
+            // 检查明显的危险操作
+            if (upperSql.startsWith("DROP") || upperSql.startsWith("TRUNCATE") || 
+                upperSql.startsWith("DELETE FROM")) {
+                result.put("success", false);
+                result.put("message", "禁止执行DROP、TRUNCATE、DELETE等危险操作");
+                return result;
+            }
+            
+            // 检查ALTER TABLE中的DROP操作（如DROP COLUMN、DROP INDEX等）
+            if (upperSql.contains("ALTER TABLE")) {
+                // 检查是否包含DROP关键字（排除COMMENT等安全操作）
+                if (upperSql.contains(" DROP ") || upperSql.contains(" DROP,") || 
+                    upperSql.contains(",DROP ") || upperSql.endsWith(" DROP")) {
+                    result.put("success", false);
+                    result.put("message", "禁止执行ALTER TABLE中的DROP操作（如DROP COLUMN、DROP INDEX等）");
+                    return result;
+                }
+            }
         }
 
         try (Connection connection = dataSource.getConnection();
@@ -118,6 +135,37 @@ public class SqlExecuteService {
         }
         
         return result;
+    }
+
+    /**
+     * 执行SQL语句（对外接口，禁止危险操作）
+     * @param sql SQL语句
+     * @return 执行结果
+     */
+    @Transactional
+    public Map<String, Object> executeSql(String sql) {
+        return executeSqlInternal(sql, false);
+    }
+
+    /**
+     * 执行DROP TABLE语句（仅供内部服务调用）
+     * @param tableName 表名
+     * @return 执行结果
+     */
+    @Transactional
+    public Map<String, Object> executeDropTable(String tableName) {
+        if (tableName == null || tableName.trim().isEmpty()) {
+            Map<String, Object> result = new HashMap<>();
+            result.put("success", false);
+            result.put("message", "表名不能为空");
+            return result;
+        }
+        
+        // 转义表名，防止SQL注入
+        String safeTableName = tableName.trim().replace("`", "").replace("'", "").replace("\"", "");
+        String dropSql = "DROP TABLE IF EXISTS `" + safeTableName + "`";
+        
+        return executeSqlInternal(dropSql, true);
     }
 
     /**
@@ -186,13 +234,16 @@ public class SqlExecuteService {
      * 同步数据库表字段到元数据系统
      */
     private void syncTableFields(String tableName, Connection connection) throws Exception {
+        DatabaseMetaData metaData = connection.getMetaData();
+        String catalog = connection.getCatalog();
+        String schema = connection.getSchema();
+        
         // 查找对应的表编码（通过表名匹配，表名可能是表编码或实际表名）
-        MetadataTable table = tableMapper.selectByCode(tableName);
+        MetadataTable table = tableMapper.selectByCode(tableName.toUpperCase());
         if (table == null) {
             // 如果表编码不存在，尝试通过表名查找
             List<MetadataTable> tables = tableMapper.selectAll(null);
             for (MetadataTable t : tables) {
-                // 这里可以根据实际情况调整匹配逻辑
                 // 如果表名就是表编码，或者有其他映射关系
                 if (tableName.equalsIgnoreCase(t.getTableCode()) || 
                     tableName.equalsIgnoreCase(t.getTableName())) {
@@ -202,26 +253,103 @@ public class SqlExecuteService {
             }
         }
         
+        String tableCode;
+        boolean tableCreated = false;
+        
         if (table == null) {
-            // 如果找不到对应的表编码，无法同步字段
-            return;
+            // 如果找不到对应的表记录，自动创建表记录
+            // 使用表名的大写形式作为表编码
+            tableCode = tableName.toUpperCase();
+            
+            // 检查表编码是否已存在（防止重复）
+            if (tableMapper.countByCode(tableCode) > 0) {
+                // 如果已存在，直接使用
+                table = tableMapper.selectByCode(tableCode);
+            } else {
+                // 从数据库获取表的注释信息和主键策略
+                String tableComment = "";
+                String pkStrategy = "NONE";
+                
+                // 通过查询 information_schema 获取表注释（MySQL）
+                // 使用PreparedStatement防止SQL注入，表名使用反引号包裹
+                try (java.sql.PreparedStatement pstmt = connection.prepareStatement(
+                         "SELECT TABLE_COMMENT FROM information_schema.TABLES " +
+                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?")) {
+                    pstmt.setString(1, tableName);
+                    try (ResultSet rs = pstmt.executeQuery()) {
+                        if (rs.next()) {
+                            tableComment = rs.getString("TABLE_COMMENT");
+                            if (tableComment == null) {
+                                tableComment = "";
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 如果查询失败，使用表名作为默认值
+                    tableComment = "";
+                }
+                
+                // 检查是否有自增主键
+                try (ResultSet primaryKeys = metaData.getPrimaryKeys(catalog, schema, tableName)) {
+                    if (primaryKeys.next()) {
+                        String pkColumnName = primaryKeys.getString("COLUMN_NAME");
+                        // 检查该主键列是否是自增的
+                        try (ResultSet columns = metaData.getColumns(catalog, schema, tableName, pkColumnName)) {
+                            if (columns.next()) {
+                                String isAutoIncrement = columns.getString("IS_AUTOINCREMENT");
+                                if ("YES".equalsIgnoreCase(isAutoIncrement)) {
+                                    pkStrategy = "AUTO";
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // 创建表记录
+                table = new MetadataTable();
+                table.setTableCode(tableCode);
+                // 如果表注释为空，使用表名作为表名称
+                table.setTableName(tableComment != null && !tableComment.isEmpty() ? tableComment : tableName);
+                table.setPkStrategy(pkStrategy);
+                table.setDescription(tableComment);
+                tableMapper.insert(table);
+                tableCreated = true;
+                
+                logService.logSuccess("admin", "SYNC_TABLE", "自动创建表记录: " + tableCode);
+            }
+        } else {
+            tableCode = table.getTableCode();
         }
 
-        String tableCode = table.getTableCode();
-        
-        // 检查是否已有字段，如果有则跳过（避免重复同步）
+        // 检查是否已有字段，如果有且不是新创建的表，则跳过（避免重复同步）
         List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode);
-        if (!existingFields.isEmpty()) {
+        if (!existingFields.isEmpty() && !tableCreated) {
             // 已有字段，可以选择更新或跳过
             // 这里选择跳过，避免覆盖用户手动配置的字段
             return;
         }
-
-        // 使用 DatabaseMetaData 获取表结构
-        DatabaseMetaData metaData = connection.getMetaData();
-        String catalog = connection.getCatalog();
-        String schema = connection.getSchema();
         
+        // 先获取主键信息，判断是否有自增主键
+        String autoIncrementPkColumn = null;
+        try (ResultSet primaryKeys = metaData.getPrimaryKeys(catalog, schema, tableName)) {
+            if (primaryKeys.next()) {
+                String pkColumnName = primaryKeys.getString("COLUMN_NAME");
+                // 检查该主键列是否是自增的
+                try (ResultSet columns = metaData.getColumns(catalog, schema, tableName, pkColumnName)) {
+                    if (columns.next()) {
+                        String isAutoIncrement = columns.getString("IS_AUTOINCREMENT");
+                        if ("YES".equalsIgnoreCase(isAutoIncrement)) {
+                            autoIncrementPkColumn = pkColumnName;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 获取主键信息失败，不影响字段同步，只记录日志
+            logService.logError("admin", "GET_PRIMARY_KEY", "获取主键信息失败: " + tableName, e.getMessage());
+        }
+        
+        // 使用 DatabaseMetaData 获取表结构
         try (ResultSet columns = metaData.getColumns(catalog, schema, tableName, null)) {
             int sort = 0;
             while (columns.next()) {
@@ -230,6 +358,7 @@ public class SqlExecuteService {
                 int columnSize = columns.getInt("COLUMN_SIZE");
                 int nullable = columns.getInt("NULLABLE");
                 String remarks = columns.getString("REMARKS");
+                String isAutoIncrement = columns.getString("IS_AUTOINCREMENT");
                 
                 // 构建字段类型字符串
                 String fieldType = columnType;
@@ -253,8 +382,22 @@ public class SqlExecuteService {
                 field.setFieldName(columnName);
                 field.setFieldType(fieldType);
                 field.setLabel(remarks != null && !remarks.isEmpty() ? remarks : columnName);
-                field.setIsRequired(nullable == DatabaseMetaData.columnNoNulls ? 1 : 0);
-                field.setFormComponent(getDefaultFormComponent(fieldType));
+                
+                // 判断是否是自增主键
+                boolean isAutoIncrementPk = (autoIncrementPkColumn != null && 
+                    autoIncrementPkColumn.equalsIgnoreCase(columnName)) ||
+                    "YES".equalsIgnoreCase(isAutoIncrement);
+                
+                if (isAutoIncrementPk) {
+                    // 自增主键：不需要表单组件，对用户来说不是必填
+                    field.setFormComponent(""); // 自增字段不需要表单组件
+                    field.setIsRequired(0); // 对用户来说不需要填写
+                } else {
+                    // 普通字段：根据字段类型设置表单组件和必填状态
+                    field.setIsRequired(nullable == DatabaseMetaData.columnNoNulls ? 1 : 0);
+                    field.setFormComponent(getDefaultFormComponent(fieldType));
+                }
+                
                 field.setSort(sort++);
                 
                 // 插入字段
