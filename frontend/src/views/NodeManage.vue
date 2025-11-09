@@ -21,7 +21,11 @@
       <el-table :data="nodeData" border style="width: 100%" v-loading="loading">
         <el-table-column prop="nodeCode" label="节点编码" width="150" />
         <el-table-column prop="nodeName" label="节点名称" />
-        <el-table-column prop="nodeType" label="节点类型" width="150" />
+        <el-table-column prop="nodeType" label="节点类型" width="150">
+          <template #default="{ row }">
+            {{ getNodeTypeName(row.nodeType) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="relatedTableCode" label="关联表" width="150" />
         <el-table-column prop="sort" label="排序" width="80" />
         <el-table-column prop="isEnabled" label="状态" width="100">
@@ -277,6 +281,20 @@ export default {
       formRef.value?.resetFields()
     }
 
+    // 节点类型英文到中文的映射
+    const getNodeTypeName = (nodeType) => {
+      const nodeTypeMap = {
+        'LIST_PAGE': '列表页',
+        'FORM_PAGE': '表单页',
+        'DETAIL_PAGE': '详情页',
+        'PROCESS_PAGE': '流程流转页',
+        'REPORT_PAGE': '报表展示页',
+        'BATCH_IMPORT_PAGE': '批量导入页',
+        'BATCH_EXPORT_PAGE': '批量导出页'
+      }
+      return nodeTypeMap[nodeType] || nodeType
+    }
+
     onMounted(() => {
       loadModules()
     })
@@ -300,7 +318,8 @@ export default {
       handleEdit,
       handleSubmit,
       handleDelete,
-      handleDialogClose
+      handleDialogClose,
+      getNodeTypeName
     }
   }
 }

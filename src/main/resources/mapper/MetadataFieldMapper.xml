@@ -64,5 +64,16 @@
         WHERE table_code = #{tableCode} AND field_code = #{fieldCode}
     </select>
 
+    <select id="countByTableCode" resultType="Long">
+        SELECT COUNT(*) FROM metadata_field WHERE table_code = #{tableCode}
+    </select>
+
+    <select id="selectPageByTableCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_field 
+        WHERE table_code = #{tableCode}
+        ORDER BY sort ASC, create_time ASC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
 </mapper>
 

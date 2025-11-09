@@ -40,6 +40,13 @@
         DELETE FROM ${tableName} WHERE id = <#noparse>#{id}</#noparse>
     </delete>
 
+    <delete id="deleteByIds">
+        DELETE FROM ${tableName} WHERE id IN
+        <foreach collection="list" item="id" open="(" separator="," close=")">
+            <#noparse>#{id}</#noparse>
+        </foreach>
+    </delete>
+
     <select id="selectById" resultMap="BaseResultMap">
         SELECT * FROM ${tableName} WHERE id = <#noparse>#{id}</#noparse>
     </select>
@@ -52,9 +59,60 @@
         SELECT COUNT(*) FROM ${tableName}
     </select>
 
+    <!-- 通用WHERE条件片段 -->
+    <sql id="whereCondition">
+        <where>
+            <#list fields as field>
+                <#if field.field.fieldName != "id">
+                    <if test="conditions != null and conditions['${field.camelCaseName}'] != null and conditions['${field.camelCaseName}'] != ''">
+                        <#if field.field.fieldType?contains("varchar") || field.field.fieldType?contains("text")>
+                        AND ${field.field.fieldName} LIKE CONCAT('%', <#noparse>#{conditions['</#noparse>${field.camelCaseName}<#noparse>']}</#noparse>, '%')
+                        <#else>
+                        AND ${field.field.fieldName} = <#noparse>#{conditions['</#noparse>${field.camelCaseName}<#noparse>']}</#noparse>
+                        </#if>
+                    </if>
+                </#if>
+            </#list>
+        </where>
+    </sql>
+
+    <!-- 条件查询总数 -->
+    <select id="countByCondition" resultType="Long">
+        SELECT COUNT(*) FROM ${tableName}
+        <include refid="whereCondition"/>
+    </select>
+
+    <!-- 分页查询（支持条件查询和排序） -->
     <select id="selectPage" resultMap="BaseResultMap">
-        SELECT * FROM ${tableName} ORDER BY id DESC
+        SELECT * FROM ${tableName}
+        <include refid="whereCondition"/>
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY <#noparse>${orderBy}</#noparse> 
+                <choose>
+                    <when test="orderDirection != null and orderDirection == 'ASC'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>ORDER BY id DESC</otherwise>
+        </choose>
         LIMIT <#noparse>#{offset}, #{size}</#noparse>
+    </select>
+
+    <!-- 条件查询（不分页，支持排序） -->
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT * FROM ${tableName}
+        <include refid="whereCondition"/>
+        <choose>
+            <when test="orderBy != null and orderBy != ''">
+                ORDER BY <#noparse>${orderBy}</#noparse> 
+                <choose>
+                    <when test="orderDirection != null and orderDirection == 'ASC'">ASC</when>
+                    <otherwise>DESC</otherwise>
+                </choose>
+            </when>
+            <otherwise>ORDER BY id DESC</otherwise>
+        </choose>
     </select>
 
 </mapper>

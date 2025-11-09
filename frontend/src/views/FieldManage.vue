@@ -39,6 +39,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total || 0"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框 -->
@@ -106,6 +118,11 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增字段')
     const formRef = ref(null)
+    const pagination = reactive({
+      current: 1,
+      size: 10,
+      total: 0
+    })
     const form = reactive({
       id: null,
       fieldCode: '',
@@ -140,19 +157,45 @@ export default {
     const loadFields = async () => {
       if (!selectedTableCode.value) {
         fieldData.value = []
+        pagination.total = 0
         return
       }
       loading.value = true
       try {
-        const res = await getFieldList(selectedTableCode.value)
+        const params = {
+          current: pagination.current,
+          size: pagination.size
+        }
+        const res = await getFieldList(selectedTableCode.value, params)
         if (res.code === 200) {
-          fieldData.value = res.data
+          if (res.data && res.data.records) {
+            // 分页数据
+            fieldData.value = res.data.records
+            pagination.total = Number(res.data.total) || 0
+          } else {
+            // 兼容旧接口（非分页数据）
+            fieldData.value = res.data || []
+            pagination.total = Number(res.data?.length) || 0
+          }
         }
       } catch (error) {
         ElMessage.error('加载字段列表失败')
+        fieldData.value = []
+        pagination.total = 0
       } finally {
         loading.value = false
       }
+    }
+
+    const handleSizeChange = (val) => {
+      pagination.size = val
+      pagination.current = 1
+      loadFields()
+    }
+
+    const handleCurrentChange = (val) => {
+      pagination.current = val
+      loadFields()
     }
 
     const handleAdd = () => {
@@ -240,9 +283,12 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
+      pagination,
       form,
       rules,
       loadFields,
+      handleSizeChange,
+      handleCurrentChange,
       handleAdd,
       handleEdit,
       handleSubmit,

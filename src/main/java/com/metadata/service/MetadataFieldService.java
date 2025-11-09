@@ -1,6 +1,8 @@
 package com.metadata.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataField;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.util.CodeValidator;
@@ -71,6 +73,15 @@ public class MetadataFieldService {
      */
     public List<MetadataField> listByTableCode(String tableCode) {
         return fieldMapper.selectByTableCode(tableCode);
+    }
+
+    /**
+     * 分页查询表的字段
+     */
+    public PageResult<MetadataField> pageByTableCode(String tableCode, PageRequest pageRequest) {
+        Long total = fieldMapper.countByTableCode(tableCode);
+        List<MetadataField> records = fieldMapper.selectPageByTableCode(tableCode, pageRequest);
+        return new PageResult<>(total, records);
     }
 }
 

@@ -85,6 +85,10 @@ public class MetadataModuleService {
         }
         // 更新模块
         module.setModuleCode(existing.getModuleCode()); // 编码不可修改
+        // 如果 status 为 null，使用现有记录的 status
+        if (module.getStatus() == null) {
+            module.setStatus(existing.getStatus());
+        }
         moduleMapper.update(module);
         // 更新关联表
         moduleTableMapper.deleteByModuleCode(existing.getModuleCode());
@@ -157,82 +161,121 @@ public class MetadataModuleService {
      * 根据模块类型自动创建默认功能节点
      */
     private void createDefaultFunctionNodes(MetadataModule module, List<String> tableCodes) {
-        if (tableCodes == null || tableCodes.isEmpty()) {
-            return;
-        }
-
-        // 获取模块类型配置
-        MetadataModuleType moduleType = moduleTypeService.getByCode(module.getModuleType());
-        if (moduleType == null || moduleType.getDefaultNodes() == null || moduleType.getDefaultNodes().trim().isEmpty()) {
-            return;
-        }
-
-        // 解析默认节点类型
-        String[] nodeTypes = moduleType.getDefaultNodes().split(",");
-        
-        // 节点类型到中文名称的映射
-        Map<String, String> nodeTypeNameMap = new HashMap<>();
-        nodeTypeNameMap.put("LIST_PAGE", "列表页");
-        nodeTypeNameMap.put("FORM_PAGE", "表单页");
-        nodeTypeNameMap.put("DETAIL_PAGE", "详情页");
-        nodeTypeNameMap.put("PROCESS_PAGE", "流程流转页");
-        nodeTypeNameMap.put("REPORT_PAGE", "报表展示页");
-        nodeTypeNameMap.put("BATCH_IMPORT_PAGE", "批量导入页");
-        nodeTypeNameMap.put("BATCH_EXPORT_PAGE", "批量导出页");
-
-        // 获取表信息（用于生成节点名称）
-        String moduleNamePrefix = module.getModuleName();
-        if (moduleNamePrefix.endsWith("模块")) {
-            moduleNamePrefix = moduleNamePrefix.substring(0, moduleNamePrefix.length() - 2);
-        }
-
-        // 为每个关联的表创建功能节点
-        for (String tableCode : tableCodes) {
-            if (!CodeValidator.isValidCode(tableCode)) {
-                continue;
+        try {
+            // 记录开始创建节点的日志
+            logService.logSuccess("admin", "ADD", "开始创建功能节点，模块：" + module.getModuleCode() + "，关联表数量：" + (tableCodes == null ? 0 : tableCodes.size()));
+            
+            if (tableCodes == null || tableCodes.isEmpty()) {
+                logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "关联表列表为空");
+                return;
             }
 
-            // 获取表信息
-            com.metadata.entity.MetadataTable table = tableService.getByCode(tableCode);
-            String tableName = table != null ? table.getTableName() : tableCode;
-            // 简化表名（去掉"表"字）
-            if (tableName.endsWith("表")) {
-                tableName = tableName.substring(0, tableName.length() - 1);
+            // 获取模块类型配置
+            String moduleTypeCode = module.getModuleType();
+            if (moduleTypeCode == null || moduleTypeCode.trim().isEmpty()) {
+                logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "模块类型为空");
+                return;
+            }
+            
+            MetadataModuleType moduleType = moduleTypeService.getByCode(moduleTypeCode);
+            if (moduleType == null) {
+                logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "模块类型不存在：" + moduleTypeCode);
+                return;
+            }
+            
+            String defaultNodes = moduleType.getDefaultNodes();
+            if (defaultNodes == null || defaultNodes.trim().isEmpty()) {
+                logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "模块类型未配置默认节点：" + moduleTypeCode);
+                return;
             }
 
-            // 为每个节点类型创建节点
-            int sort = 0;
-            for (String nodeType : nodeTypes) {
-                nodeType = nodeType.trim();
-                if (nodeType.isEmpty()) {
+            // 解析默认节点类型
+            String[] nodeTypes = defaultNodes.split(",");
+            logService.logSuccess("admin", "ADD", "解析节点类型，模块：" + module.getModuleCode() + "，节点类型数量：" + nodeTypes.length);
+            
+            // 节点类型到中文名称的映射
+            Map<String, String> nodeTypeNameMap = new HashMap<>();
+            nodeTypeNameMap.put("LIST_PAGE", "列表页");
+            nodeTypeNameMap.put("FORM_PAGE", "表单页");
+            nodeTypeNameMap.put("DETAIL_PAGE", "详情页");
+            nodeTypeNameMap.put("PROCESS_PAGE", "流程流转页");
+            nodeTypeNameMap.put("REPORT_PAGE", "报表展示页");
+            nodeTypeNameMap.put("BATCH_IMPORT_PAGE", "批量导入页");
+            nodeTypeNameMap.put("BATCH_EXPORT_PAGE", "批量导出页");
+
+            // 获取表信息（用于生成节点名称）
+            String moduleNamePrefix = module.getModuleName();
+            if (moduleNamePrefix.endsWith("模块")) {
+                moduleNamePrefix = moduleNamePrefix.substring(0, moduleNamePrefix.length() - 2);
+            }
+
+            // 为每个关联的表创建功能节点
+            int totalCreated = 0;
+            for (String tableCode : tableCodes) {
+                if (!CodeValidator.isValidCode(tableCode)) {
+                    logService.logError("admin", "ADD", "跳过无效表编码：" + tableCode, "编码格式不正确");
                     continue;
                 }
 
-                // 生成节点编码：{MODULE_CODE}_{TABLE_CODE}_{NODE_TYPE}
-                String nodeCode = module.getModuleCode() + "_" + tableCode + "_" + nodeType;
-                
-                // 检查节点是否已存在
-                MetadataFunctionNode existing = functionNodeMapper.selectByCode(module.getModuleCode(), nodeCode);
-                if (existing != null) {
-                    continue; // 已存在则跳过
+                // 获取表信息
+                com.metadata.entity.MetadataTable table = tableService.getByCode(tableCode);
+                String tableName = table != null ? table.getTableName() : tableCode;
+                // 简化表名（去掉"表"字）
+                if (tableName.endsWith("表")) {
+                    tableName = tableName.substring(0, tableName.length() - 1);
                 }
 
-                // 生成节点名称
-                String nodeTypeName = nodeTypeNameMap.getOrDefault(nodeType, nodeType);
-                String nodeName = tableName + nodeTypeName;
+                // 为每个节点类型创建节点
+                int sort = 0;
+                for (String nodeType : nodeTypes) {
+                    nodeType = nodeType.trim();
+                    if (nodeType.isEmpty()) {
+                        continue;
+                    }
 
-                // 创建功能节点
-                MetadataFunctionNode node = new MetadataFunctionNode();
-                node.setNodeCode(nodeCode);
-                node.setNodeName(nodeName);
-                node.setModuleCode(module.getModuleCode());
-                node.setNodeType(nodeType);
-                node.setRelatedTableCode(tableCode);
-                node.setSort(sort++);
-                node.setIsEnabled(1);
+                    try {
+                        // 生成节点编码：{MODULE_CODE}_{TABLE_CODE}_{NODE_TYPE}
+                        String nodeCode = module.getModuleCode() + "_" + tableCode + "_" + nodeType;
+                        
+                        // 检查节点是否已存在
+                        MetadataFunctionNode existing = functionNodeMapper.selectByCode(module.getModuleCode(), nodeCode);
+                        if (existing != null) {
+                            continue; // 已存在则跳过
+                        }
 
-                functionNodeMapper.insert(node);
+                        // 生成节点名称
+                        String nodeTypeName = nodeTypeNameMap.getOrDefault(nodeType, nodeType);
+                        String nodeName = tableName + nodeTypeName;
+
+                        // 创建功能节点
+                        MetadataFunctionNode node = new MetadataFunctionNode();
+                        node.setNodeCode(nodeCode);
+                        node.setNodeName(nodeName);
+                        node.setModuleCode(module.getModuleCode());
+                        node.setNodeType(nodeType);
+                        node.setRelatedTableCode(tableCode);
+                        node.setSort(sort++);
+                        node.setIsEnabled(1);
+
+                        int result = functionNodeMapper.insert(node);
+                        if (result > 0) {
+                            totalCreated++;
+                            logService.logSuccess("admin", "ADD", "成功创建功能节点：" + nodeCode + "，节点名称：" + nodeName);
+                        } else {
+                            logService.logError("admin", "ADD", "创建功能节点失败：" + nodeCode, "插入返回结果：" + result);
+                        }
+                    } catch (Exception e) {
+                        // 单个节点创建失败不影响其他节点
+                        logService.logError("admin", "ADD", "创建功能节点异常：" + module.getModuleCode() + "_" + tableCode + "_" + nodeType, e.getMessage());
+                    }
+                }
             }
+            
+            // 记录创建结果
+            logService.logSuccess("admin", "ADD", "功能节点创建完成，模块：" + module.getModuleCode() + "，成功创建：" + totalCreated + "个节点");
+        } catch (Exception e) {
+            // 节点创建失败不影响模块创建，只记录日志
+            logService.logError("admin", "ADD", "自动创建功能节点失败：" + module.getModuleCode(), e.getMessage() + "，异常类型：" + e.getClass().getName());
         }
     }
 }

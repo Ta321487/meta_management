@@ -28,6 +28,11 @@ public interface ${className}Mapper {
     int deleteById(Long id);
 
     /**
+     * 批量删除
+     */
+    int deleteByIds(List<Long> ids);
+
+    /**
      * 根据ID查询
      */
     ${className} selectById(Long id);
@@ -41,10 +46,20 @@ public interface ${className}Mapper {
      * 查询总数
      */
     Long count();
+    
+    /**
+     * 条件查询总数
+     */
+    Long countByCondition(PageRequest pageRequest);
 
     /**
-     * 分页查询
+     * 分页查询（支持条件查询和排序）
      */
     List<${className}> selectPage(PageRequest pageRequest);
+    
+    /**
+     * 条件查询（不分页，支持排序）
+     */
+    List<${className}> selectByCondition(PageRequest pageRequest);
 }
 

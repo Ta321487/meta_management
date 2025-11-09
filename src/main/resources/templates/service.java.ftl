@@ -40,6 +40,16 @@ public class ${className}Service {
     }
 
     /**
+     * 批量删除
+     */
+    public void batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        ${entityName}Mapper.deleteByIds(ids);
+    }
+
+    /**
      * 根据ID查询
      */
     public ${className} getById(Long id) {
@@ -54,12 +64,21 @@ public class ${className}Service {
     }
 
     /**
-     * 分页查询列表
+     * 分页查询列表（支持条件查询和排序）
      */
     public PageResult<${className}> page(PageRequest pageRequest) {
-        Long total = ${entityName}Mapper.count();
+        // 查询总数（带条件）
+        Long total = ${entityName}Mapper.countByCondition(pageRequest);
+        // 分页查询数据（带条件和排序）
         List<${className}> records = ${entityName}Mapper.selectPage(pageRequest);
         return new PageResult<>(total, records);
+    }
+    
+    /**
+     * 条件查询列表（不分页）
+     */
+    public List<${className}> listByCondition(PageRequest pageRequest) {
+        return ${entityName}Mapper.selectByCondition(pageRequest);
     }
 }
 

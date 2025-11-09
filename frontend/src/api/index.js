@@ -22,7 +22,7 @@ export const deleteTable = (data) => request.post('/table/delete', data)
 export const getTablesByModule = (moduleCode) => request.get(`/table/listByModule/${moduleCode}`)
 
 // 字段相关
-export const getFieldList = (tableCode) => request.get(`/field/list/${tableCode}`)
+export const getFieldList = (tableCode, params) => request.get(`/field/list/${tableCode}`, { params })
 export const addField = (data) => request.post('/field/add', data)
 export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (data) => request.post('/field/delete', data)

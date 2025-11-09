@@ -16,5 +16,7 @@ public interface MetadataFieldMapper {
     MetadataField selectByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode);
     List<MetadataField> selectByTableCode(String tableCode);
     int countByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode);
+    Long countByTableCode(String tableCode);
+    List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode, @Param("pageRequest") com.metadata.common.PageRequest pageRequest);
 }
 

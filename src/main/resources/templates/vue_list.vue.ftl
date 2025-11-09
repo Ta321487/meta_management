@@ -12,13 +12,61 @@
       <template #header>
         <div class="card-header">
           <span>${table.tableName}</span>
-          <el-button type="primary" @click="handleAdd">新增</el-button>
+          <div>
+            <el-button type="danger" :disabled="multipleSelection.length === 0" @click="handleBatchDelete" style="margin-right: 10px">
+              批量删除
+            </el-button>
+            <el-button type="primary" @click="handleAdd">新增</el-button>
+          </div>
         </div>
       </template>
 
-      <el-table :data="tableData" border style="width: 100%">
+      <!-- 搜索表单 -->
+      <el-form :model="searchForm" :inline="true" class="search-form">
 <#list fields as field>
-        <el-table-column prop="${field.camelCaseName}" label="${field.field.label}" />
+        <#if field.field.fieldName != "id" && (field.field.formComponent == "input" || field.field.formComponent == "select")>
+        <el-form-item label="${field.field.label}">
+          <#if field.field.formComponent == "select">
+          <el-select v-model="searchForm.${field.camelCaseName}" placeholder="请选择${field.field.label}" clearable style="width: 180px">
+            <#if (field.validationRules?? && field.validationRules.hasOptions!false)>
+              <#if field.validationRules.options?is_sequence>
+                <#list field.validationRules.options as option>
+                  <#if option?is_string>
+            <el-option label="${option}" value="${option}" />
+                  <#else>
+            <el-option label="${option.label!option.value}" value="${option.value!option}" />
+                  </#if>
+                </#list>
+              </#if>
+            </#if>
+          </el-select>
+          <#else>
+          <el-input v-model="searchForm.${field.camelCaseName}" placeholder="请输入${field.field.label}" clearable style="width: 180px" />
+          </#if>
+        </el-form-item>
+        </#if>
+</#list>
+        <el-form-item>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <el-button @click="handleReset">重置</el-button>
+        </el-form-item>
+      </el-form>
+
+      <el-table 
+        :data="tableData" 
+        border 
+        style="width: 100%"
+        v-loading="loading"
+        @selection-change="handleSelectionChange"
+      >
+        <el-table-column type="selection" width="55" />
+<#list fields as field>
+        <el-table-column 
+          prop="${field.camelCaseName}" 
+          label="${field.field.label}"
+          sortable="custom"
+          @sort-change="(sort) => handleSortChange('${field.camelCaseName}', sort)"
+        />
 </#list>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
@@ -105,10 +153,23 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增')
     const formRef = ref(null)
+    const multipleSelection = ref([])
+    const loading = ref(false)
     const pagination = reactive({
       current: 1,
       size: 10,
       total: 0
+    })
+    const searchForm = reactive({
+<#list fields as field>
+      <#if field.field.fieldName != "id" && (field.field.formComponent == "input" || field.field.formComponent == "select")>
+      ${field.camelCaseName}: '',
+      </#if>
+</#list>
+    })
+    const sortParams = reactive({
+      orderBy: '',
+      orderDirection: 'DESC'
     })
     const form = reactive({
 <#list fields as field>
@@ -136,18 +197,69 @@ export default {
     }
 
     const loadData = async () => {
+      loading.value = true
       try {
-        const res = await ${componentName}Api.page({
-          current: pagination.current,
-          size: pagination.size
+        // 构建查询条件
+        const conditions = {}
+        Object.keys(searchForm).forEach(key => {
+          if (searchForm[key] !== null && searchForm[key] !== '' && searchForm[key] !== undefined) {
+            conditions[key] = searchForm[key]
+          }
         })
+        
+        const params = {
+          current: pagination.current,
+          size: pagination.size,
+          conditions: Object.keys(conditions).length > 0 ? conditions : null
+        }
+        
+        // 添加排序参数
+        if (sortParams.orderBy) {
+          params.orderBy = sortParams.orderBy
+          params.orderDirection = sortParams.orderDirection
+        }
+        
+        const res = await ${componentName}Api.page(params)
         if (res.code === 200) {
           tableData.value = res.data.records || []
           pagination.total = res.data.total || 0
+        } else {
+          ElMessage.error(res.message || '加载数据失败')
         }
       } catch (error) {
-        ElMessage.error('加载数据失败')
+        ElMessage.error('加载数据失败：' + (error.message || '未知错误'))
+        tableData.value = []
+        pagination.total = 0
+      } finally {
+        loading.value = false
       }
+    }
+    
+    const handleSearch = () => {
+      pagination.current = 1
+      loadData()
+    }
+    
+    const handleReset = () => {
+      Object.keys(searchForm).forEach(key => {
+        searchForm[key] = ''
+      })
+      sortParams.orderBy = ''
+      sortParams.orderDirection = 'DESC'
+      pagination.current = 1
+      loadData()
+    }
+    
+    const handleSortChange = (prop, sort) => {
+      if (sort.order) {
+        sortParams.orderBy = prop
+        sortParams.orderDirection = sort.order === 'ascending' ? 'ASC' : 'DESC'
+      } else {
+        sortParams.orderBy = ''
+        sortParams.orderDirection = 'DESC'
+      }
+      pagination.current = 1
+      loadData()
     }
 
     const handleSizeChange = (val) => {
@@ -212,6 +324,32 @@ export default {
       })
     }
 
+    const handleSelectionChange = (selection) => {
+      multipleSelection.value = selection
+    }
+
+    const handleBatchDelete = () => {
+      if (multipleSelection.value.length === 0) {
+        ElMessage.warning('请选择要删除的记录')
+        return
+      }
+      ElMessageBox.confirm('确定要删除选中的 ' + multipleSelection.value.length + ' 条记录吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const ids = multipleSelection.value.map(item => item.id)
+          await ${componentName}Api.batchDelete({ ids })
+          ElMessage.success('批量删除成功')
+          multipleSelection.value = []
+          loadData()
+        } catch (error) {
+          ElMessage.error('批量删除失败')
+        }
+      })
+    }
+
     const handleDialogClose = () => {
       formRef.value?.resetFields()
     }
@@ -228,13 +366,21 @@ export default {
       form,
       rules,
       pagination,
+      multipleSelection,
+      loading,
+      searchForm,
       handleAdd,
       handleEdit,
       handleSubmit,
       handleDelete,
+      handleBatchDelete,
+      handleSelectionChange,
       handleDialogClose,
       handleSizeChange,
-      handleCurrentChange
+      handleCurrentChange,
+      handleSearch,
+      handleReset,
+      handleSortChange
     }
   }
 }
@@ -249,6 +395,13 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.search-form {
+  margin-bottom: 20px;
+  padding: 20px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
 }
 </style>
 
