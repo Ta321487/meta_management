@@ -1,5 +1,7 @@
 package com.metadata.controller;
 
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataModule;
 import com.metadata.service.MetadataModuleService;
@@ -86,9 +88,20 @@ public class MetadataModuleController {
      * 查询所有模块
      */
     @GetMapping("/list")
-    public Result<List<MetadataModule>> list(@RequestParam(required = false) String moduleName,
-                                              @RequestParam(required = false) String moduleType,
-                                              @RequestParam(required = false) Integer status) {
+    public Result<?> list(@RequestParam(required = false) String moduleName,
+                          @RequestParam(required = false) String moduleType,
+                          @RequestParam(required = false) Integer status,
+                          @RequestParam(required = false) Integer current,
+                          @RequestParam(required = false) Integer size) {
+        // 如果传入了分页参数，使用分页查询
+        if (current != null && size != null) {
+            PageRequest pageRequest = new PageRequest();
+            pageRequest.setCurrent(current);
+            pageRequest.setSize(size);
+            PageResult<MetadataModule> pageResult = moduleService.page(moduleName, moduleType, status, pageRequest);
+            return Result.success(pageResult);
+        }
+        // 否则使用非分页查询（兼容旧接口）
         List<MetadataModule> list = moduleService.list(moduleName, moduleType, status);
         return Result.success(list);
     }

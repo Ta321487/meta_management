@@ -34,9 +34,10 @@ public class CodeGeneratorService {
         // 使用当前类确保从类路径根目录开始查找，"/templates" 是相对于类路径根目录的路径
         ClassTemplateLoader templateLoader = new ClassTemplateLoader(CodeGeneratorService.class, "/templates");
         freemarkerConfig.setTemplateLoader(templateLoader);
+
+
         freemarkerConfig.setDefaultEncoding("UTF-8");
     }
-
     /**
      * 生成数据库建表SQL
      */

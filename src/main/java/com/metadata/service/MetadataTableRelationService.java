@@ -1,6 +1,8 @@
 package com.metadata.service;
 
 import com.alibaba.fastjson2.JSON;
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.mapper.MetadataTableMapper;
@@ -102,6 +104,15 @@ public class MetadataTableRelationService {
      */
     public List<MetadataTableRelation> listAll() {
         return relationMapper.selectAll();
+    }
+
+    /**
+     * 分页查询关联关系
+     */
+    public PageResult<MetadataTableRelation> page(PageRequest pageRequest) {
+        Long total = relationMapper.count();
+        List<MetadataTableRelation> records = relationMapper.selectPage(pageRequest);
+        return new PageResult<>(total, records);
     }
 }
 

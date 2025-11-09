@@ -1,5 +1,7 @@
 package com.metadata.service;
 
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataOperationLog;
 import com.metadata.mapper.MetadataOperationLogMapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +50,15 @@ public class OperationLogService {
      */
     public List<MetadataOperationLog> list(String operateType, String startTime, String endTime) {
         return logMapper.selectAll(null, operateType, startTime, endTime);
+    }
+
+    /**
+     * 分页查询操作日志列表
+     */
+    public PageResult<MetadataOperationLog> page(String operateType, String startTime, String endTime, PageRequest pageRequest) {
+        Long total = logMapper.count(null, operateType, startTime, endTime);
+        List<MetadataOperationLog> records = logMapper.selectPage(null, operateType, startTime, endTime, pageRequest);
+        return new PageResult<>(total, records);
     }
 }
 

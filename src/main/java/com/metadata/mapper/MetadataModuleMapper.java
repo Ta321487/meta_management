@@ -1,5 +1,6 @@
 package com.metadata.mapper;
 
+import com.metadata.common.PageRequest;
 import com.metadata.entity.MetadataModule;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -17,5 +18,12 @@ public interface MetadataModuleMapper {
                                     @Param("moduleType") String moduleType,
                                     @Param("status") Integer status);
     int countByCode(String moduleCode);
+    Long count(@Param("moduleName") String moduleName, 
+               @Param("moduleType") String moduleType,
+               @Param("status") Integer status);
+    List<MetadataModule> selectPage(@Param("moduleName") String moduleName, 
+                                    @Param("moduleType") String moduleType,
+                                    @Param("status") Integer status,
+                                    @Param("pageRequest") PageRequest pageRequest);
 }
 

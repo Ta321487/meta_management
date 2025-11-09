@@ -1,5 +1,7 @@
 package com.metadata.controller;
 
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataTable;
 import com.metadata.service.MetadataTableService;
@@ -72,7 +74,18 @@ public class MetadataTableController {
      * 查询所有表
      */
     @GetMapping("/list")
-    public Result<List<MetadataTable>> list(@RequestParam(required = false) String tableName) {
+    public Result<?> list(@RequestParam(required = false) String tableName,
+                         @RequestParam(required = false) Integer current,
+                         @RequestParam(required = false) Integer size) {
+        // 如果传入了分页参数，使用分页查询
+        if (current != null && size != null) {
+            PageRequest pageRequest = new PageRequest();
+            pageRequest.setCurrent(current);
+            pageRequest.setSize(size);
+            PageResult<MetadataTable> pageResult = tableService.page(tableName, pageRequest);
+            return Result.success(pageResult);
+        }
+        // 否则使用非分页查询（兼容旧接口）
         List<MetadataTable> list = tableService.list(tableName);
         return Result.success(list);
     }

@@ -27,6 +27,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框 -->
@@ -93,6 +105,11 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增')
     const formRef = ref(null)
+    const pagination = reactive({
+      current: 1,
+      size: 10,
+      total: 0
+    })
     const form = reactive({
 <#list fields as field>
       ${field.camelCaseName}: <#if field.field.fieldType?contains("int")>null<#elseif field.field.fieldType?contains("date")>null<#else>''</#if>,
@@ -120,13 +137,28 @@ export default {
 
     const loadData = async () => {
       try {
-        const res = await ${componentName}Api.list()
+        const res = await ${componentName}Api.page({
+          current: pagination.current,
+          size: pagination.size
+        })
         if (res.code === 200) {
-          tableData.value = res.data
+          tableData.value = res.data.records || []
+          pagination.total = res.data.total || 0
         }
       } catch (error) {
         ElMessage.error('加载数据失败')
       }
+    }
+
+    const handleSizeChange = (val) => {
+      pagination.size = val
+      pagination.current = 1
+      loadData()
+    }
+
+    const handleCurrentChange = (val) => {
+      pagination.current = val
+      loadData()
     }
 
     const handleAdd = () => {
@@ -195,11 +227,14 @@ export default {
       formRef,
       form,
       rules,
+      pagination,
       handleAdd,
       handleEdit,
       handleSubmit,
       handleDelete,
-      handleDialogClose
+      handleDialogClose,
+      handleSizeChange,
+      handleCurrentChange
     }
   }
 }

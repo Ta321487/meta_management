@@ -1,5 +1,7 @@
 package ${packageName}.service;
 
+import ${packageName}.common.PageRequest;
+import ${packageName}.common.PageResult;
 import ${packageName}.entity.${className};
 import ${packageName}.mapper.${className}Mapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -49,6 +51,15 @@ public class ${className}Service {
      */
     public List<${className}> list() {
         return ${entityName}Mapper.selectAll();
+    }
+
+    /**
+     * 分页查询列表
+     */
+    public PageResult<${className}> page(PageRequest pageRequest) {
+        Long total = ${entityName}Mapper.count();
+        List<${className}> records = ${entityName}Mapper.selectPage(pageRequest);
+        return new PageResult<>(total, records);
     }
 }
 

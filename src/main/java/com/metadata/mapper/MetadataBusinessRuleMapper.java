@@ -1,5 +1,6 @@
 package com.metadata.mapper;
 
+import com.metadata.common.PageRequest;
 import com.metadata.entity.MetadataBusinessRule;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -14,5 +15,8 @@ public interface MetadataBusinessRuleMapper {
     int deleteByModuleCode(String moduleCode);
     MetadataBusinessRule selectByCode(@Param("moduleCode") String moduleCode, @Param("ruleCode") String ruleCode);
     List<MetadataBusinessRule> selectByModuleCode(String moduleCode);
+    Long countByModuleCode(String moduleCode);
+    List<MetadataBusinessRule> selectPageByModuleCode(@Param("moduleCode") String moduleCode, 
+                                                      @Param("pageRequest") PageRequest pageRequest);
 }
 

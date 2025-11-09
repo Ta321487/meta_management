@@ -1,5 +1,6 @@
 package com.metadata.mapper;
 
+import com.metadata.common.PageRequest;
 import com.metadata.entity.MetadataTableRelation;
 import java.util.List;
 
@@ -15,5 +16,7 @@ public interface MetadataTableRelationMapper {
     List<MetadataTableRelation> selectBySlaveTableCode(String slaveTableCode);
     List<MetadataTableRelation> selectAll();
     int countByCode(String relationCode);
+    Long count();
+    List<MetadataTableRelation> selectPage(@Param("pageRequest") PageRequest pageRequest);
 }
 

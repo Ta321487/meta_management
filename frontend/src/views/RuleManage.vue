@@ -34,6 +34,18 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <el-pagination
+          v-model:current-page="pagination.current"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total || 0"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
     </el-card>
 
     <!-- 新增/编辑对话框 -->
@@ -91,6 +103,11 @@ export default {
     const previewVisible = ref(false)
     const previewContent = ref('')
     const formRef = ref(null)
+    const pagination = reactive({
+      current: 1,
+      size: 10,
+      total: 0
+    })
     const form = reactive({
       id: null,
       ruleCode: '',
@@ -119,19 +136,45 @@ export default {
     const loadRules = async () => {
       if (!selectedModuleCode.value) {
         ruleData.value = []
+        pagination.total = 0
         return
       }
       loading.value = true
       try {
-        const res = await getRuleList(selectedModuleCode.value)
+        const params = {
+          current: pagination.current,
+          size: pagination.size
+        }
+        const res = await getRuleList(selectedModuleCode.value, params)
         if (res.code === 200) {
-          ruleData.value = res.data
+          if (res.data && res.data.records) {
+            // 分页数据
+            ruleData.value = res.data.records
+            pagination.total = Number(res.data.total) || 0
+          } else {
+            // 兼容旧接口（非分页数据）
+            ruleData.value = res.data || []
+            pagination.total = Number(res.data?.length) || 0
+          }
         }
       } catch (error) {
         ElMessage.error('加载规则列表失败')
+        ruleData.value = []
+        pagination.total = 0
       } finally {
         loading.value = false
       }
+    }
+
+    const handleSizeChange = (val) => {
+      pagination.size = val
+      pagination.current = 1
+      loadRules()
+    }
+
+    const handleCurrentChange = (val) => {
+      pagination.current = val
+      loadRules()
     }
 
     const handleAdd = () => {
@@ -230,9 +273,12 @@ export default {
       previewVisible,
       previewContent,
       formRef,
+      pagination,
       form,
       rules,
       loadRules,
+      handleSizeChange,
+      handleCurrentChange,
       handleAdd,
       handleEdit,
       handlePreview,

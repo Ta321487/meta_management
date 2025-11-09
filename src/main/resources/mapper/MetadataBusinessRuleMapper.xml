@@ -45,5 +45,16 @@
         ORDER BY create_time DESC
     </select>
 
+    <select id="countByModuleCode" resultType="Long">
+        SELECT COUNT(*) FROM metadata_business_rule WHERE module_code = #{moduleCode}
+    </select>
+
+    <select id="selectPageByModuleCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_rule 
+        WHERE module_code = #{moduleCode}
+        ORDER BY create_time DESC
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
 </mapper>
 

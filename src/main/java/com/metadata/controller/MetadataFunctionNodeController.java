@@ -1,5 +1,7 @@
 package com.metadata.controller;
 
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.service.MetadataFunctionNodeService;
@@ -51,7 +53,18 @@ public class MetadataFunctionNodeController {
     }
 
     @GetMapping("/list/{moduleCode}")
-    public Result<List<MetadataFunctionNode>> listByModuleCode(@PathVariable String moduleCode) {
+    public Result<?> listByModuleCode(@PathVariable String moduleCode,
+                                      @RequestParam(required = false) Integer current,
+                                      @RequestParam(required = false) Integer size) {
+        // 如果传入了分页参数，使用分页查询
+        if (current != null && size != null) {
+            PageRequest pageRequest = new PageRequest();
+            pageRequest.setCurrent(current);
+            pageRequest.setSize(size);
+            PageResult<MetadataFunctionNode> pageResult = nodeService.pageByModuleCode(moduleCode, pageRequest);
+            return Result.success(pageResult);
+        }
+        // 否则使用非分页查询（兼容旧接口）
         List<MetadataFunctionNode> list = nodeService.listByModuleCode(moduleCode);
         return Result.success(list);
     }
