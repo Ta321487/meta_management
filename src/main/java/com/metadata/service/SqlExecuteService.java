@@ -2,14 +2,17 @@ package com.metadata.service;
 
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
+import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataTableMapper;
+import com.metadata.mapper.MetadataTableRelationMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.sql.DataSource;
+import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.ResultSet;
@@ -38,6 +41,9 @@ public class SqlExecuteService {
 
     @Autowired
     private MetadataFieldMapper fieldMapper;
+
+    @Autowired
+    private MetadataTableRelationMapper relationMapper;
 
     /**
      * 执行SQL语句（内部方法，允许执行DROP TABLE等危险操作）
@@ -115,6 +121,8 @@ public class SqlExecuteService {
                         String tableName = extractTableName(sql);
                         if (tableName != null) {
                             syncTableFields(tableName, connection);
+                            // 同步外键关联关系
+                            syncTableForeignKeys(tableName, connection);
                         }
                     } catch (Exception e) {
                         // 同步失败不影响 SQL 执行结果，只记录日志
@@ -421,6 +429,282 @@ public class SqlExecuteService {
             return "textarea";
         } else {
             return "input";
+        }
+    }
+
+    /**
+     * 同步数据库表外键到元数据关联关系系统（公共方法，供外部调用）
+     * @param tableCode 表编码，如果为null则同步所有表
+     * @return 同步结果
+     */
+    @Transactional
+    public Map<String, Object> syncForeignKeys(String tableCode) {
+        Map<String, Object> result = new HashMap<>();
+        int successCount = 0;
+        int failCount = 0;
+        int totalCreated = 0; // 总共创建的关联关系记录数
+        List<String> messages = new ArrayList<>();
+        
+        try (Connection connection = dataSource.getConnection()) {
+            if (tableCode != null && !tableCode.trim().isEmpty()) {
+                // 同步指定表
+                // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写
+                String tableName1 = convertToTableName(tableCode);
+                String tableName2 = tableCode.toLowerCase();
+                
+                try {
+                    // 先尝试去掉_TABLE的格式
+                    int created = syncTableForeignKeys(tableName1, connection);
+                    successCount = 1;
+                    totalCreated += created;
+                    messages.add("表 " + tableCode + " 的外键同步成功，创建 " + created + " 条关联关系");
+                } catch (Exception e1) {
+                    // 如果失败，尝试直接转小写的格式
+                    try {
+                        int created = syncTableForeignKeys(tableName2, connection);
+                        successCount = 1;
+                        totalCreated += created;
+                        messages.add("表 " + tableCode + " 的外键同步成功，创建 " + created + " 条关联关系");
+                    } catch (Exception e2) {
+                        // 两种格式都失败
+                        failCount = 1;
+                        messages.add("表 " + tableCode + " 的外键同步失败: " + e2.getMessage());
+                        logService.logError("admin", "SYNC_FOREIGN_KEY", "同步外键失败: " + tableCode, e2.getMessage());
+                    }
+                }
+            } else {
+                // 同步所有表
+                List<MetadataTable> tables = tableMapper.selectAll(null);
+                for (MetadataTable table : tables) {
+                    try {
+                        // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写
+                        String tableName1 = convertToTableName(table.getTableCode());
+                        String tableName2 = table.getTableCode().toLowerCase();
+                        
+                        // 先尝试去掉_TABLE的格式
+                        try {
+                            int created = syncTableForeignKeys(tableName1, connection);
+                            successCount++;
+                            totalCreated += created;
+                        } catch (Exception e1) {
+                            // 如果失败，尝试直接转小写的格式
+                            try {
+                                int created = syncTableForeignKeys(tableName2, connection);
+                                successCount++;
+                                totalCreated += created;
+                            } catch (Exception e2) {
+                                // 两种格式都失败
+                                failCount++;
+                                messages.add("表 " + table.getTableCode() + " 的外键同步失败: " + e2.getMessage());
+                                logService.logError("admin", "SYNC_FOREIGN_KEY", "同步外键失败: " + table.getTableCode(), e2.getMessage());
+                            }
+                        }
+                    } catch (Exception e) {
+                        failCount++;
+                        messages.add("表 " + table.getTableCode() + " 的外键同步失败: " + e.getMessage());
+                        logService.logError("admin", "SYNC_FOREIGN_KEY", "同步外键失败: " + table.getTableCode(), e.getMessage());
+                    }
+                }
+                if (successCount > 0) {
+                    messages.add(0, "成功同步 " + successCount + " 个表的外键，共创建 " + totalCreated + " 条关联关系");
+                }
+            }
+            
+            result.put("success", failCount == 0);
+            result.put("message", String.join("; ", messages));
+            result.put("successCount", successCount);
+            result.put("failCount", failCount);
+            result.put("totalCreated", totalCreated); // 返回创建的记录数
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "同步外键失败: " + e.getMessage());
+            result.put("successCount", successCount);
+            result.put("failCount", failCount);
+            result.put("totalCreated", totalCreated);
+            logService.logError("admin", "SYNC_FOREIGN_KEY", "同步外键失败", e.getMessage());
+        }
+        
+        return result;
+    }
+
+    /**
+     * 工具方法：转换为表名（下划线）
+     */
+    private String convertToTableName(String code) {
+        // 将 TABLE_CODE 转换为 table_code
+        return code.toLowerCase().replace("_TABLE", "");
+    }
+
+    /**
+     * 同步数据库表外键到元数据关联关系系统（内部方法）
+     * @return 创建的关联关系记录数
+     */
+    private int syncTableForeignKeys(String tableName, Connection connection) throws Exception {
+        DatabaseMetaData metaData = connection.getMetaData();
+        String catalog = connection.getCatalog();
+        String schema = connection.getSchema();
+        
+        // 查找对应的表编码
+        MetadataTable table = tableMapper.selectByCode(tableName.toUpperCase());
+        if (table == null) {
+            // 如果表编码不存在，尝试通过表名查找
+            List<MetadataTable> tables = tableMapper.selectAll(null);
+            for (MetadataTable t : tables) {
+                if (tableName.equalsIgnoreCase(t.getTableCode()) || 
+                    tableName.equalsIgnoreCase(t.getTableName())) {
+                    table = t;
+                    break;
+                }
+            }
+        }
+        
+        if (table == null) {
+            // 如果找不到表记录，无法同步外键
+            return 0;
+        }
+        
+        String slaveTableCode = table.getTableCode();
+        int createdCount = 0;
+        
+        // 获取该表的所有外键
+        try (ResultSet foreignKeys = metaData.getImportedKeys(catalog, schema, tableName)) {
+            while (foreignKeys.next()) {
+                String pkTableName = foreignKeys.getString("PKTABLE_NAME"); // 主表名
+                String pkColumnName = foreignKeys.getString("PKCOLUMN_NAME"); // 主表字段名
+                String fkColumnName = foreignKeys.getString("FKCOLUMN_NAME"); // 从表外键字段名
+                
+                // 查找主表编码
+                MetadataTable mainTable = tableMapper.selectByCode(pkTableName.toUpperCase());
+                if (mainTable == null) {
+                    // 尝试通过表名查找
+                    List<MetadataTable> tables = tableMapper.selectAll(null);
+                    for (MetadataTable t : tables) {
+                        if (pkTableName.equalsIgnoreCase(t.getTableCode()) || 
+                            pkTableName.equalsIgnoreCase(t.getTableName())) {
+                            mainTable = t;
+                            break;
+                        }
+                    }
+                }
+                
+                if (mainTable == null) {
+                    // 主表不存在，跳过
+                    continue;
+                }
+                
+                String mainTableCode = mainTable.getTableCode();
+                
+                // 查找主表字段编码
+                MetadataField mainField = fieldMapper.selectByCode(mainTableCode, pkColumnName.toUpperCase());
+                if (mainField == null) {
+                    // 尝试通过字段名查找
+                    List<MetadataField> fields = fieldMapper.selectByTableCode(mainTableCode);
+                    for (MetadataField f : fields) {
+                        if (pkColumnName.equalsIgnoreCase(f.getFieldName())) {
+                            mainField = f;
+                            break;
+                        }
+                    }
+                }
+                
+                if (mainField == null) {
+                    // 主表字段不存在，跳过
+                    continue;
+                }
+                
+                // 查找从表字段编码
+                MetadataField slaveField = fieldMapper.selectByCode(slaveTableCode, fkColumnName.toUpperCase());
+                if (slaveField == null) {
+                    // 尝试通过字段名查找
+                    List<MetadataField> fields = fieldMapper.selectByTableCode(slaveTableCode);
+                    for (MetadataField f : fields) {
+                        if (fkColumnName.equalsIgnoreCase(f.getFieldName())) {
+                            slaveField = f;
+                            break;
+                        }
+                    }
+                }
+                
+                if (slaveField == null) {
+                    // 从表字段不存在，跳过
+                    continue;
+                }
+                
+                // 生成关联编码（确保不超过50个字符）
+                String relationCode = generateRelationCode(mainTableCode, slaveTableCode, 
+                                                          mainField.getFieldCode(), slaveField.getFieldCode());
+                
+                // 检查关联关系是否已存在
+                if (relationMapper.countByCode(relationCode) > 0) {
+                    // 已存在，跳过
+                    continue;
+                }
+                
+                // 创建关联关系
+                MetadataTableRelation relation = new MetadataTableRelation();
+                relation.setRelationCode(relationCode);
+                relation.setMainTableCode(mainTableCode);
+                relation.setSlaveTableCode(slaveTableCode);
+                relation.setMainFieldCode(mainField.getFieldCode());
+                relation.setSlaveFieldCode(slaveField.getFieldCode());
+                relation.setRelationType("ONE_TO_MANY"); // 默认一对多
+                relation.setRelationName(mainTable.getTableName() + " -> " + table.getTableName());
+                
+                relationMapper.insert(relation);
+                createdCount++;
+                logService.logSuccess("admin", "SYNC_FOREIGN_KEY", "自动创建外键关联关系: " + relationCode);
+            }
+        } catch (Exception e) {
+            // 同步外键失败不影响其他操作，只记录日志
+            logService.logError("admin", "SYNC_FOREIGN_KEY", "同步外键关联关系失败: " + tableName, e.getMessage());
+            throw e; // 重新抛出异常，让调用者知道失败
+        }
+        
+        return createdCount;
+    }
+    
+    /**
+     * 生成关联编码（确保不超过50个字符）
+     * @param mainTableCode 主表编码
+     * @param slaveTableCode 从表编码
+     * @param mainFieldCode 主表字段编码
+     * @param slaveFieldCode 从表字段编码
+     * @return 关联编码（最长50个字符）
+     */
+    private String generateRelationCode(String mainTableCode, String slaveTableCode, 
+                                        String mainFieldCode, String slaveFieldCode) {
+        // 先尝试生成简洁的编码
+        String simpleCode = "REL_" + mainTableCode + "_" + slaveTableCode + "_" + 
+                           mainFieldCode + "_" + slaveFieldCode;
+        
+        // 如果不超过50个字符，直接返回
+        if (simpleCode.length() <= 50) {
+            return simpleCode;
+        }
+        
+        // 如果超过50个字符，使用哈希值生成短编码
+        try {
+            String fullCode = mainTableCode + "_" + slaveTableCode + "_" + 
+                             mainFieldCode + "_" + slaveFieldCode;
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] hashBytes = md.digest(fullCode.getBytes("UTF-8"));
+            
+            // 将哈希值转换为十六进制字符串，取前42个字符，加上"REL_"前缀
+            StringBuilder hexString = new StringBuilder();
+            for (byte b : hashBytes) {
+                String hex = Integer.toHexString(0xff & b);
+                if (hex.length() == 1) {
+                    hexString.append('0');
+                }
+                hexString.append(hex);
+            }
+            
+            // 取前42个字符，加上"REL_"前缀，总共46个字符
+            String hash = hexString.toString().substring(0, Math.min(42, hexString.length()));
+            return "REL_" + hash.toUpperCase();
+        } catch (Exception e) {
+            // 如果哈希生成失败，使用截断的方式（不推荐，但作为后备方案）
+            return simpleCode.substring(0, 50);
         }
     }
 }

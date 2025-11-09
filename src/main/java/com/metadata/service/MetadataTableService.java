@@ -41,6 +41,10 @@ public class MetadataTableService {
     @Autowired
     private SqlExecuteService sqlExecuteService;
 
+    @Autowired
+    @Lazy
+    private MetadataTableRelationService relationService;
+
     /**
      * 新增表
      */

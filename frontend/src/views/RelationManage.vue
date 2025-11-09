@@ -4,7 +4,10 @@
       <template #header>
         <div class="card-header">
           <span>表关联关系管理</span>
-          <el-button type="primary" @click="handleAdd">新增关联</el-button>
+          <div>
+            <el-button type="success" @click="handleSyncForeignKeys" style="margin-right: 10px;">同步外键</el-button>
+            <el-button type="primary" @click="handleAdd">新增关联</el-button>
+          </div>
         </div>
       </template>
 
@@ -101,6 +104,9 @@
             <el-option label="一对多" value="ONE_TO_MANY" />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="!form.id" label="创建外键约束">
+          <el-checkbox v-model="form.createForeignKey">同时创建数据库外键约束</el-checkbox>
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -113,7 +119,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, getFieldList, addRelation, updateRelation, deleteRelation, getAllRelations } from '../api'
+import { getTableList, getFieldList, addRelation, updateRelation, deleteRelation, getAllRelations, createForeignKey, syncForeignKeys } from '../api'
 
 export default {
   name: 'RelationManage',
@@ -138,7 +144,8 @@ export default {
       slaveTableCode: '',
       mainFieldCode: '',
       slaveFieldCode: '',
-      relationType: 'ONE_TO_MANY'
+      relationType: 'ONE_TO_MANY',
+      createForeignKey: false
     })
     const rules = {
       relationCode: [{ required: true, message: '请输入关联编码', trigger: 'blur' }],
@@ -237,7 +244,8 @@ export default {
         slaveTableCode: '',
         mainFieldCode: '',
         slaveFieldCode: '',
-        relationType: 'ONE_TO_MANY'
+        relationType: 'ONE_TO_MANY',
+        createForeignKey: false
       })
       dialogVisible.value = true
     }
@@ -267,16 +275,28 @@ export default {
               await updateRelation(form)
             } else {
               await addRelation(form)
+              // 如果选择了创建外键约束，则创建外键
+              if (form.createForeignKey) {
+                try {
+                  await createForeignKey(form)
+                  ElMessage.success('关联关系和外键约束创建成功')
+                } catch (error) {
+                  ElMessage.warning('关联关系创建成功，但外键约束创建失败: ' + (error.response?.data?.message || error.message))
+                }
+              }
             }
-            ElMessage.success('操作成功')
+            if (!form.createForeignKey || form.id) {
+              ElMessage.success('操作成功')
+            }
             dialogVisible.value = false
             loadRelations()
           } catch (error) {
-            ElMessage.error('操作失败')
+            ElMessage.error('操作失败: ' + (error.response?.data?.message || error.message))
           }
         }
       })
     }
+
 
     const handleDelete = (row) => {
       ElMessageBox.confirm('确定要删除该关联关系吗？', '提示', {
@@ -298,6 +318,27 @@ export default {
       formRef.value?.resetFields()
       mainTableFields.value = []
       slaveTableFields.value = []
+    }
+
+    const handleSyncForeignKeys = () => {
+      ElMessageBox.confirm('确定要从数据库同步外键到元数据系统吗？这将扫描所有表的外键约束并创建关联关系记录。', '同步外键', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }).then(async () => {
+        try {
+          const res = await syncForeignKeys(null)
+          if (res.code === 200) {
+            ElMessage.success(res.message || '同步外键成功')
+            loadRelations()
+          } else {
+            ElMessage.warning(res.message || '同步外键完成，但部分表可能失败')
+            loadRelations()
+          }
+        } catch (error) {
+          ElMessage.error('同步外键失败: ' + (error.response?.data?.message || error.message))
+        }
+      })
     }
 
     onMounted(() => {
@@ -324,7 +365,8 @@ export default {
       handleEdit,
       handleSubmit,
       handleDelete,
-      handleDialogClose
+      handleDialogClose,
+      handleSyncForeignKeys
     }
   }
 }

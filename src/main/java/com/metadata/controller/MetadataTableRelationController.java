@@ -79,5 +79,34 @@ public class MetadataTableRelationController {
         List<MetadataTableRelation> list = relationService.listAll();
         return Result.success(list);
     }
+
+    @PostMapping("/createForeignKey")
+    public Result<?> createForeignKey(@RequestBody MetadataTableRelation relation) {
+        try {
+            Map<String, Object> result = relationService.createForeignKey(relation);
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return Result.success(result.get("message"));
+            } else {
+                return Result.error(result.get("message").toString());
+            }
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PostMapping("/syncForeignKeys")
+    public Result<?> syncForeignKeys(@RequestBody(required = false) Map<String, String> params) {
+        try {
+            String tableCode = params != null ? params.get("tableCode") : null;
+            Map<String, Object> result = relationService.syncForeignKeys(tableCode);
+            if (Boolean.TRUE.equals(result.get("success"))) {
+                return Result.success(result.get("message"));
+            } else {
+                return Result.error(result.get("message").toString());
+            }
+        } catch (Exception e) {
+            return Result.error("同步外键失败: " + e.getMessage());
+        }
+    }
 }
 

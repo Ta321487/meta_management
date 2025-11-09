@@ -47,6 +47,8 @@ export const getAllRelations = (params) => request.get('/relation/list', { param
 export const addRelation = (data) => request.post('/relation/add', data)
 export const updateRelation = (data) => request.post('/relation/update', data)
 export const deleteRelation = (data) => request.post('/relation/delete', data)
+export const createForeignKey = (data) => request.post('/relation/createForeignKey', data)
+export const syncForeignKeys = (tableCode) => request.post('/relation/syncForeignKeys', tableCode ? { tableCode } : {})
 
 // 代码生成相关
 export const generateSQL = (tableCode) => request.get(`/codegen/sql/${tableCode}`)
