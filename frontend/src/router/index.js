@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
 import ModuleManage from '../views/ModuleManage.vue'
+import ModuleTypeManage from '../views/ModuleTypeManage.vue'
 import TableManage from '../views/TableManage.vue'
 import FieldManage from '../views/FieldManage.vue'
 import NodeManage from '../views/NodeManage.vue'
@@ -26,6 +27,11 @@ const routes = [
         path: '/module',
         name: 'ModuleManage',
         component: ModuleManage
+      },
+      {
+        path: '/module-type',
+        name: 'ModuleTypeManage',
+        component: ModuleTypeManage
       },
       {
         path: '/table',

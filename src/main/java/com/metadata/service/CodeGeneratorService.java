@@ -4,6 +4,8 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
+import com.metadata.entity.MetadataFunctionNode;
+import com.metadata.mapper.MetadataFunctionNodeMapper;
 import freemarker.cache.ClassTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -25,6 +27,9 @@ public class CodeGeneratorService {
 
     @Autowired
     private MetadataTableService tableService;
+
+    @Autowired
+    private MetadataFunctionNodeMapper nodeMapper;
 
     private Configuration freemarkerConfig;
 
@@ -331,6 +336,34 @@ public class CodeGeneratorService {
     }
 
     /**
+     * 生成前端路由配置（routes.js）
+     * 会优先查找功能节点中配置的 jumpRelation 与 nodeType，以生成更贴合的路由，否则使用默认路径约定
+     */
+    public String generateRoutes(String tableCode) throws Exception {
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new RuntimeException("表不存在: " + tableCode);
+        }
+
+        String componentName = convertToComponentName(table.getTableCode());
+        String componentDir = "generated/" + componentName.toLowerCase();
+
+        // 查询与该表相关的功能节点（若数据库中配置了 jumpRelation，则优先使用）
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("table", table);
+        data.put("componentName", componentName);
+        data.put("componentDir", componentDir);
+        data.put("nodes", nodes);
+
+        Template template = freemarkerConfig.getTemplate("routes.js.ftl");
+        StringWriter writer = new StringWriter();
+        template.process(data, writer);
+        return writer.toString();
+    }
+
+    /**
      * 生成完整的代码包（ZIP格式的JSON字符串，包含所有文件）
      */
     public Map<String, String> generateAll(String tableCode, String packageName) throws Exception {
@@ -349,6 +382,13 @@ public class CodeGeneratorService {
         // 生成Vue代码
         codeMap.put("List.vue", generateVueList(tableCode));
         codeMap.put("Form.vue", generateVueForm(tableCode));
+        // 生成路由配置（供客户集成到前端）
+        try {
+            codeMap.put("routes.js", generateRoutes(tableCode));
+        } catch (Exception e) {
+            // 不阻塞主流程，记录但仍返回其他文件
+            codeMap.put("routes.js", "// 生成路由失败: " + e.getMessage());
+        }
 
         return codeMap;
     }

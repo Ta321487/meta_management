@@ -46,6 +46,8 @@
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
+      close-on-click-modal="false"
+      close-on-press-escape="false"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"

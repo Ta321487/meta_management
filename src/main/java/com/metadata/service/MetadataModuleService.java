@@ -254,6 +254,19 @@ public class MetadataModuleService {
                         node.setModuleCode(module.getModuleCode());
                         node.setNodeType(nodeType);
                         node.setRelatedTableCode(tableCode);
+                        // 生成默认跳转关系，方便路由生成器和前端集成
+                        // 约定路径：/小写表名/list 以及 /小写表名/form/:id?
+                        String pathBase = tableCode == null ? "" : tableCode.toLowerCase().replace("_table", "");
+                        if (nodeType != null && nodeType.toUpperCase().contains("LIST")) {
+                            node.setJumpRelation("/" + pathBase + "/list");
+                        } else if (nodeType != null && nodeType.toUpperCase().contains("FORM")) {
+                            node.setJumpRelation("/" + pathBase + "/form/:id?");
+                        } else if (nodeType != null && nodeType.toUpperCase().contains("DETAIL")) {
+                            node.setJumpRelation("/" + pathBase + "/detail/:id?");
+                        } else {
+                            // 其它类型不默认设置跳转关系
+                            node.setJumpRelation("");
+                        }
                         node.setSort(sort++);
                         node.setIsEnabled(1);
 

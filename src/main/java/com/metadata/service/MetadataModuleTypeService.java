@@ -29,5 +29,26 @@ public class MetadataModuleTypeService {
     public MetadataModuleType getByCode(String typeCode) {
         return typeMapper.selectByCode(typeCode);
     }
+
+    /**
+     * 新增模块类型
+     */
+    public void add(MetadataModuleType type) {
+        typeMapper.insert(type);
+    }
+
+    /**
+     * 更新模块类型
+     */
+    public void update(MetadataModuleType type) {
+        typeMapper.update(type);
+    }
+
+    /**
+     * 删除模块类型
+     */
+    public void delete(Long id) {
+        typeMapper.deleteById(id);
+    }
 }
 

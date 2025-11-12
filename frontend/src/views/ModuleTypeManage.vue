@@ -1,0 +1,131 @@
+<template>
+  <div class="page-module-type">
+    <div class="card">
+      <div class="card-header">
+        <span>模块类型管理</span>
+        <el-button type="primary" @click="handleAdd">新增类型</el-button>
+      </div>
+      <div class="card-body">
+        <el-table :data="tableData" border style="width: 100%">
+          <el-table-column prop="typeCode" label="类型编码" width="180" />
+          <el-table-column prop="typeName" label="类型名称" />
+          <el-table-column prop="defaultNodes" label="默认节点" />
+          <el-table-column prop="description" label="描述" />
+          <el-table-column label="操作" width="220" fixed="right">
+            <template #default="{ row }">
+              <el-button size="mini" @click="handleEdit(row)">编辑</el-button>
+              <el-button size="mini" type="danger" @click="handleDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+    </div>
+
+  <el-dialog :title="dialogTitle" v-model="dialogVisible" close-on-click-modal="false" close-on-press-escape="false">
+      <el-form :model="form" ref="formRef" label-width="120px">
+        <el-form-item label="类型编码" prop="typeCode">
+          <el-input v-model="form.typeCode" :disabled="form.id"></el-input>
+        </el-form-item>
+        <el-form-item label="类型名称" prop="typeName">
+          <el-input v-model="form.typeName"></el-input>
+        </el-form-item>
+        <el-form-item label="默认节点" prop="defaultNodes">
+          <el-select v-model="form.defaultNodes" multiple placeholder="请选择默认节点" style="width: 100%">
+            <el-option label="列表页" value="LIST_PAGE" />
+            <el-option label="表单页" value="FORM_PAGE" />
+            <el-option label="详情页" value="DETAIL_PAGE" />
+            <el-option label="导入页" value="IMPORT_PAGE" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="描述" prop="description">
+          <el-input type="textarea" v-model="form.description" :rows="3"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmit">保存</el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script>
+import { ref, reactive, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { getModuleTypeList, addModuleType, updateModuleType, deleteModuleType } from '../api'
+
+export default {
+  name: 'ModuleTypeManage',
+  setup() {
+    const tableData = ref([])
+    const dialogVisible = ref(false)
+    const dialogTitle = ref('新增类型')
+    const formRef = ref(null)
+    const form = reactive({ id: null, typeCode: '', typeName: '', defaultNodes: '', description: '' })
+
+    const loadData = async () => {
+      try {
+        const res = await getModuleTypeList()
+        if (res.code === 200) {
+          tableData.value = res.data || []
+        }
+      } catch (e) {
+        ElMessage.error('加载失败')
+      }
+    }
+
+    const handleAdd = () => {
+      dialogTitle.value = '新增类型'
+      Object.assign(form, { id: null, typeCode: '', typeName: '', defaultNodes: '', description: '' })
+      dialogVisible.value = true
+    }
+
+    const handleEdit = (row) => {
+      dialogTitle.value = '编辑类型'
+      Object.assign(form, { id: row.id, typeCode: row.typeCode, typeName: row.typeName, defaultNodes: row.defaultNodes, description: row.description })
+      dialogVisible.value = true
+    }
+
+    const handleDelete = async (row) => {
+      try {
+        await deleteModuleType({ id: row.id })
+        ElMessage.success('删除成功')
+        loadData()
+      } catch (e) {
+        ElMessage.error('删除失败')
+      }
+    }
+
+    const handleSubmit = async () => {
+      try {
+        if (!form.typeCode || !form.typeName) {
+          ElMessage.warning('请填写编码和名称')
+          return
+        }
+        if (form.id) {
+          await updateModuleType(form)
+          ElMessage.success('更新成功')
+        } else {
+          await addModuleType(form)
+          ElMessage.success('添加成功')
+        }
+        dialogVisible.value = false
+        loadData()
+      } catch (e) {
+        ElMessage.error('保存失败')
+      }
+    }
+
+    onMounted(() => {
+      loadData()
+    })
+
+    return { tableData, dialogVisible, dialogTitle, form, formRef, handleAdd, handleEdit, handleDelete, handleSubmit }
+  }
+}
+</script>
+
+<style scoped>
+.card { background: #fff; padding: 12px; border-radius: 6px; }
+.card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px }
+</style>

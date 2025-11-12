@@ -9,6 +9,10 @@
         text-color="#bfcbd9"
         active-text-color="#409EFF"
       >
+        <el-menu-item index="/module-type">
+          <el-icon><Document /></el-icon>
+          <span>模块类型管理</span>
+        </el-menu-item>
         <el-menu-item index="/module">
           <el-icon><Setting /></el-icon>
           <span>模块管理</span>
@@ -25,13 +29,13 @@
           <el-icon><Menu /></el-icon>
           <span>功能节点</span>
         </el-menu-item>
-        <el-menu-item index="/rule">
-          <el-icon><List /></el-icon>
-          <span>业务规则</span>
-        </el-menu-item>
         <el-menu-item index="/relation">
           <el-icon><Connection /></el-icon>
           <span>表关联</span>
+        </el-menu-item>
+        <el-menu-item index="/rule">
+          <el-icon><List /></el-icon>
+          <span>业务规则</span>
         </el-menu-item>
         <el-menu-item index="/log">
           <el-icon><Document /></el-icon>
@@ -71,7 +75,7 @@
     </el-container>
 
     <!-- 修改密码对话框 -->
-    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px">
+  <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px" close-on-click-modal="false" close-on-press-escape="false">
       <el-form :model="passwordForm" :rules="passwordRules" ref="passwordFormRef" label-width="100px">
         <el-form-item label="原密码" prop="oldPassword">
           <el-input v-model="passwordForm.oldPassword" type="password" show-password />

@@ -60,12 +60,16 @@ export const generateMapperXml = (tableCode, packageName) => request.get(`/codeg
 export const generateVueList = (tableCode) => request.get(`/codegen/vue/list/${tableCode}`)
 export const generateVueForm = (tableCode) => request.get(`/codegen/vue/form/${tableCode}`)
 export const generateAll = (tableCode, packageName) => request.get(`/codegen/all/${tableCode}`, { params: { packageName } })
+export const generateRoutes = (tableCode) => request.get(`/codegen/routes/${tableCode}`)
 
 // 代码测试相关
 export const testCode = (tableCode, packageName) => request.get(`/codetest/test/${tableCode}`, { params: { packageName } })
 
 // 模块类型相关
 export const getModuleTypeList = () => request.get('/moduleType/list')
+export const addModuleType = (data) => request.post('/moduleType/add', data)
+export const updateModuleType = (data) => request.post('/moduleType/update', data)
+export const deleteModuleType = (data) => request.post('/moduleType/delete', data)
 
 // 元数据导出相关
 export const getModuleMetadata = (moduleCode) => request.get(`/metadata/module/${moduleCode}`)

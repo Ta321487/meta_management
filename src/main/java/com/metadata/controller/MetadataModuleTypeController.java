@@ -23,5 +23,45 @@ public class MetadataModuleTypeController {
         List<MetadataModuleType> list = typeService.listAll();
         return Result.success(list);
     }
+
+    /**
+     * 新增模块类型
+     */
+    @PostMapping("/add")
+    public Result<?> add(@RequestBody MetadataModuleType type) {
+        try {
+            typeService.add(type);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 更新模块类型
+     */
+    @PostMapping("/update")
+    public Result<?> update(@RequestBody MetadataModuleType type) {
+        try {
+            typeService.update(type);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 删除模块类型
+     */
+    @PostMapping("/delete")
+    public Result<?> delete(@RequestBody java.util.Map<String, Object> params) {
+        try {
+            Long id = Long.valueOf(params.get("id").toString());
+            typeService.delete(id);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }
 

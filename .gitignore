@@ -46,3 +46,4 @@ Thumbs.db
 *.tar.gz
 *.rar
 
+.github/copilot-instructions.md

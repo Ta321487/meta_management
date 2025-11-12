@@ -183,6 +183,26 @@
             />
           </div>
         </el-tab-pane>
+
+        <el-tab-pane label="Routes" name="routes">
+          <div class="code-container">
+            <div class="code-header">
+              <span>routes.js</span>
+              <div>
+                <el-button type="primary" size="small" @click="handleGenerate('routes')">生成</el-button>
+                <el-button type="success" size="small" @click="handleCopy('routes')">复制</el-button>
+                <el-button type="info" size="small" @click="handleDownload('routes', 'routes.js')">下载</el-button>
+              </div>
+            </div>
+            <el-input
+              v-model="codeMap.routes"
+              type="textarea"
+              :rows="10"
+              readonly
+              class="code-textarea"
+            />
+          </div>
+        </el-tab-pane>
       </el-tabs>
 
       <!-- 测试结果卡片 -->
@@ -277,6 +297,8 @@
 
       <!-- 列表页预览对话框 -->
       <el-dialog
+        close-on-click-modal="false"
+        close-on-press-escape="false"
         v-model="listPreviewVisible"
         title="列表页样式预览"
         width="1200px"
@@ -394,6 +416,8 @@
 
         <!-- 新增/编辑对话框 -->
         <el-dialog
+          close-on-click-modal="false"
+          close-on-press-escape="false"
           v-model="listPreviewDialogVisible"
           :title="listPreviewDialogTitle"
           width="600px"
@@ -474,6 +498,8 @@
 
       <!-- 表单预览对话框 -->
       <el-dialog
+        close-on-click-modal="false"
+        close-on-press-escape="false"
         v-model="formPreviewVisible"
         title="表单样式预览"
         width="900px"
@@ -582,6 +608,7 @@ import {
   generateVueList,
   generateVueForm,
   generateAll,
+  generateRoutes,
   testCode,
   getFieldList,
   getTableByCode
@@ -604,7 +631,8 @@ export default {
       mapper: '',
       mapperxml: '',
       vueList: '',
-      vueForm: ''
+      vueForm: '',
+      routes: ''
     })
     const testResult = ref(null)
     const activeTestItems = ref([])
@@ -719,6 +747,12 @@ export default {
               codeMap.vueForm = res.data
             }
             break
+          case 'routes':
+            res = await generateRoutes(form.tableCode)
+            if (res.code === 200) {
+              codeMap.routes = res.data
+            }
+            break
         }
         ElMessage.success('生成成功')
       } catch (error) {
@@ -744,6 +778,7 @@ export default {
           codeMap.mapperxml = data['Mapper.xml'] || ''
           codeMap.vueList = data['List.vue'] || ''
           codeMap.vueForm = data['Form.vue'] || ''
+          codeMap.routes = data['routes.js'] || data['routes'] || ''
           ElMessage.success('所有代码生成成功')
           // 生成成功后自动运行测试
           await runTest()
@@ -804,6 +839,23 @@ export default {
         ElMessage.error('复制失败')
       }
       document.body.removeChild(textarea)
+    }
+
+    const handleDownload = (type, filename) => {
+      const text = codeMap[type]
+      if (!text) {
+        ElMessage.warning('请先生成代码')
+        return
+      }
+      const blob = new Blob([text], { type: 'text/javascript;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename || (type + '.js')
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
     }
 
     // 预览列表页样式

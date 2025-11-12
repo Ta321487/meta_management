@@ -15,6 +15,7 @@ public interface MetadataFunctionNodeMapper {
     int deleteByModuleCode(String moduleCode);
     MetadataFunctionNode selectByCode(@Param("moduleCode") String moduleCode, @Param("nodeCode") String nodeCode);
     List<MetadataFunctionNode> selectByModuleCode(String moduleCode);
+    List<MetadataFunctionNode> selectByRelatedTableCode(@Param("relatedTableCode") String relatedTableCode);
     int updateSort(@Param("id") Long id, @Param("sort") Integer sort);
     Long countByModuleCode(String moduleCode);
     List<MetadataFunctionNode> selectPageByModuleCode(@Param("moduleCode") String moduleCode, 

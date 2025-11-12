@@ -44,6 +44,8 @@
 
     <!-- 新增数据库对话框 -->
     <el-dialog
+      close-on-click-modal="false"
+      close-on-press-escape="false"
       v-model="dialogVisible"
       title="新增数据库"
       width="500px"
@@ -68,6 +70,8 @@
 
     <!-- 查看表对话框 -->
     <el-dialog
+      close-on-click-modal="false"
+      close-on-press-escape="false"
       v-model="tablesDialogVisible"
       :title="`数据库 ${currentDatabase} 中的表`"
       width="800px"

@@ -139,5 +139,18 @@ public class CodeGeneratorController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 生成路由配置（单独接口）
+     */
+    @GetMapping("/routes/{tableCode}")
+    public Result<String> generateRoutes(@PathVariable String tableCode) {
+        try {
+            String code = codeGeneratorService.generateRoutes(tableCode);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }
 

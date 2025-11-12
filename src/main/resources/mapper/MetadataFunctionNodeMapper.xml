@@ -57,6 +57,12 @@
         ORDER BY sort ASC, create_time ASC
     </select>
 
+    <select id="selectByRelatedTableCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_function_node
+        WHERE related_table_code = #{relatedTableCode}
+        ORDER BY sort ASC, create_time ASC
+    </select>
+
     <select id="countByModuleCode" resultType="Long">
         SELECT COUNT(*) FROM metadata_function_node WHERE module_code = #{moduleCode}
     </select>
