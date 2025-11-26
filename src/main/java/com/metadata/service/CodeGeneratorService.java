@@ -337,7 +337,7 @@ public class CodeGeneratorService {
 
     /**
      * 生成前端路由配置（routes.js）
-     * 会优先查找功能节点中配置的 jumpRelation 与 nodeType，以生成更贴合的路由，否则使用默认路径约定
+     * 会优先查找功能节点中配置的 routePath、componentPath、isMenuVisible 与 nodeType，以生成更贴合的路由，否则使用默认路径约定
      */
     public String generateRoutes(String tableCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
@@ -348,7 +348,7 @@ public class CodeGeneratorService {
         String componentName = convertToComponentName(table.getTableCode());
         String componentDir = "generated/" + componentName.toLowerCase();
 
-        // 查询与该表相关的功能节点（若数据库中配置了 jumpRelation，则优先使用）
+        // 查询与该表相关的功能节点（若数据库中配置了 routePath，则优先使用）
         List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
 
         Map<String, Object> data = new HashMap<>();

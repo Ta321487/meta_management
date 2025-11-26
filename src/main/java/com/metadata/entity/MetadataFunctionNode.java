@@ -15,6 +15,10 @@ public class MetadataFunctionNode {
     private String nodeType;
     private String relatedTableCode;
     private String jumpRelation;
+    private String routePath;
+    private String componentPath;
+    private Integer isMenuVisible;
+    private String icon;
     private Integer sort;
     private Integer isEnabled;
     private LocalDateTime createTime;

@@ -27,6 +27,21 @@
           </template>
         </el-table-column>
         <el-table-column prop="relatedTableCode" label="关联表" width="150" />
+        <el-table-column prop="routePath" label="路由路径" width="180" />
+        <el-table-column prop="componentPath" label="组件路径" width="200" />
+        <el-table-column prop="isMenuVisible" label="是否菜单显示" width="120">
+          <template #default="{ row }">
+            <el-tag :type="row.isMenuVisible === 1 ? 'success' : 'info'">
+              {{ row.isMenuVisible === 1 ? '是' : '否' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="icon" label="节点图标" width="120">
+          <template #default="{ row }">
+            <el-icon v-if="row.icon" :size="18">{{ row.icon }}</el-icon>
+            <span v-else>-</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="sort" label="排序" width="80" />
         <el-table-column prop="isEnabled" label="状态" width="100">
           <template #default="{ row }">
@@ -65,7 +80,7 @@
       width="600px"
       @close="handleDialogClose"
     >
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item label="节点编码" prop="nodeCode" v-if="!form.id">
           <el-input v-model="form.nodeCode" placeholder="如：NODE_001" />
         </el-form-item>
@@ -96,6 +111,24 @@
         <el-form-item label="跳转关系" prop="jumpRelation">
           <el-input v-model="form.jumpRelation" placeholder="如：NODE_001→NODE_002" />
         </el-form-item>
+        <el-form-item label="路由路径" prop="routePath">
+          <el-input v-model="form.routePath" placeholder="如：/list（相对于模块路由的子路径）" />
+        </el-form-item>
+        <el-form-item label="组件路径" prop="componentPath">
+          <el-input v-model="form.componentPath" placeholder="如：List.vue（相对于模块组件路径的子路径）" />
+        </el-form-item>
+        <el-form-item label="是否在菜单显示" prop="isMenuVisible">
+          <el-radio-group v-model="form.isMenuVisible">
+            <el-radio :label="1">是</el-radio>
+            <el-radio :label="0">否</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="节点图标" prop="icon">
+          <div class="icon-select-wrapper">
+            <el-input v-model="form.icon" placeholder="点击选择图标" readonly @click="showIconSelector = true" />
+            <el-button type="primary" size="small" @click="showIconSelector = true">选择图标</el-button>
+          </div>
+        </el-form-item>
         <el-form-item label="排序号" prop="sort">
           <el-input-number v-model="form.sort" :min="0" />
         </el-form-item>
@@ -111,6 +144,12 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+      
+    <!-- 图标选择器 -->
+    <IconSelector
+      v-model="form.icon"
+      v-model:visible="showIconSelector"
+    />
   </div>
 </template>
 
@@ -118,9 +157,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getModuleList, getNodeList, addNode, updateNode, deleteNode, getTablesByModule } from '../api'
+import IconSelector from '../components/IconSelector.vue'
 
 export default {
   name: 'NodeManage',
+  components: {
+    IconSelector
+  },
   setup() {
     const modules = ref([])
     const tables = ref([])
@@ -130,6 +173,7 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增节点')
     const formRef = ref(null)
+    const showIconSelector = ref(false)
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -143,6 +187,10 @@ export default {
       nodeType: '',
       relatedTableCode: '',
       jumpRelation: '',
+      routePath: '',
+      componentPath: '',
+      isMenuVisible: 1,
+      icon: '',
       sort: 0,
       isEnabled: 1
     })
@@ -222,9 +270,14 @@ export default {
         nodeType: '',
         relatedTableCode: '',
         jumpRelation: '',
+        routePath: '',
+        componentPath: '',
+        isMenuVisible: 1,
+        icon: '',
         sort: 0,
         isEnabled: 1
       })
+      showIconSelector.value = false
       dialogVisible.value = true
     }
 
@@ -238,9 +291,14 @@ export default {
         nodeType: row.nodeType,
         relatedTableCode: row.relatedTableCode || '',
         jumpRelation: row.jumpRelation || '',
+        routePath: row.routePath || '',
+        componentPath: row.componentPath || '',
+        isMenuVisible: row.isMenuVisible || 1,
+        icon: row.icon || '',
         sort: row.sort,
         isEnabled: row.isEnabled
       })
+      showIconSelector.value = false
       dialogVisible.value = true
     }
 
@@ -315,6 +373,7 @@ export default {
       pagination,
       form,
       rules,
+      showIconSelector,
       loadNodes,
       handleSizeChange,
       handleCurrentChange,
@@ -337,6 +396,12 @@ export default {
 .card-header {
   display: flex;
   justify-content: space-between;
+  align-items: center;
+}
+
+.icon-select-wrapper {
+  display: flex;
+  gap: 10px;
   align-items: center;
 }
 </style>

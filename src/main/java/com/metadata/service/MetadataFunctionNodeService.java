@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataFunctionNode;
+import com.metadata.entity.MetadataModule;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,9 @@ public class MetadataFunctionNodeService {
 
     @Autowired
     private MetadataFunctionNodeMapper nodeMapper;
+
+    @Autowired
+    private MetadataModuleService moduleService;
 
     @Autowired
     private OperationLogService logService;

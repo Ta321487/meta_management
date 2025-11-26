@@ -10,6 +10,10 @@
         <result column="node_type" property="nodeType"/>
         <result column="related_table_code" property="relatedTableCode"/>
         <result column="jump_relation" property="jumpRelation"/>
+        <result column="route_path" property="routePath"/>
+        <result column="component_path" property="componentPath"/>
+        <result column="is_menu_visible" property="isMenuVisible"/>
+        <result column="icon" property="icon"/>
         <result column="sort" property="sort"/>
         <result column="is_enabled" property="isEnabled"/>
         <result column="create_time" property="createTime"/>
@@ -18,9 +22,11 @@
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataFunctionNode" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_function_node (node_code, node_name, module_code, node_type, 
-                                           related_table_code, jump_relation, sort, is_enabled)
+                                           related_table_code, jump_relation, route_path, component_path, 
+                                           is_menu_visible, icon, sort, is_enabled)
         VALUES (#{nodeCode}, #{nodeName}, #{moduleCode}, #{nodeType},
-                #{relatedTableCode}, #{jumpRelation}, #{sort}, #{isEnabled})
+                #{relatedTableCode}, #{jumpRelation}, #{routePath}, #{componentPath},
+                #{isMenuVisible}, #{icon}, #{sort}, #{isEnabled})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataFunctionNode">
@@ -29,6 +35,10 @@
             node_type = #{nodeType},
             related_table_code = #{relatedTableCode},
             jump_relation = #{jumpRelation},
+            route_path = #{routePath},
+            component_path = #{componentPath},
+            is_menu_visible = #{isMenuVisible},
+            icon = #{icon},
             sort = #{sort},
             is_enabled = #{isEnabled}
         WHERE id = #{id}
