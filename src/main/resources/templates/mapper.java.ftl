@@ -25,17 +25,29 @@ public interface ${className}Mapper {
     /**
      * 根据ID删除
      */
+    <#if table.pkStrategy == "UUID">
+    int deleteById(String id);
+    <#else>
     int deleteById(Long id);
+    </#if>
 
     /**
      * 批量删除
      */
+    <#if table.pkStrategy == "UUID">
+    int deleteByIds(List<String> ids);
+    <#else>
     int deleteByIds(List<Long> ids);
+    </#if>
 
     /**
      * 根据ID查询
      */
+    <#if table.pkStrategy == "UUID">
+    ${className} selectById(String id);
+    <#else>
     ${className} selectById(Long id);
+    </#if>
 
     /**
      * 查询所有

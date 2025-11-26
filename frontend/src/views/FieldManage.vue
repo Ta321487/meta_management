@@ -106,7 +106,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTableList, getFieldList, addField, updateField, deleteField } from '../api'
 
@@ -136,6 +136,13 @@ export default {
       formComponent: 'input',
       validateRule: '',
       sort: 0
+    })
+    
+    // 监听字段名称变化，当字段名为'id'时自动设置排序号为0
+    watch(() => form.fieldName, (newValue) => {
+      if (newValue === 'id') {
+        form.sort = 0
+      }
     })
     const rules = {
       fieldCode: [{ required: true, message: '请输入字段编码', trigger: 'blur' }],
@@ -170,15 +177,24 @@ export default {
         }
         const res = await getFieldList(selectedTableCode.value, params)
         if (res.code === 200) {
+          let fields = []
           if (res.data && res.data.records) {
             // 分页数据
-            fieldData.value = res.data.records
+            fields = res.data.records
             pagination.total = Number(res.data.total) || 0
           } else {
             // 兼容旧接口（非分页数据）
-            fieldData.value = res.data || []
+            fields = res.data || []
             pagination.total = Number(res.data?.length) || 0
           }
+          
+          // 处理主键字段，确保其必填状态正确显示在表格中
+          fieldData.value = fields.map(field => {
+            if (field.fieldName === 'id') {
+              return { ...field, isRequired: 1 }
+            }
+            return field
+          })
         }
       } catch (error) {
         ElMessage.error('加载字段列表失败')
@@ -202,6 +218,20 @@ export default {
 
     const handleAdd = () => {
       dialogTitle.value = '新增字段'
+      
+      // 默认为非主键字段的排序号
+      let newSort = 1
+      if (fieldData.value && fieldData.value.length > 0) {
+        // 找出当前所有字段中的最大排序号
+        const existingSorts = fieldData.value
+          .map(field => Number(field.sort) || 0)
+          .filter(sort => !isNaN(sort))
+          
+        if (existingSorts.length > 0) {
+          newSort = Math.max(...existingSorts) + 1
+        }
+      }
+      
       Object.assign(form, {
         id: null,
         fieldCode: '',
@@ -212,8 +242,14 @@ export default {
         isRequired: 0,
         formComponent: 'input',
         validateRule: '',
-        sort: 0
+        sort: newSort // 默认为计算的排序号
       })
+      
+      // 检查是否为主键字段（字段名为id），如果是则设置排序号为0
+      if (form.fieldName === 'id') {
+        form.sort = 0
+      }
+      
       dialogVisible.value = true
     }
 
@@ -231,26 +267,87 @@ export default {
         validateRule: row.validateRule || '',
         sort: row.sort
       })
+      
+      // 对于主键字段（字段名为id），确保设置为必填且设置默认表单组件
+      if (row.fieldName === 'id') {
+        form.isRequired = 1 // 主键字段强制设置为必填
+        if (!row.formComponent) {
+          form.formComponent = 'input' // 临时设置，提交时会保持原值
+        }
+      }
+      
       dialogVisible.value = true
     }
 
     const handleSubmit = async () => {
-      await formRef.value.validate(async (valid) => {
-        if (valid) {
-          try {
-            if (form.id) {
-              await updateField(form)
-            } else {
-              await addField(form)
-            }
-            ElMessage.success('操作成功')
-            dialogVisible.value = false
-            loadFields()
-          } catch (error) {
-            ElMessage.error('操作失败')
-          }
+      // 特殊处理主键字段：如果是主键字段（字段名为id）且表单组件为空，则跳过表单组件验证
+      let isValid = true
+      let errorMessage = ''
+      
+      if (form.fieldName === 'id') {
+        // 对主键字段进行简化验证，跳过表单组件验证
+        if (!form.fieldCode) {
+          isValid = false
+          errorMessage = '请输入字段编码'
+        } else if (!form.fieldName) {
+          isValid = false
+          errorMessage = '请输入字段名称'
+        } else if (!form.fieldType) {
+          isValid = false
+          errorMessage = '请输入字段类型'
+        } else if (!form.label) {
+          isValid = false
+          errorMessage = '请输入显示名'
         }
-      })
+        
+        if (!isValid) {
+          ElMessage.error(errorMessage)
+          return
+        }
+      } else {
+        // 非主键字段使用正常的表单验证
+        await formRef.value.validate(async (valid) => {
+          if (valid) {
+            try {
+              if (form.id) {
+                await updateField(form)
+              } else {
+                await addField(form)
+              }
+              ElMessage.success('操作成功')
+              dialogVisible.value = false
+              loadFields()
+            } catch (error) {
+              // 显示后端返回的具体错误消息，如果没有则显示通用错误
+              const errorMsg = error.response?.data?.message || '操作失败'
+              ElMessage.error(errorMsg)
+            }
+          }
+        })
+        return
+      }
+      
+      // 主键字段的保存逻辑
+      try {
+        // 确保主键字段的排序号为0
+        const submitForm = { ...form }
+        if (form.fieldName === 'id') {
+          submitForm.sort = 0
+        }
+        
+        if (form.id) {
+          await updateField(submitForm)
+        } else {
+          await addField(submitForm)
+        }
+        ElMessage.success('操作成功')
+        dialogVisible.value = false
+        loadFields()
+      } catch (error) {
+        // 显示后端返回的具体错误消息，适配多种错误格式
+        const errorMsg = error.response?.data?.message || error.data?.message || error.message || '操作失败'
+        ElMessage.error(errorMsg)
+      }
     }
 
     const handleDelete = (row) => {
@@ -264,7 +361,9 @@ export default {
           ElMessage.success('删除成功')
           loadFields()
         } catch (error) {
-          ElMessage.error('删除失败')
+          // 显示后端返回的具体错误消息，适配多种错误格式
+          const errorMsg = error.response?.data?.message || error.data?.message || error.message || '删除失败'
+          ElMessage.error(errorMsg)
         }
       })
     }

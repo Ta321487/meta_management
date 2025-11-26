@@ -8,6 +8,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+<#if table.pkStrategy == "UUID">
+import java.util.UUID;
+</#if>
 
 /**
  * ${table.tableName}服务类
@@ -35,10 +38,32 @@ public class ${className}Service {
     /**
      * 删除
      */
+    <#if table.pkStrategy == "UUID">
+    public void delete(String id) {
+        ${entityName}Mapper.deleteById(id);
+    }
+    
+    /**
+     * 批量删除
+     */
+    public void batchDelete(List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+        ${entityName}Mapper.deleteByIds(ids);
+    }
+    
+    /**
+     * 根据ID查询
+     */
+    public ${className} getById(String id) {
+        return ${entityName}Mapper.selectById(id);
+    }
+    <#else>
     public void delete(Long id) {
         ${entityName}Mapper.deleteById(id);
     }
-
+    
     /**
      * 批量删除
      */
@@ -48,13 +73,14 @@ public class ${className}Service {
         }
         ${entityName}Mapper.deleteByIds(ids);
     }
-
+    
     /**
      * 根据ID查询
      */
     public ${className} getById(Long id) {
         return ${entityName}Mapper.selectById(id);
     }
+    </#if>
 
     /**
      * 查询列表

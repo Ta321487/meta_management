@@ -63,32 +63,39 @@ public class MetadataTableService {
         List<com.metadata.entity.MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
         
         // 如果没有字段，根据主键策略自动创建一个主键字段
-        if (fields.isEmpty()) {
-            com.metadata.entity.MetadataField primaryKeyField = new com.metadata.entity.MetadataField();
-            primaryKeyField.setFieldCode("ID");
-            primaryKeyField.setTableCode(table.getTableCode());
-            primaryKeyField.setFieldName("id");
-            primaryKeyField.setLabel("主键ID");
-            primaryKeyField.setSort(0);
-            
-            // 根据主键策略设置字段类型和表单组件
-            if ("AUTO".equals(table.getPkStrategy())) {
-                // 自增主键：不需要表单组件，对用户来说不是必填
-                primaryKeyField.setFieldType("BIGINT");
-                primaryKeyField.setFormComponent(""); // 自增字段不需要表单组件
-                primaryKeyField.setIsRequired(0); // 对用户来说不需要填写
-            } else if ("UUID".equals(table.getPkStrategy())) {
-                primaryKeyField.setFieldType("VARCHAR(36)");
-                primaryKeyField.setFormComponent("input");
-                primaryKeyField.setIsRequired(1);
-            } else {
-                // 默认使用 BIGINT
-                primaryKeyField.setFieldType("BIGINT");
-                primaryKeyField.setFormComponent("input");
-                primaryKeyField.setIsRequired(1);
-            }
-            
-            // 插入主键字段
+            if (fields.isEmpty()) {
+                com.metadata.entity.MetadataField primaryKeyField = new com.metadata.entity.MetadataField();
+                primaryKeyField.setFieldCode("ID");
+                primaryKeyField.setTableCode(table.getTableCode());
+                // 根据主键策略设置不同的字段名
+                if ("UUID".equals(table.getPkStrategy())) {
+                    primaryKeyField.setFieldName("uuid");
+                    primaryKeyField.setLabel("主键UUID");
+                } else {
+                    primaryKeyField.setFieldName("id");
+                    primaryKeyField.setLabel("主键ID");
+                }
+                primaryKeyField.setSort(0);
+                
+                // 根据主键策略设置字段类型和表单组件
+                if ("AUTO".equals(table.getPkStrategy())) {
+                    // 自增主键：不需要表单组件，但在数据库层面是必填的
+                    primaryKeyField.setFieldType("BIGINT");
+                    primaryKeyField.setFormComponent(""); // 自增字段不需要表单组件
+                    primaryKeyField.setIsRequired(1); // 主键在数据库层面必须是必填的
+                } else if ("UUID".equals(table.getPkStrategy())) {
+                    primaryKeyField.setFieldType("VARCHAR(36)");
+                    primaryKeyField.setFormComponent(""); // UUID由数据库自动生成，不需要表单组件
+                    primaryKeyField.setIsRequired(1);
+                    // UUID默认值通过SQL模板设置，这里不需要额外设置
+                } else {
+                    // 默认使用 BIGINT
+                    primaryKeyField.setFieldType("BIGINT");
+                    primaryKeyField.setFormComponent("input");
+                    primaryKeyField.setIsRequired(1);
+                }
+                
+                // 插入主键字段
             fieldMapper.insert(primaryKeyField);
             logService.logSuccess("admin", "AUTO_CREATE_PK_FIELD", "自动创建主键字段: " + table.getTableCode());
         }
@@ -120,6 +127,11 @@ public class MetadataTableService {
             throw new RuntimeException("表不存在");
         }
         table.setTableCode(existing.getTableCode()); // 编码不可修改
+        
+        // 检查主键生成策略是否变更
+        if (!existing.getPkStrategy().equals(table.getPkStrategy())) {
+            throw new RuntimeException("主键生成策略不允许修改，请删除表后重新创建");
+        }
         
         // 更新元数据记录
         tableMapper.update(table);

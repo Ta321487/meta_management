@@ -257,8 +257,9 @@ export default {
             dialogVisible.value = false
             loadNodes()
           } catch (error) {
-            ElMessage.error('操作失败')
-          }
+        // 显示后端返回的具体错误信息，适配多种错误格式
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '操作失败')
+      }
         }
       })
     }
@@ -274,7 +275,8 @@ export default {
           ElMessage.success('删除成功')
           loadNodes()
         } catch (error) {
-          ElMessage.error('删除失败')
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '删除失败')
         }
       })
     }

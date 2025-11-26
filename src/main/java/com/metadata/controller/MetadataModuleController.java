@@ -32,6 +32,13 @@ public class MetadataModuleController {
             module.setModuleName((String) params.get("moduleName"));
             module.setModuleType((String) params.get("moduleType"));
             module.setDescription((String) params.get("description"));
+            // 处理新增字段
+            if (params.containsKey("sort")) {
+                module.setSort(params.get("sort") != null ? Integer.valueOf(params.get("sort").toString()) : 1);
+            }
+            module.setIcon((String) params.get("icon"));
+            module.setRoutePath((String) params.get("routePath"));
+            module.setComponentPath((String) params.get("componentPath"));
             @SuppressWarnings("unchecked")
             List<String> tableCodes = (List<String>) params.get("tableCodes");
             moduleService.add(module, tableCodes);
@@ -52,6 +59,13 @@ public class MetadataModuleController {
             module.setModuleName((String) params.get("moduleName"));
             module.setModuleType((String) params.get("moduleType"));
             module.setDescription((String) params.get("description"));
+            // 处理新增字段
+            if (params.containsKey("sort")) {
+                module.setSort(params.get("sort") != null ? Integer.valueOf(params.get("sort").toString()) : 1);
+            }
+            module.setIcon((String) params.get("icon"));
+            module.setRoutePath((String) params.get("routePath"));
+            module.setComponentPath((String) params.get("componentPath"));
             @SuppressWarnings("unchecked")
             List<String> tableCodes = (List<String>) params.get("tableCodes");
             moduleService.update(module, tableCodes);

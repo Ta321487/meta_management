@@ -151,6 +151,6 @@ INSERT INTO `metadata_module_type` (`type_code`, `type_name`, `default_nodes`, `
 ('DATA_MANAGE', '数据管理型', 'LIST_PAGE,FORM_PAGE,DETAIL_PAGE', '支持CRUD操作的数据管理模块'),
 ('PROCESS_APPROVE', '流程审批型', 'LIST_PAGE,FORM_PAGE,PROCESS_PAGE', '支持流程审批的模块'),
 ('STAT_REPORT', '统计报表型', 'LIST_PAGE,REPORT_PAGE', '支持统计报表的模块'),
-('BATCH_OPERATE', '批量操作型', 'LIST_PAGE,BATCH_IMPORT_PAGE,BATCH_EXPORT_PAGE', '支持批量导入导出的模块')
+('BATCH_OPERATE', '批量操作型', 'LIST_PAGE,FORM_PAGE,DETAIL_PAGE,IMPORT_PAGE', '支持CRUD和批量导入的模块')
 ON DUPLICATE KEY UPDATE `type_code`=`type_code`;
 

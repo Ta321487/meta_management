@@ -2,6 +2,8 @@ package com.metadata.entity;
 
 import lombok.Data;
 
+import java.util.List;
+
 /**
  * 模块类型实体
  */
@@ -10,7 +12,9 @@ public class MetadataModuleType {
     private Long id;
     private String typeCode;
     private String typeName;
-    private String defaultNodes;
+    
+    private List<String> defaultNodes;
+    
     private String description;
 }
 

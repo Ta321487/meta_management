@@ -6,19 +6,19 @@
         <id column="id" property="id"/>
         <result column="type_code" property="typeCode"/>
         <result column="type_name" property="typeName"/>
-        <result column="default_nodes" property="defaultNodes"/>
+        <result column="default_nodes" property="defaultNodes" typeHandler="com.metadata.util.ListStringTypeHandler"/>
         <result column="description" property="description"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataModuleType" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_module_type (type_code, type_name, default_nodes, description)
-        VALUES (#{typeCode}, #{typeName}, #{defaultNodes}, #{description})
+        VALUES (#{typeCode}, #{typeName}, #{defaultNodes,typeHandler=com.metadata.util.ListStringTypeHandler}, #{description})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataModuleType">
         UPDATE metadata_module_type
         SET type_name = #{typeName},
-            default_nodes = #{defaultNodes},
+            default_nodes = #{defaultNodes,typeHandler=com.metadata.util.ListStringTypeHandler},
             description = #{description}
         WHERE id = #{id}
     </update>

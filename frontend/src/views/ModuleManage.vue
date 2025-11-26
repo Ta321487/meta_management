@@ -118,12 +118,33 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="排序号" prop="sort">
+          <el-input-number v-model="form.sort" :min="1" :step="1" placeholder="请输入排序号" />
+        </el-form-item>
+        <el-form-item label="图标" prop="icon">
+          <div class="icon-select-wrapper">
+            <el-input v-model="form.icon" placeholder="点击选择图标" readonly @click="showIconSelector = true" />
+            <el-button type="primary" size="small" @click="showIconSelector = true">选择图标</el-button>
+          </div>
+        </el-form-item>
+        <el-form-item label="路由路径" prop="routePath">
+          <el-input v-model="form.routePath" placeholder="如：/student" />
+        </el-form-item>
+        <el-form-item label="组件路径" prop="componentPath">
+          <el-input v-model="form.componentPath" placeholder="如：views/student" />
+        </el-form-item>
       </el-form>
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+      
+      <!-- 图标选择器 -->
+      <IconSelector
+        v-model="form.icon"
+        v-model:visible="showIconSelector"
+      />
   </div>
 </template>
 
@@ -140,6 +161,7 @@ import {
   getTableList,
   getTablesByModule
 } from '../api'
+import IconSelector from '../components/IconSelector.vue'
 
 export default {
   name: 'ModuleManage',
@@ -166,12 +188,19 @@ export default {
       moduleName: '',
       moduleType: '',
       description: '',
+      sort: 1,
+      icon: '',
+      routePath: '',
+      componentPath: '',
       tableCodes: []
     })
+    const showIconSelector = ref(false)
     const rules = {
       moduleCode: [{ required: true, message: '请输入模块编码', trigger: 'blur' }],
       moduleName: [{ required: true, message: '请输入模块名称', trigger: 'blur' }],
-      moduleType: [{ required: true, message: '请选择模块类型', trigger: 'change' }]
+      moduleType: [{ required: true, message: '请选择模块类型', trigger: 'change' }],
+      sort: [{ required: true, message: '请输入排序号', trigger: 'blur' }],
+      routePath: [{ pattern: '^(/[a-zA-Z0-9_-]+)*$', message: '路由路径格式不正确', trigger: 'blur' }]
     }
 
     const loadData = async () => {
@@ -194,7 +223,8 @@ export default {
           }
         }
       } catch (error) {
-        ElMessage.error('加载数据失败')
+        // 显示后端返回的具体错误信息，适配多种错误格式
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '加载数据失败')
         tableData.value = []
         pagination.total = 0
       }
@@ -218,7 +248,8 @@ export default {
           moduleTypes.value = res.data
         }
       } catch (error) {
-        ElMessage.error('加载模块类型失败')
+        // 显示后端返回的具体错误信息，适配多种错误格式
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '加载模块类型失败')
       }
     }
 
@@ -248,12 +279,23 @@ export default {
 
     const handleAdd = () => {
       dialogTitle.value = '新增模块'
+      
+      // 自动计算排序号：获取当前表格中最大的排序号并加1
+      let maxSort = 0
+      if (tableData.value && tableData.value.length > 0) {
+        maxSort = Math.max(...tableData.value.map(item => item.sort || 0))
+      }
+      
       Object.assign(form, {
         id: null,
         moduleCode: '',
         moduleName: '',
         moduleType: '',
         description: '',
+        sort: maxSort + 1,
+        icon: '',
+        routePath: '',
+        componentPath: '',
         tableCodes: []
       })
       dialogVisible.value = true
@@ -267,6 +309,10 @@ export default {
         moduleName: row.moduleName,
         moduleType: row.moduleType,
         description: row.description,
+        sort: row.sort || 1,
+        icon: row.icon || '',
+        routePath: row.routePath || '',
+        componentPath: row.componentPath || '',
         tableCodes: []
       })
       // 加载关联的表
@@ -296,7 +342,8 @@ export default {
             dialogVisible.value = false
             loadData()
           } catch (error) {
-            ElMessage.error('操作失败')
+            // 显示后端返回的具体错误信息，适配多种错误格式
+            ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '操作失败')
           }
         }
       })
@@ -313,7 +360,8 @@ export default {
           ElMessage.success('删除成功')
           loadData()
         } catch (error) {
-          ElMessage.error('删除失败')
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '删除失败')
         }
       })
     }
@@ -327,7 +375,8 @@ export default {
         ElMessage.success('操作成功')
         loadData()
       } catch (error) {
-        ElMessage.error('操作失败')
+        // 显示后端返回的具体错误信息，适配多种错误格式
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '操作失败')
       }
     }
 
@@ -352,6 +401,7 @@ export default {
       form,
       rules,
       pagination,
+      showIconSelector,
       handleSearch,
       handleReset,
       handleAdd,
@@ -363,6 +413,9 @@ export default {
       handleSizeChange,
       handleCurrentChange
     }
+  },
+  components: {
+    IconSelector
   }
 }
 </script>
@@ -380,6 +433,12 @@ export default {
 
 .search-form {
   margin-bottom: 20px;
+}
+
+.icon-select-wrapper {
+  display: flex;
+  gap: 10px;
+  align-items: center;
 }
 </style>
 

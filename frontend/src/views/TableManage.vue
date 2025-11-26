@@ -184,22 +184,37 @@ export default {
     }
 
     const handleSubmit = async () => {
-      await formRef.value.validate(async (valid) => {
-        if (valid) {
-          try {
-            if (form.id) {
-              await updateTable(form)
-            } else {
-              await addTable(form)
-            }
-            ElMessage.success('操作成功')
-            dialogVisible.value = false
-            loadData()
-          } catch (error) {
-            ElMessage.error('操作失败')
+      try {
+        // 先验证表单
+        await formRef.value.validate()
+        
+        // 检查是否修改了主键生成策略
+        if (form.id) {
+          const originalTable = tableData.value.find(t => t.id === form.id)
+          if (originalTable && originalTable.pkStrategy !== form.pkStrategy) {
+            // 直接提示用户主键策略不可修改，而不是让用户确认后再被后端拒绝
+            ElMessage.warning('主键生成策略不允许修改，请删除表后重新创建')
+            // 恢复原始主键策略值
+            form.pkStrategy = originalTable.pkStrategy
+            return
           }
         }
-      })
+        
+        // 提交表单
+        if (form.id) {
+          await updateTable(form)
+        } else {
+          await addTable(form)
+        }
+        ElMessage.success('操作成功')
+        dialogVisible.value = false
+        loadData()
+      } catch (error) {
+        // 只处理实际错误，表单验证失败和取消操作的错误已经被单独处理
+        if (!(error.message === 'cancel' || error.toString().includes('取消'))) {
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '操作失败')
+        }
+      }
     }
 
     const handleDelete = (row) => {
@@ -213,7 +228,8 @@ export default {
           ElMessage.success('删除成功')
           loadData()
         } catch (error) {
-          ElMessage.error('删除失败')
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '删除失败')
         }
       })
     }

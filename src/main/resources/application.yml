@@ -20,6 +20,16 @@ spring:
       pool-name: MetadataHikariCP
       max-lifetime: 1800000
       connection-timeout: 30000
+  # 热部署配置
+  devtools:
+    restart:
+      enabled: true
+      # 排除不需要重启的目录
+      exclude: WEB-INF/**
+      # 自定义重启目录
+      additional-paths: src/main/java
+  thymeleaf:
+    cache: false
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

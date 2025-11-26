@@ -7,6 +7,10 @@ import java.time.LocalDateTime;
 <#if hasDecimal>
 import java.math.BigDecimal;
 </#if>
+<#if table.pkStrategy == "UUID">
+import java.util.UUID;
+import com.baomidou.mybatisplus.annotation.TableField;
+</#if>
 
 /**
  * ${table.tableName}实体类
@@ -18,7 +22,20 @@ public class ${className} {
     /**
      * ${field.field.label}
      */
+    <#if field.field.fieldName == "id" && table.pkStrategy == "UUID">
+    @TableField("uuid")
+    private UUID id;
+    <#else>
     private ${field.javaType} ${field.camelCaseName};
+    </#if>
 </#list>
+    <#if table.pkStrategy == "UUID">
+    /**
+     * 无参构造函数，自动生成UUID主键
+     */
+    public ${className}() {
+        this.id = UUID.randomUUID();
+    }
+    </#if>
 }
 

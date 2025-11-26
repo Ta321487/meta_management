@@ -10,6 +10,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
+<#if table.pkStrategy == "UUID">
+import java.util.UUID;
+</#if>
 
 /**
  * ${table.tableName}控制器
@@ -53,8 +56,12 @@ public class ${className}Controller {
     @PostMapping("/delete")
     public Result<?> delete(@RequestBody Map<String, Object> params) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
+            String id = params.get("id").toString();
+            <#if table.pkStrategy == "UUID">
             ${entityName}Service.delete(id);
+            <#else>
+            ${entityName}Service.delete(Long.valueOf(id));
+            </#if>
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -67,8 +74,13 @@ public class ${className}Controller {
     @PostMapping("/batchDelete")
     public Result<?> batchDelete(@RequestBody Map<String, Object> params) {
         try {
+            <#if table.pkStrategy == "UUID">
+            @SuppressWarnings("unchecked")
+            List<String> ids = (List<String>) params.get("ids");
+            <#else>
             @SuppressWarnings("unchecked")
             List<Long> ids = (List<Long>) params.get("ids");
+            </#if>
             if (ids == null || ids.isEmpty()) {
                 return Result.error("请选择要删除的记录");
             }
@@ -83,9 +95,17 @@ public class ${className}Controller {
      * 根据ID查询
      */
     @GetMapping("/{id}")
-    public Result<${className}> getById(@PathVariable Long id) {
-        ${className} ${entityName} = ${entityName}Service.getById(id);
-        return Result.success(${entityName});
+    public Result<${className}> getById(@PathVariable String id) {
+        try {
+            <#if table.pkStrategy == "UUID">
+            ${className} ${entityName} = ${entityName}Service.getById(id);
+            <#else>
+            ${className} ${entityName} = ${entityName}Service.getById(Long.valueOf(id));
+            </#if>
+            return Result.success(${entityName});
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 
     /**

@@ -9,13 +9,17 @@
         <result column="module_type" property="moduleType"/>
         <result column="description" property="description"/>
         <result column="status" property="status"/>
+        <result column="sort" property="sort"/>
+        <result column="icon" property="icon"/>
+        <result column="route_path" property="routePath"/>
+        <result column="component_path" property="componentPath"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataModule" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_module (module_code, module_name, module_type, description, status)
-        VALUES (#{moduleCode}, #{moduleName}, #{moduleType}, #{description}, #{status})
+        INSERT INTO metadata_module (module_code, module_name, module_type, description, status, sort, icon, route_path, component_path)
+        VALUES (#{moduleCode}, #{moduleName}, #{moduleType}, #{description}, #{status}, #{sort}, #{icon}, #{routePath}, #{componentPath})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataModule">
@@ -23,7 +27,11 @@
         SET module_name = #{moduleName},
             module_type = #{moduleType},
             description = #{description},
-            status = #{status}
+            status = #{status},
+            sort = #{sort},
+            icon = #{icon},
+            route_path = #{routePath},
+            component_path = #{componentPath}
         WHERE id = #{id}
     </update>
 

@@ -4,14 +4,27 @@
 
     <resultMap id="BaseResultMap" type="${packageName}.entity.${className}">
 <#list fields as field>
-        <#if field.field.fieldName == "id">
-        <id column="${field.field.fieldName}" property="${field.camelCaseName}"/>
+        <#if field.field.fieldName == 'id'>
+        <id column="<#if table.pkStrategy == 'UUID'>uuid<#else>${field.field.fieldName}</#if>" property="${field.camelCaseName}"/>
         <#else>
         <result column="${field.field.fieldName}" property="${field.camelCaseName}"/>
         </#if>
 </#list>
     </resultMap>
 
+    <#if table.pkStrategy == 'UUID'>
+    <insert id="insert" parameterType="${packageName}.entity.${className}">
+        INSERT INTO ${tableName} (
+<#list fields as field>
+            <#if field.field.fieldName == 'id'><#if table.pkStrategy == 'UUID'>uuid<#else>${field.field.fieldName}</#if><#else>${field.field.fieldName}</#if><#if field_has_next>,</#if>
+</#list>
+        ) VALUES (
+<#list fields as field>
+            ${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
+</#list>
+        )
+    </insert>
+    <#else>
     <insert id="insert" parameterType="${packageName}.entity.${className}" useGeneratedKeys="true" keyProperty="<#noparse>id</#noparse>">
         INSERT INTO ${tableName} (
 <#list fields as field>
@@ -25,6 +38,7 @@
 </#list>
         )
     </insert>
+    </#if>
 
     <update id="update" parameterType="${packageName}.entity.${className}">
         UPDATE ${tableName}
@@ -33,26 +47,26 @@
             <#if field.field.fieldName != "id">${field.field.fieldName} = ${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
             </#if>
 </#list>
-        WHERE id = <#noparse>#{id}</#noparse>
+        WHERE <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> = <#noparse>#{id}</#noparse>
     </update>
 
     <delete id="deleteById">
-        DELETE FROM ${tableName} WHERE id = <#noparse>#{id}</#noparse>
+        DELETE FROM ${tableName} WHERE <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> = <#noparse>#{id}</#noparse>
     </delete>
 
     <delete id="deleteByIds">
-        DELETE FROM ${tableName} WHERE id IN
+        DELETE FROM ${tableName} WHERE <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> IN
         <foreach collection="list" item="id" open="(" separator="," close=")">
             <#noparse>#{id}</#noparse>
         </foreach>
     </delete>
 
     <select id="selectById" resultMap="BaseResultMap">
-        SELECT * FROM ${tableName} WHERE id = <#noparse>#{id}</#noparse>
+        SELECT * FROM ${tableName} WHERE <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> = <#noparse>#{id}</#noparse>
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT * FROM ${tableName} ORDER BY id DESC
+        SELECT * FROM ${tableName} ORDER BY <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> DESC
     </select>
 
     <select id="count" resultType="Long">
@@ -94,7 +108,7 @@
                     <otherwise>DESC</otherwise>
                 </choose>
             </when>
-            <otherwise>ORDER BY id DESC</otherwise>
+            <otherwise>ORDER BY <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> DESC</otherwise>
         </choose>
         LIMIT <#noparse>#{offset}, #{size}</#noparse>
     </select>
@@ -111,7 +125,7 @@
                     <otherwise>DESC</otherwise>
                 </choose>
             </when>
-            <otherwise>ORDER BY id DESC</otherwise>
+            <otherwise>ORDER BY <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> DESC</otherwise>
         </choose>
     </select>
 

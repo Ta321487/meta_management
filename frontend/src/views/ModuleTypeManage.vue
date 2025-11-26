@@ -9,7 +9,7 @@
         <el-table :data="tableData" border style="width: 100%">
           <el-table-column prop="typeCode" label="类型编码" width="180" />
           <el-table-column prop="typeName" label="类型名称" />
-          <el-table-column prop="defaultNodes" label="默认节点" />
+          <el-table-column prop="defaultNodes" label="默认节点" :formatter="formatDefaultNodes" />
           <el-table-column prop="description" label="描述" />
           <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
@@ -35,6 +35,10 @@
             <el-option label="表单页" value="FORM_PAGE" />
             <el-option label="详情页" value="DETAIL_PAGE" />
             <el-option label="导入页" value="IMPORT_PAGE" />
+            <el-option label="流程页" value="PROCESS_PAGE" />
+            <el-option label="报表页" value="REPORT_PAGE" />
+            <el-option label="批量导入页" value="BATCH_IMPORT_PAGE" />
+            <el-option label="批量导出页" value="BATCH_EXPORT_PAGE" />
           </el-select>
         </el-form-item>
         <el-form-item label="描述" prop="description">
@@ -62,6 +66,26 @@ export default {
     const dialogTitle = ref('新增类型')
     const formRef = ref(null)
     const form = reactive({ id: null, typeCode: '', typeName: '', defaultNodes: '', description: '' })
+    
+    // 节点类型映射配置
+    const nodeTypeMap = {
+      'LIST_PAGE': '列表页',
+      'FORM_PAGE': '表单页', 
+      'DETAIL_PAGE': '详情页',
+      'IMPORT_PAGE': '导入页',
+      'PROCESS_PAGE': '流程页',
+      'REPORT_PAGE': '报表页',
+      'BATCH_IMPORT_PAGE': '批量导入页',
+      'BATCH_EXPORT_PAGE': '批量导出页'
+    }
+    
+    // 格式化默认节点显示为中文
+    const formatDefaultNodes = (row, column, cellValue) => {
+      if (!cellValue || !Array.isArray(cellValue) || cellValue.length === 0) {
+        return ''
+      }
+      return cellValue.map(node => nodeTypeMap[node] || node).join('，')
+    }
 
     const loadData = async () => {
       try {
@@ -120,7 +144,7 @@ export default {
       loadData()
     })
 
-    return { tableData, dialogVisible, dialogTitle, form, formRef, handleAdd, handleEdit, handleDelete, handleSubmit }
+    return { tableData, dialogVisible, dialogTitle, form, formRef, handleAdd, handleEdit, handleDelete, handleSubmit, formatDefaultNodes }
   }
 }
 </script>

@@ -14,6 +14,10 @@ public class MetadataModule {
     private String moduleType;
     private String description;
     private Integer status;
+    private Integer sort;  // 排序号
+    private String icon;   // 图标
+    private String routePath;  // 路由路径
+    private String componentPath;  // 组件路径
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }
