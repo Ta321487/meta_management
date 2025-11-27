@@ -10,6 +10,12 @@ const service = axios.create({
 // 请求拦截器
 service.interceptors.request.use(
   config => {
+    // 添加认证信息到请求头
+    const admin = sessionStorage.getItem('admin')
+    if (admin) {
+      // 对于基于Session的认证，浏览器会自动处理Cookie，这里确保请求携带凭证
+      config.withCredentials = true
+    }
     return config
   },
   error => {
@@ -23,7 +29,10 @@ service.interceptors.response.use(
     const res = response.data
     if (res.code === 401) {
       ElMessage.error('未登录，请先登录')
-      router.push('/login')
+      // 清除过期的sessionStorage信息
+      sessionStorage.removeItem('admin')
+      // 确保重定向到登录页
+      router.replace('/login')
       return Promise.reject(new Error('未登录'))
     }
     // 不在这里自动显示错误消息，让各个组件自己处理
@@ -33,7 +42,14 @@ service.interceptors.response.use(
     return res
   },
   error => {
-    // 网络错误等异常情况，也不自动显示，让组件处理
+    // 处理网络错误等异常情况
+    if (error.response && error.response.status === 401) {
+      ElMessage.error('未登录，请先登录')
+      // 清除过期的sessionStorage信息
+      sessionStorage.removeItem('admin')
+      // 确保重定向到登录页
+      router.replace('/login')
+    }
     return Promise.reject(error)
   }
 )
