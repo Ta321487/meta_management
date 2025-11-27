@@ -18,16 +18,13 @@
           <span>SQL语句</span>
           <div>
             <el-button type="primary" @click="handleExecute" :loading="executing">执行</el-button>
+            <el-button @click="handleFormat">格式化</el-button>
             <el-button @click="handleClear">清空</el-button>
           </div>
         </div>
-        <el-input
-          v-model="sqlText"
-          type="textarea"
-          :rows="15"
-          placeholder="请输入SQL语句，多条SQL用分号(;)分隔&#10;例如：&#10;INSERT INTO metadata_table (table_code, table_name, pk_strategy, description) VALUES ('TABLE_001', '测试表', 'AUTO', '测试描述');&#10;INSERT INTO metadata_field (field_code, table_code, field_name, field_type, label, is_required, form_component, sort) VALUES ('FIELD_001', 'TABLE_001', 'name', 'varchar(100)', '名称', 1, 'input', 1);"
-          class="sql-textarea"
-        />
+        <div class="editor-wrapper">
+          <div ref="editorContainer" class="sql-editor"></div>
+        </div>
       </div>
 
       <div class="result-container" v-if="result">
@@ -112,9 +109,10 @@
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { InfoFilled } from '@element-plus/icons-vue'
+import * as monaco from 'monaco-editor'
 import { executeSql, executeMultipleSql } from '../api'
 
 export default {
@@ -123,13 +121,50 @@ export default {
     InfoFilled
   },
   setup() {
-    const sqlText = ref('')
+    const editorContainer = ref(null)
+    let editor = null
     const executing = ref(false)
     const result = ref(null)
     const activeCollapse = ref([])
 
+    // 初始化编辑器
+    const initEditor = () => {
+      if (!editorContainer.value) return
+
+      editor = monaco.editor.create(editorContainer.value, {
+        value: '',
+        language: 'sql',
+        theme: 'vs',
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        automaticLayout: true,
+        lineNumbers: 'on',
+        tabSize: 2,
+        scrollbar: {
+          useShadows: false,
+          verticalScrollbarSize: 10,
+          horizontalScrollbarSize: 10
+        },
+        placeholder: '请输入SQL语句，多条SQL用分号(;)分隔\n例如：\nINSERT INTO metadata_table (table_code, table_name, pk_strategy, description) VALUES (\'TABLE_001\', \'测试表\', \'AUTO\', \'测试描述\');\nINSERT INTO metadata_field (field_code, table_code, field_name, field_type, label, is_required, form_component, sort) VALUES (\'FIELD_001\', \'TABLE_001\', \'name\', \'varchar(100)\', \'名称\', 1, \'input\', 1);'
+      })
+    }
+
+    // 获取编辑器内容
+    const getSqlText = () => {
+      return editor ? editor.getValue() : ''
+    }
+
+    // 设置编辑器内容
+    const setSqlText = (value) => {
+      if (editor) {
+        editor.setValue(value)
+      }
+    }
+
+    // 执行SQL
     const handleExecute = async () => {
-      if (!sqlText.value || !sqlText.value.trim()) {
+      const sqlText = getSqlText()
+      if (!sqlText || !sqlText.trim()) {
         ElMessage.warning('请输入SQL语句')
         return
       }
@@ -139,13 +174,13 @@ export default {
 
       try {
         // 判断是否包含多条SQL（有分号分隔）
-        const sqlCount = sqlText.value.split(';').filter(s => s.trim().length > 0).length
+        const sqlCount = sqlText.split(';').filter(s => s.trim().length > 0).length
         
         let response
         if (sqlCount > 1) {
-          response = await executeMultipleSql({ sql: sqlText.value })
+          response = await executeMultipleSql({ sql: sqlText })
         } else {
-          response = await executeSql({ sql: sqlText.value })
+          response = await executeSql({ sql: sqlText })
         }
 
         if (response.code === 200) {
@@ -173,18 +208,62 @@ export default {
       }
     }
 
+    // 格式化SQL
+    const handleFormat = () => {
+      if (!editor) return
+
+      try {
+        const sqlText = getSqlText()
+        if (!sqlText.trim()) {
+          ElMessage.warning('请先输入SQL语句')
+          return
+        }
+
+        // 使用monaco-editor的格式化功能
+        const model = editor.getModel()
+        if (model) {
+          monaco.editor.executeEdits('format', [
+            {
+              range: model.getFullModelRange(),
+              text: sqlText, // 这里可以添加更复杂的SQL格式化逻辑
+              forceMoveMarkers: true
+            }
+          ])
+          
+          // 触发格式化命令
+          monaco.editor.getAction(editor, 'editor.action.formatDocument').run()
+          ElMessage.success('SQL格式化成功')
+        }
+      } catch (error) {
+        ElMessage.error('SQL格式化失败: ' + (error.message || '未知错误'))
+      }
+    }
+
+    // 清空SQL
     const handleClear = () => {
-      sqlText.value = ''
+      setSqlText('')
       result.value = null
       activeCollapse.value = []
     }
 
+    // 生命周期钩子
+    onMounted(() => {
+      initEditor()
+    })
+
+    onBeforeUnmount(() => {
+      if (editor) {
+        editor.dispose()
+      }
+    })
+
     return {
-      sqlText,
+      editorContainer,
       executing,
       result,
       activeCollapse,
       handleExecute,
+      handleFormat,
       handleClear
     }
   }
@@ -214,7 +293,15 @@ export default {
   font-weight: bold;
 }
 
-.sql-textarea {
+.editor-wrapper {
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sql-editor {
+  width: 100%;
+  min-height: 400px;
   font-family: 'Courier New', monospace;
 }
 

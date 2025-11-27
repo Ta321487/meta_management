@@ -231,6 +231,8 @@ export default {
           // 显示后端返回的具体错误信息，适配多种错误格式
           ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '删除失败')
         }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
       })
     }
 

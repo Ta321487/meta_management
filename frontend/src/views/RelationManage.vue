@@ -313,6 +313,8 @@ export default {
         } catch (error) {
           ElMessage.error('删除失败')
         }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
       })
     }
 
@@ -340,6 +342,8 @@ export default {
         } catch (error) {
           ElMessage.error('同步外键失败: ' + (error.response?.data?.message || error.message))
         }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
       })
     }
 

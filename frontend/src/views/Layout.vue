@@ -144,6 +144,8 @@ export default {
           await logout()
           sessionStorage.removeItem('admin')
           router.push('/login')
+        }).catch(() => {
+          // 处理用户取消退出登录操作，不做任何处理
         })
       } else if (command === 'changePassword') {
         passwordDialogVisible.value = true

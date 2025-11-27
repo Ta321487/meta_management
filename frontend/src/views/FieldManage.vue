@@ -388,6 +388,8 @@ export default {
           const errorMsg = error.response?.data?.message || error.data?.message || error.message || '删除失败'
           ElMessage.error(errorMsg)
         }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
       })
     }
 

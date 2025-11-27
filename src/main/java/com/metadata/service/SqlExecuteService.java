@@ -71,19 +71,31 @@ public class SqlExecuteService {
         if (!skipSafetyCheck) {
             // 检查明显的危险操作
             if (upperSql.startsWith("DROP") || upperSql.startsWith("TRUNCATE") || 
-                upperSql.startsWith("DELETE FROM")) {
-                result.put("success", false);
-                result.put("message", "禁止执行DROP、TRUNCATE、DELETE等危险操作");
-                return result;
-            }
-            
-            // 检查ALTER TABLE中的DROP操作（如DROP COLUMN、DROP INDEX等）
-            if (upperSql.contains("ALTER TABLE")) {
-                // 检查是否包含DROP关键字（排除COMMENT等安全操作）
-                if (upperSql.contains(" DROP ") || upperSql.contains(" DROP,") || 
-                    upperSql.contains(",DROP ") || upperSql.endsWith(" DROP")) {
+                upperSql.startsWith("DELETE FROM") || upperSql.startsWith("SHOW") || 
+                upperSql.startsWith("DESC") || upperSql.startsWith("DESCRIBE") ||
+                upperSql.startsWith("ALTER TABLE") || upperSql.startsWith("RENAME TABLE") ||
+                upperSql.startsWith("CREATE DATABASE") || upperSql.startsWith("DROP DATABASE") ||
+                upperSql.startsWith("GRANT") || upperSql.startsWith("REVOKE") ||
+                upperSql.startsWith("FLUSH") || upperSql.startsWith("RESET") ||
+                upperSql.startsWith("LOAD DATA") || upperSql.startsWith("SELECT INTO OUTFILE")) {
+                
+                // 特殊处理ALTER TABLE，只允许添加字段等安全操作
+                if (upperSql.startsWith("ALTER TABLE")) {
+                    // 只允许ALTER TABLE中的ADD COLUMN、MODIFY COLUMN、CHANGE COLUMN、ADD INDEX、ADD CONSTRAINT等安全操作
+                    // 禁止DROP、RENAME等危险操作
+                    if (upperSql.contains(" DROP ") || upperSql.contains(" DROP,") || 
+                        upperSql.contains(",DROP ") || upperSql.endsWith(" DROP") ||
+                        upperSql.contains(" RENAME ") || upperSql.contains(" RENAME COLUMN") ||
+                        upperSql.contains(" DROP COLUMN") || upperSql.contains(" DROP INDEX") ||
+                        upperSql.contains(" DROP CONSTRAINT")) {
+                        result.put("success", false);
+                        result.put("message", "禁止执行ALTER TABLE中的DROP、RENAME等危险操作");
+                        return result;
+                    }
+                } else {
+                    // 其他危险操作直接禁止
                     result.put("success", false);
-                    result.put("message", "禁止执行ALTER TABLE中的DROP操作（如DROP COLUMN、DROP INDEX等）");
+                    result.put("message", "禁止执行该操作，仅允许INSERT、UPDATE、SELECT、CREATE TABLE等低风险操作");
                     return result;
                 }
             }
@@ -92,9 +104,8 @@ public class SqlExecuteService {
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
             
-            // 判断是否为查询语句
-            boolean isQuery = upperSql.startsWith("SELECT") || upperSql.startsWith("SHOW") || 
-                            upperSql.startsWith("DESC") || upperSql.startsWith("DESCRIBE");
+            // 判断是否为查询语句，仅允许SELECT语句
+            boolean isQuery = upperSql.startsWith("SELECT");
             
             if (isQuery) {
                 // 查询语句使用JdbcTemplate执行
