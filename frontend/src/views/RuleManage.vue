@@ -69,7 +69,15 @@
           </el-select>
         </el-form-item>
         <el-form-item label="规则内容" prop="ruleContent">
-          <el-input v-model="form.ruleContent" type="textarea" :rows="10" placeholder="请输入JSON格式的规则内容" />
+          <json-editor
+            v-model="form.ruleContent"
+            min-height="100px"
+            max-height="400px"
+            :options="{
+              maxLines: 20,
+              minLines: 1
+            }"
+          />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" />
@@ -92,9 +100,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getModuleList, getRuleList, addRule, updateRule, deleteRule } from '../api'
+import JsonEditor from '../components/JsonEditor'
 
 export default {
   name: 'RuleManage',
+  components: {
+    JsonEditor
+  },
   setup() {
     const modules = ref([])
     const ruleData = ref([])
@@ -218,18 +230,17 @@ export default {
     const handleSubmit = async () => {
       await formRef.value.validate(async (valid) => {
         if (valid) {
-          // 验证JSON格式
           try {
-            JSON.parse(form.ruleContent)
-          } catch (error) {
-            ElMessage.error('规则内容必须是有效的JSON格式')
-            return
-          }
-          try {
+            // 处理规则内容：如果是{}，转换为null
+            const submitForm = { ...form }
+            if (submitForm.ruleContent === '{}' || submitForm.ruleContent === '{\n}') {
+              submitForm.ruleContent = null
+            }
+            
             if (form.id) {
-              await updateRule(form)
+              await updateRule(submitForm)
             } else {
-              await addRule(form)
+              await addRule(submitForm)
             }
             ElMessage.success('操作成功')
             dialogVisible.value = false

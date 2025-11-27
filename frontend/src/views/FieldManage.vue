@@ -91,7 +91,15 @@
           </el-select>
         </el-form-item>
         <el-form-item label="校验规则" prop="validateRule">
-          <el-input v-model="form.validateRule" type="textarea" :rows="2" placeholder="JSON格式" />
+          <json-editor
+            v-model="form.validateRule"
+            min-height="60px"
+            max-height="200px"
+            :options="{
+              maxLines: 10,
+              minLines: 1
+            }"
+          />
         </el-form-item>
         <el-form-item label="排序号" prop="sort">
           <el-input-number v-model="form.sort" :min="0" />
@@ -109,9 +117,13 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTableList, getFieldList, addField, updateField, deleteField } from '../api'
+import JsonEditor from '../components/JsonEditor'
 
 export default {
   name: 'FieldManage',
+  components: {
+    JsonEditor
+  },
   setup() {
     const tables = ref([])
     const fieldData = ref([])
@@ -309,10 +321,16 @@ export default {
         await formRef.value.validate(async (valid) => {
           if (valid) {
             try {
+              // 处理校验规则：如果是{}，转换为null
+              const submitForm = { ...form }
+              if (submitForm.validateRule === '{}' || submitForm.validateRule === '{\n}') {
+                submitForm.validateRule = null
+              }
+              
               if (form.id) {
-                await updateField(form)
+                await updateField(submitForm)
               } else {
-                await addField(form)
+                await addField(submitForm)
               }
               ElMessage.success('操作成功')
               dialogVisible.value = false
@@ -333,6 +351,11 @@ export default {
         const submitForm = { ...form }
         if (form.fieldName === 'id') {
           submitForm.sort = 0
+        }
+        
+        // 处理校验规则：如果是{}，转换为null
+        if (submitForm.validateRule === '{}' || submitForm.validateRule === '{\n}') {
+          submitForm.validateRule = null
         }
         
         if (form.id) {
