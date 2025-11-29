@@ -3,6 +3,9 @@ package com.metadata.controller;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataAdmin;
 import com.metadata.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "认证管理", description = "用户认证相关API")
 public class AuthController {
 
     @Autowired
@@ -25,7 +29,10 @@ public class AuthController {
      * 登录
      */
     @PostMapping("/login")
-    public Result<Map<String, Object>> login(@RequestBody Map<String, String> params, HttpServletRequest request) {
+    @Operation(summary = "用户登录", description = "用户登录认证，返回用户信息")
+    public Result<Map<String, Object>> login(
+            @Parameter(description = "登录参数，包含username和password") @RequestBody Map<String, String> params,
+            HttpServletRequest request) {
         String username = params.get("username");
         String password = params.get("password");
         MetadataAdmin admin = authService.login(username, password);
@@ -43,6 +50,7 @@ public class AuthController {
      * 退出登录
      */
     @PostMapping("/logout")
+    @Operation(summary = "用户退出", description = "用户退出登录，清空会话信息")
     public Result<?> logout(HttpServletRequest request) {
         request.getSession().invalidate();
         return Result.success();
@@ -52,7 +60,10 @@ public class AuthController {
      * 修改密码
      */
     @PostMapping("/changePassword")
-    public Result<?> changePassword(@RequestBody Map<String, String> params, HttpServletRequest request) {
+    @Operation(summary = "修改密码", description = "用户修改密码，需要验证原密码")
+    public Result<?> changePassword(
+            @Parameter(description = "密码参数，包含oldPassword和newPassword") @RequestBody Map<String, String> params,
+            HttpServletRequest request) {
         HttpSession session = request.getSession();
         MetadataAdmin admin = (MetadataAdmin) session.getAttribute("admin");
         if (admin == null) {

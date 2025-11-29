@@ -3,6 +3,7 @@ package com.metadata.controller;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataModuleType;
 import com.metadata.service.MetadataModuleTypeService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,6 +14,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/moduleType")
+@Tag(name = "模块类型管理", description = "模块类型相关API")
 public class MetadataModuleTypeController {
 
     @Autowired

@@ -23,7 +23,12 @@ public class InterceptorConfig implements WebMvcConfigurer {
                         "/css/**",
                         "/js/**",
                         "/fonts/**",
-                        "/img/**"
+                        "/img/**",
+                        // Swagger UI相关路径
+                        "/swagger-ui.html",
+                        "/swagger-ui/**",
+                        "/v3/api-docs/**",
+                        "/webjars/**"
                 );
     }
 }

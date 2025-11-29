@@ -5,6 +5,7 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.service.MetadataBusinessRuleService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/rule")
+@Tag(name = "业务规则管理", description = "业务规则管理相关API")
 public class MetadataBusinessRuleController {
 
     @Autowired

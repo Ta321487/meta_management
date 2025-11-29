@@ -2,6 +2,7 @@ package com.metadata.controller;
 
 import com.metadata.common.Result;
 import com.metadata.service.SqlExecuteService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +13,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/sql")
+@Tag(name = "SQL执行管理", description = "SQL执行相关API")
 public class SqlExecuteController {
 
     @Autowired

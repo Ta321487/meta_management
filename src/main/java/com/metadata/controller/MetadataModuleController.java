@@ -5,6 +5,9 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataModule;
 import com.metadata.service.MetadataModuleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/module")
+@Tag(name = "模块管理", description = "元数据模块相关API")
 public class MetadataModuleController {
 
     @Autowired
@@ -25,7 +29,8 @@ public class MetadataModuleController {
      * 新增模块
      */
     @PostMapping("/add")
-    public Result<?> add(@RequestBody Map<String, Object> params) {
+    @Operation(summary = "新增模块", description = "添加新的元数据模块")
+    public Result<?> add(@Parameter(description = "模块信息，包含moduleCode、moduleName、moduleType等字段") @RequestBody Map<String, Object> params) {
         try {
             MetadataModule module = new MetadataModule();
             module.setModuleCode((String) params.get("moduleCode"));
@@ -52,7 +57,8 @@ public class MetadataModuleController {
      * 更新模块
      */
     @PostMapping("/update")
-    public Result<?> update(@RequestBody Map<String, Object> params) {
+    @Operation(summary = "更新模块", description = "更新元数据模块信息")
+    public Result<?> update(@Parameter(description = "模块信息，包含id、moduleName、moduleType等字段") @RequestBody Map<String, Object> params) {
         try {
             MetadataModule module = new MetadataModule();
             module.setId(Long.valueOf(params.get("id").toString()));
@@ -79,7 +85,8 @@ public class MetadataModuleController {
      * 删除模块
      */
     @PostMapping("/delete")
-    public Result<?> delete(@RequestBody Map<String, Object> params) {
+    @Operation(summary = "删除模块", description = "根据ID删除元数据模块")
+    public Result<?> delete(@Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
         try {
             Long id = Long.valueOf(params.get("id").toString());
             moduleService.delete(id);
@@ -93,7 +100,8 @@ public class MetadataModuleController {
      * 查询模块详情
      */
     @GetMapping("/{moduleCode}")
-    public Result<MetadataModule> getByCode(@PathVariable String moduleCode) {
+    @Operation(summary = "查询模块详情", description = "根据模块编码查询模块详情")
+    public Result<MetadataModule> getByCode(@Parameter(description = "模块编码") @PathVariable String moduleCode) {
         MetadataModule module = moduleService.getByCode(moduleCode);
         return Result.success(module);
     }
@@ -102,11 +110,13 @@ public class MetadataModuleController {
      * 查询所有模块
      */
     @GetMapping("/list")
-    public Result<?> list(@RequestParam(required = false) String moduleName,
-                          @RequestParam(required = false) String moduleType,
-                          @RequestParam(required = false) Integer status,
-                          @RequestParam(required = false) Integer current,
-                          @RequestParam(required = false) Integer size) {
+    @Operation(summary = "查询模块列表", description = "查询模块列表，支持分页和条件查询")
+    public Result<?> list(
+            @Parameter(description = "模块名称") @RequestParam(required = false) String moduleName,
+            @Parameter(description = "模块类型") @RequestParam(required = false) String moduleType,
+            @Parameter(description = "模块状态") @RequestParam(required = false) Integer status,
+            @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
+            @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
@@ -124,7 +134,8 @@ public class MetadataModuleController {
      * 更新模块状态
      */
     @PostMapping("/updateStatus")
-    public Result<?> updateStatus(@RequestBody Map<String, Object> params) {
+    @Operation(summary = "更新模块状态", description = "更新模块的启用/禁用状态")
+    public Result<?> updateStatus(@Parameter(description = "包含id和status的参数") @RequestBody Map<String, Object> params) {
         try {
             Long id = Long.valueOf(params.get("id").toString());
             Integer status = Integer.valueOf(params.get("status").toString());

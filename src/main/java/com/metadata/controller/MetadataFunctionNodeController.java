@@ -5,6 +5,7 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.service.MetadataFunctionNodeService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/node")
+@Tag(name = "功能节点管理", description = "功能节点相关API")
 public class MetadataFunctionNodeController {
 
     @Autowired

@@ -3,6 +3,7 @@ package com.metadata.controller;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.common.Result;
 import com.metadata.service.MetadataExportService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/metadata")
+@Tag(name = "元数据导出管理", description = "元数据导出相关API")
 public class MetadataExportController {
 
     @Autowired

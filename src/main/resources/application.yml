@@ -57,3 +57,9 @@ admin:
   default-username: admin
   default-password: 123456
 
+# Swagger UI配置
+springdoc:
+  swagger-ui:
+    # 设置Swagger UI语言为中文
+    locale: zh-CN
+

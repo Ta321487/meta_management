@@ -5,6 +5,9 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataField;
 import com.metadata.service.MetadataFieldService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +19,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/field")
+@Tag(name = "字段管理", description = "元数据字段相关API")
 public class MetadataFieldController {
 
     @Autowired
@@ -25,7 +29,8 @@ public class MetadataFieldController {
      * 新增字段
      */
     @PostMapping("/add")
-    public Result<?> add(@RequestBody MetadataField field) {
+    @Operation(summary = "新增字段", description = "添加新的元数据字段")
+    public Result<?> add(@Parameter(description = "字段信息") @RequestBody MetadataField field) {
         try {
             fieldService.add(field);
             return Result.success();
@@ -38,7 +43,8 @@ public class MetadataFieldController {
      * 更新字段
      */
     @PostMapping("/update")
-    public Result<?> update(@RequestBody MetadataField field) {
+    @Operation(summary = "更新字段", description = "更新元数据字段信息")
+    public Result<?> update(@Parameter(description = "字段信息") @RequestBody MetadataField field) {
         try {
             fieldService.update(field);
             return Result.success();
@@ -51,7 +57,8 @@ public class MetadataFieldController {
      * 删除字段
      */
     @PostMapping("/delete")
-    public Result<?> delete(@RequestBody Map<String, Object> params) {
+    @Operation(summary = "删除字段", description = "根据ID删除元数据字段")
+    public Result<?> delete(@Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
         try {
             Long id = Long.valueOf(params.get("id").toString());
             fieldService.delete(id);
@@ -65,9 +72,11 @@ public class MetadataFieldController {
      * 查询表的所有字段（支持分页）
      */
     @GetMapping("/list/{tableCode}")
-    public Result<?> listByTableCode(@PathVariable String tableCode,
-                                    @RequestParam(required = false) Integer current,
-                                    @RequestParam(required = false) Integer size) {
+    @Operation(summary = "查询字段列表", description = "根据表编码查询字段列表，支持分页")
+    public Result<?> listByTableCode(
+            @Parameter(description = "表编码") @PathVariable String tableCode,
+            @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
+            @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();

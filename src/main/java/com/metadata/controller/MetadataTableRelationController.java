@@ -5,6 +5,7 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.service.MetadataTableRelationService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,6 +17,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/relation")
+@Tag(name = "表关联关系管理", description = "表关联关系相关API")
 public class MetadataTableRelationController {
 
     @Autowired

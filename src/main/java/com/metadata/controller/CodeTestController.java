@@ -2,6 +2,7 @@ package com.metadata.controller;
 
 import com.metadata.common.Result;
 import com.metadata.service.CodeTestService;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,6 +13,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/codetest")
+@Tag(name = "代码生成测试管理", description = "测试代码生成API")
 public class CodeTestController {
 
     @Autowired
