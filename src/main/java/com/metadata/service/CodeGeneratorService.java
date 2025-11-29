@@ -77,6 +77,11 @@ public class CodeGeneratorService {
     private List<Map<String, Object>> prepareFieldList(List<MetadataField> fields) {
         List<Map<String, Object>> fieldList = new ArrayList<>();
         for (MetadataField field : fields) {
+            // 只处理启用的字段
+            if (field.getIsEnabled() != null && field.getIsEnabled() == 0) {
+                continue;
+            }
+            
             Map<String, Object> fieldMap = new HashMap<>();
             fieldMap.put("field", field);
             fieldMap.put("fieldName", field.getFieldName());
@@ -350,6 +355,11 @@ public class CodeGeneratorService {
 
         // 查询与该表相关的功能节点（若数据库中配置了 routePath，则优先使用）
         List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        
+        // 过滤掉禁用的功能节点
+        nodes = nodes.stream()
+                .filter(node -> node.getIsEnabled() == null || node.getIsEnabled() == 1)
+                .collect(Collectors.toList());
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
@@ -489,6 +499,68 @@ public class CodeGeneratorService {
              f.getFieldType().toLowerCase().contains("float") ||
              f.getFieldType().toLowerCase().contains("double"))
         );
+    }
+
+    /**
+     * 生成添加字段的ALTER TABLE语句
+     */
+    public String generateAlterTableAddColumnSQL(String tableCode, MetadataField field) throws Exception {
+        String tableName = convertToTableName(tableCode);
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE `").append(tableName).append("`");
+        sql.append(" ADD COLUMN `").append(field.getFieldName()).append("` ");
+        sql.append(field.getFieldType());
+        
+        // 添加NOT NULL约束
+        if (field.getIsRequired() != null && field.getIsRequired() == 1) {
+            sql.append(" NOT NULL");
+        } else {
+            sql.append(" NULL");
+        }
+        
+        // 添加注释
+        if (field.getLabel() != null && !field.getLabel().trim().isEmpty()) {
+            sql.append(" COMMENT '").append(field.getLabel().replace("'", "''")).append("'");
+        }
+        
+        return sql.toString();
+    }
+
+    /**
+     * 生成修改字段的ALTER TABLE语句
+     */
+    public String generateAlterTableModifyColumnSQL(String tableCode, MetadataField field) throws Exception {
+        String tableName = convertToTableName(tableCode);
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE `").append(tableName).append("`");
+        sql.append(" MODIFY COLUMN `").append(field.getFieldName()).append("` ");
+        sql.append(field.getFieldType());
+        
+        // 添加NOT NULL约束
+        if (field.getIsRequired() != null && field.getIsRequired() == 1) {
+            sql.append(" NOT NULL");
+        } else {
+            sql.append(" NULL");
+        }
+        
+        // 添加注释
+        if (field.getLabel() != null && !field.getLabel().trim().isEmpty()) {
+            sql.append(" COMMENT '").append(field.getLabel().replace("'", "''")).append("'");
+        }
+        
+        return sql.toString();
+    }
+
+    /**
+     * 生成删除字段的ALTER TABLE语句
+     */
+    public String generateAlterTableDropColumnSQL(String tableCode, String fieldName) throws Exception {
+        String tableName = convertToTableName(tableCode);
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE `").append(tableName).append("`");
+        sql.append(" DROP COLUMN `").append(fieldName).append("`");
+        
+        return sql.toString();
     }
 }
 

@@ -102,7 +102,7 @@ public class MetadataTableRelationService {
                     if (oldFkName != null && !oldFkName.isEmpty()) {
                         // 删除旧的外键约束
                         String dropFkSql = "ALTER TABLE `" + oldSlaveTableName + "` DROP FOREIGN KEY `" + oldFkName + "`";
-                        Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql);
+                        Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql, true);
                         if (Boolean.TRUE.equals(dropResult.get("success"))) {
                             logService.logSuccess("admin", "DROP_FOREIGN_KEY", "删除旧外键约束: " + oldFkName);
                         } else {
@@ -126,11 +126,11 @@ public class MetadataTableRelationService {
                     String newFkName = "fk_" + slaveTableName + "_" + slaveField.getFieldName();
                     
                     String createFkSql = String.format(
-                        "ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (`%s`) REFERENCES `%s` (`%s`)",
+                        "ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (`%s`) REFERENCES `%s` (`%s`) ",
                         slaveTableName, newFkName, slaveField.getFieldName(), mainTableName, mainField.getFieldName()
                     );
                     
-                    Map<String, Object> createResult = sqlExecuteService.executeSql(createFkSql);
+                    Map<String, Object> createResult = sqlExecuteService.executeSql(createFkSql, true);
                     if (Boolean.TRUE.equals(createResult.get("success"))) {
                         logService.logSuccess("admin", "CREATE_FOREIGN_KEY", "创建新外键约束: " + newFkName);
                     } else {
@@ -278,7 +278,7 @@ public class MetadataTableRelationService {
         
         // 执行SQL
         try {
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql);
+            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql, true);
             if (Boolean.TRUE.equals(sqlResult.get("success"))) {
                 // 如果关联关系不存在，自动创建
                 if (relation.getRelationCode() == null || relation.getRelationCode().isEmpty()) {

@@ -2,7 +2,7 @@
 -- 表编码：${table.tableCode}
 -- 描述：${table.description!""}
 
-CREATE TABLE IF NOT EXISTS `${table.tableName}` (
+CREATE TABLE IF NOT EXISTS `${tableName}` (
 <#list fields as field>
   <#-- 对于主键字段，根据策略使用不同的列名 -->
   <#if field.fieldName == 'id'>

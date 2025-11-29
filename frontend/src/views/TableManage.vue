@@ -23,9 +23,23 @@
         <el-table-column prop="tableName" label="表名称" />
         <el-table-column prop="pkStrategy" label="主键策略" width="120" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="isEnabled" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isEnabled === 1 ? 'success' : 'danger'">
+              {{ row.isEnabled === 1 ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button 
+              :type="row.isEnabled === 1 ? 'warning' : 'success'" 
+              size="small" 
+              @click="handleToggleEnable(row)"
+            >
+              {{ row.isEnabled === 1 ? '禁用' : '启用' }}
+            </el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -103,7 +117,8 @@ export default {
       tableCode: '',
       tableName: '',
       pkStrategy: 'AUTO',
-      description: ''
+      description: '',
+      isEnabled: 1
     })
     const rules = {
       tableCode: [{ required: true, message: '请输入表编码', trigger: 'blur' }],
@@ -217,6 +232,35 @@ export default {
       }
     }
 
+    const handleToggleEnable = async (row) => {
+      try {
+        const newStatus = row.isEnabled === 1 ? 0 : 1
+        const statusText = newStatus === 1 ? '启用' : '禁用'
+        
+        // 弹出确认框
+        await ElMessageBox.confirm(`确定要${statusText}该表吗？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        
+        // 传递完整的表信息，包括主键生成策略，避免后端检查时出现null值
+        const updateData = {
+          ...row,
+          isEnabled: newStatus
+        }
+        await updateTable(updateData)
+        ElMessage.success(`${statusText}成功`)
+        loadData()
+      } catch (error) {
+        // 如果用户取消操作，不显示错误信息
+        // Element Plus 的取消操作会抛出一个带有 name 属性为 'cancel' 的错误对象
+        if (!(error.name === 'cancel' || error.toString().includes('cancel'))) {
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '状态更新失败')
+        }
+      }
+    }
+
     const handleDelete = (row) => {
       ElMessageBox.confirm('确定要删除该表吗？删除后关联的字段也会被删除', '提示', {
         confirmButtonText: '确定',
@@ -260,6 +304,7 @@ export default {
       handleAdd,
       handleEdit,
       handleSubmit,
+      handleToggleEnable,
       handleDelete,
       handleDialogClose
     }

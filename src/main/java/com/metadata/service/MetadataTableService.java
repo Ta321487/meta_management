@@ -81,19 +81,22 @@ public class MetadataTableService {
                 if ("AUTO".equals(table.getPkStrategy())) {
                     // 自增主键：不需要表单组件，但在数据库层面是必填的
                     primaryKeyField.setFieldType("BIGINT");
-                    primaryKeyField.setFormComponent(""); // 自增字段不需要表单组件
+                    primaryKeyField.setFormComponent("primary_key"); // 自增字段使用primary_key表单组件
                     primaryKeyField.setIsRequired(1); // 主键在数据库层面必须是必填的
                 } else if ("UUID".equals(table.getPkStrategy())) {
                     primaryKeyField.setFieldType("VARCHAR(36)");
-                    primaryKeyField.setFormComponent(""); // UUID由数据库自动生成，不需要表单组件
+                    primaryKeyField.setFormComponent("primary_key"); // UUID字段使用primary_key表单组件
                     primaryKeyField.setIsRequired(1);
                     // UUID默认值通过SQL模板设置，这里不需要额外设置
                 } else {
                     // 默认使用 BIGINT
                     primaryKeyField.setFieldType("BIGINT");
-                    primaryKeyField.setFormComponent("input");
+                    primaryKeyField.setFormComponent("primary_key"); // 其他主键使用primary_key表单组件
                     primaryKeyField.setIsRequired(1);
-                }
+                }     
+
+
+
                 
                 // 插入主键字段
             fieldMapper.insert(primaryKeyField);
@@ -129,7 +132,7 @@ public class MetadataTableService {
         table.setTableCode(existing.getTableCode()); // 编码不可修改
         
         // 检查主键生成策略是否变更
-        if (!existing.getPkStrategy().equals(table.getPkStrategy())) {
+        if (table.getPkStrategy() != null && !existing.getPkStrategy().equals(table.getPkStrategy())) {
             throw new RuntimeException("主键生成策略不允许修改，请删除表后重新创建");
         }
         

@@ -130,7 +130,7 @@ CREATE TABLE IF NOT EXISTS `metadata_admin` (
 CREATE TABLE IF NOT EXISTS `metadata_operation_log` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `operate_user` varchar(50) NOT NULL COMMENT '操作人（admin）',
-  `operate_type` varchar(20) NOT NULL COMMENT '操作类型（ADD/EDIT/DELETE/EXPORT）',
+  `operate_type` varchar(50) NOT NULL COMMENT '操作类型（ADD/EDIT/DELETE/EXPORT）',
   `operate_content` text NOT NULL COMMENT '操作内容（JSON格式，记录配置变更）',
   `operate_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
   `status` tinyint NOT NULL COMMENT '操作状态：1-成功，0-失败',

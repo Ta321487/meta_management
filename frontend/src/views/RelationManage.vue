@@ -163,7 +163,8 @@ export default {
       try {
         const res = await getTableList({})
         if (res.code === 200) {
-          tables.value = res.data
+          // 过滤掉禁用状态的表
+          tables.value = res.data.filter(table => table.isEnabled === 1)
         }
       } catch (error) {
         ElMessage.error('加载表列表失败')

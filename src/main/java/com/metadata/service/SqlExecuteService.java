@@ -165,6 +165,17 @@ public class SqlExecuteService {
     public Map<String, Object> executeSql(String sql) {
         return executeSqlInternal(sql, false);
     }
+    
+    /**
+     * 执行SQL语句（支持跳过安全检查）
+     * @param sql SQL语句
+     * @param skipSafetyCheck 是否跳过安全检查
+     * @return 执行结果
+     */
+    @Transactional
+    public Map<String, Object> executeSql(String sql, boolean skipSafetyCheck) {
+        return executeSqlInternal(sql, skipSafetyCheck);
+    }
 
     /**
      * 执行DROP TABLE语句（仅供内部服务调用）

@@ -8,20 +8,22 @@
         <result column="table_name" property="tableName"/>
         <result column="pk_strategy" property="pkStrategy"/>
         <result column="description" property="description"/>
+        <result column="is_enabled" property="isEnabled"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataTable" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description)
-        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description})
+        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description, is_enabled)
+        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description}, #{isEnabled, jdbcType=INTEGER})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataTable">
         UPDATE metadata_table
         SET table_name = #{tableName},
             pk_strategy = #{pkStrategy},
-            description = #{description}
+            description = #{description},
+            is_enabled = #{isEnabled}
         WHERE id = #{id}
     </update>
 

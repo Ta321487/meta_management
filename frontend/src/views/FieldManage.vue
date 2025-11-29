@@ -31,10 +31,24 @@
           </template>
         </el-table-column>
         <el-table-column prop="formComponent" label="表单组件" width="120" />
+        <el-table-column prop="isEnabled" label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.isEnabled === 1 ? 'success' : 'danger'">
+              {{ row.isEnabled === 1 ? '启用' : '禁用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="sort" label="排序" width="80" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button 
+              :type="row.isEnabled === 1 ? 'warning' : 'success'" 
+              size="small" 
+              @click="handleToggleEnable(row)"
+            >
+              {{ row.isEnabled === 1 ? '禁用' : '启用' }}
+            </el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -83,6 +97,7 @@
         </el-form-item>
         <el-form-item label="表单组件" prop="formComponent">
           <el-select v-model="form.formComponent" placeholder="请选择" style="width: 100%">
+            <el-option label="主键字段" value="primary_key" />
             <el-option label="输入框" value="input" />
             <el-option label="下拉框" value="select" />
             <el-option label="日期选择器" value="datepicker" />
@@ -147,13 +162,15 @@ export default {
       isRequired: 0,
       formComponent: 'input',
       validateRule: '',
-      sort: 0
+      sort: 0,
+      isEnabled: 1
     })
     
-    // 监听字段名称变化，当字段名为'id'时自动设置排序号为0
+    // 监听字段名称变化，当字段名为'id'或'uuid'时自动设置排序号为0和表单组件为primary_key
     watch(() => form.fieldName, (newValue) => {
-      if (newValue === 'id') {
+      if (newValue === 'id' || newValue === 'uuid') {
         form.sort = 0
+        form.formComponent = 'primary_key'
       }
     })
     const rules = {
@@ -168,7 +185,8 @@ export default {
       try {
         const res = await getTableList({})
         if (res.code === 200) {
-          tables.value = res.data
+          // 过滤掉禁用状态的表
+          tables.value = res.data.filter(table => table.isEnabled === 1)
         }
       } catch (error) {
         ElMessage.error('加载表列表失败')
@@ -257,11 +275,6 @@ export default {
         sort: newSort // 默认为计算的排序号
       })
       
-      // 检查是否为主键字段（字段名为id），如果是则设置排序号为0
-      if (form.fieldName === 'id') {
-        form.sort = 0
-      }
-      
       dialogVisible.value = true
     }
 
@@ -280,11 +293,11 @@ export default {
         sort: row.sort
       })
       
-      // 对于主键字段（字段名为id），确保设置为必填且设置默认表单组件
-      if (row.fieldName === 'id') {
+      // 对于主键字段（字段名为id或uuid），确保设置为必填且设置默认表单组件
+      if (row.fieldName === 'id' || row.fieldName === 'uuid') {
         form.isRequired = 1 // 主键字段强制设置为必填
         if (!row.formComponent) {
-          form.formComponent = 'input' // 临时设置，提交时会保持原值
+          form.formComponent = 'primary_key' // 主键字段使用primary_key表单组件
         }
       }
       
@@ -292,6 +305,44 @@ export default {
     }
 
     const handleSubmit = async () => {
+      // 检查是否设置了主键字段（仅基于formComponent判断）
+      const isSettingPrimaryKey = form.formComponent === 'primary_key'
+      
+      // 检查当前是否正在将主键字段修改为非主键字段
+      if (form.id) {
+        // 获取当前字段的原始数据
+        const originalField = fieldData.value.find(field => field.id === form.id)
+        const wasPrimaryKey = originalField && originalField.formComponent === 'primary_key'
+        
+        // 如果是将主键字段修改为非主键字段，检查是否还有其他主键字段
+        if (wasPrimaryKey && !isSettingPrimaryKey) {
+          // 检查是否还有其他主键字段
+          const hasOtherPrimaryKey = fieldData.value.some(field => 
+            field.id !== form.id && // 排除当前字段
+            field.formComponent === 'primary_key'
+          )
+          
+          if (!hasOtherPrimaryKey) {
+            ElMessage.error('当前表必须有且只有一个主键字段，无法将唯一的主键字段修改为非主键字段')
+            return
+          }
+        }
+      }
+      
+      // 如果是设置主键字段，检查当前表是否已经存在主键字段
+      if (isSettingPrimaryKey) {
+        // 查找当前表中已有的主键字段
+        const existingPrimaryKey = fieldData.value.find(field => 
+          field.formComponent === 'primary_key' && 
+          field.id !== form.id // 排除当前正在编辑的字段
+        )
+        
+        if (existingPrimaryKey) {
+          ElMessage.error('当前表已经存在主键字段，每个表只能有一个主键字段')
+          return
+        }
+      }
+      
       // 特殊处理主键字段：如果是主键字段（字段名为id）且表单组件为空，则跳过表单组件验证
       let isValid = true
       let errorMessage = ''
@@ -374,6 +425,22 @@ export default {
     }
 
     const handleDelete = (row) => {
+      // 检查是否为唯一的主键字段（仅基于formComponent判断）
+      const isPrimaryKey = row.formComponent === 'primary_key'
+      
+      if (isPrimaryKey) {
+        // 检查是否还有其他主键字段
+        const hasOtherPrimaryKey = fieldData.value.some(field => 
+          field.id !== row.id && // 排除当前字段
+          field.formComponent === 'primary_key'
+        )
+        
+        if (!hasOtherPrimaryKey) {
+          ElMessage.error('当前表必须有且只有一个主键字段，无法删除唯一的主键字段')
+          return
+        }
+      }
+      
       ElMessageBox.confirm('确定要删除该字段吗？', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -386,6 +453,32 @@ export default {
         } catch (error) {
           // 显示后端返回的具体错误消息，适配多种错误格式
           const errorMsg = error.response?.data?.message || error.data?.message || error.message || '删除失败'
+          ElMessage.error(errorMsg)
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
+    }
+
+    const handleToggleEnable = (row) => {
+      const newStatus = row.isEnabled === 1 ? 0 : 1
+      const statusText = newStatus === 1 ? '启用' : '禁用'
+      
+      ElMessageBox.confirm(`确定要${statusText}该字段吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await updateField({
+            ...row,
+            isEnabled: newStatus
+          })
+          ElMessage.success(`${statusText}成功`)
+          loadFields()
+        } catch (error) {
+          // 显示后端返回的具体错误消息，适配多种错误格式
+          const errorMsg = error.response?.data?.message || error.data?.message || error.message || `${statusText}失败`
           ElMessage.error(errorMsg)
         }
       }).catch(() => {
@@ -418,6 +511,7 @@ export default {
       handleAdd,
       handleEdit,
       handleSubmit,
+      handleToggleEnable,
       handleDelete,
       handleDialogClose
     }

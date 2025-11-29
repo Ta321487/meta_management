@@ -17,7 +17,7 @@
 
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
 <#list fields as field>
-        <#if field.field.fieldName != "id">
+        <#if field.field.formComponent != "primary_key">
         <el-form-item label="${field.field.label}" prop="${field.camelCaseName}">
           <#if field.field.formComponent == "input">
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
@@ -79,7 +79,7 @@ export default {
     
     const rules = {
 <#list fields as field>
-      <#if field.field.fieldName != "id" && (field.field.isRequired == 1 || (field.validationRules?? && field.validationRules.hasPattern!false))>
+      <#if field.field.formComponent != "primary_key" && (field.field.isRequired == 1 || (field.validationRules?? && field.validationRules.hasPattern!false))>
       ${field.camelCaseName}: [
         <#if field.field.isRequired == 1>
         { required: true, message: '请输入${field.field.label}', trigger: 'blur' }<#if (field.validationRules?? && field.validationRules.hasPattern!false)>,</#if>

@@ -13,15 +13,16 @@
         <result column="form_component" property="formComponent"/>
         <result column="validate_rule" property="validateRule"/>
         <result column="sort" property="sort"/>
+        <result column="is_enabled" property="isEnabled"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataField" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_field (field_code, table_code, field_name, field_type, label, 
-                                   is_required, form_component, validate_rule, sort)
+                                   is_required, form_component, validate_rule, sort, is_enabled)
         VALUES (#{fieldCode}, #{tableCode}, #{fieldName}, #{fieldType}, #{label},
-                #{isRequired}, #{formComponent}, #{validateRule}, #{sort})
+                #{isRequired}, #{formComponent}, #{validateRule}, #{sort}, #{isEnabled, jdbcType=INTEGER})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataField">
@@ -32,7 +33,8 @@
             is_required = #{isRequired},
             form_component = #{formComponent},
             validate_rule = #{validateRule},
-            sort = #{sort}
+            sort = #{sort},
+            is_enabled = #{isEnabled}
         WHERE id = #{id}
     </update>
 

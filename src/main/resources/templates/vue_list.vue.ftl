@@ -24,7 +24,7 @@
       <!-- 搜索表单 -->
       <el-form :model="searchForm" :inline="true" class="search-form">
 <#list fields as field>
-        <#if field.field.fieldName != "id" && (field.field.formComponent == "input" || field.field.formComponent == "select")>
+        <#if field.field.formComponent != "primary_key" && (field.field.formComponent == "input" || field.field.formComponent == "select")>
         <el-form-item label="${field.field.label}">
           <#if field.field.formComponent == "select">
           <el-select v-model="searchForm.${field.camelCaseName}" placeholder="请选择${field.field.label}" clearable style="width: 180px">
@@ -98,7 +98,7 @@
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
 <#list fields as field>
-        <#if field.field.fieldName != "id">
+        <#if field.field.formComponent != "primary_key">
         <el-form-item label="${field.field.label}" prop="${field.camelCaseName}">
           <#if field.field.formComponent == "input">
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />

@@ -18,6 +18,7 @@ public class MetadataField {
     private String formComponent;
     private String validateRule;
     private Integer sort;
+    private Integer isEnabled;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

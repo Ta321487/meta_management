@@ -50,9 +50,16 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button 
+              :type="row.isEnabled === 1 ? 'warning' : 'success'" 
+              size="small" 
+              @click="handleToggleEnable(row)"
+            >
+              {{ row.isEnabled === 1 ? '禁用' : '启用' }}
+            </el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -238,7 +245,8 @@ export default {
         // 加载关联的表
         const tableRes = await getTablesByModule(selectedModuleCode.value)
         if (tableRes.code === 200) {
-          tables.value = tableRes.data
+          // 过滤掉禁用状态的表
+          tables.value = tableRes.data.filter(table => table.isEnabled === 1)
         }
       } catch (error) {
         ElMessage.error('加载节点列表失败')
@@ -322,6 +330,23 @@ export default {
       })
     }
 
+    const handleToggleEnable = async (row) => {
+      try {
+        const newStatus = row.isEnabled === 1 ? 0 : 1
+        const updateData = {
+          id: row.id,
+          nodeCode: row.nodeCode,
+          moduleCode: row.moduleCode,
+          isEnabled: newStatus
+        }
+        await updateNode(updateData)
+        ElMessage.success('状态更新成功')
+        loadNodes()
+      } catch (error) {
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '状态更新失败')
+      }
+    }
+
     const handleDelete = (row) => {
       ElMessageBox.confirm('确定要删除该节点吗？', '提示', {
         confirmButtonText: '确定',
@@ -382,6 +407,7 @@ export default {
       handleAdd,
       handleEdit,
       handleSubmit,
+      handleToggleEnable,
       handleDelete,
       handleDialogClose,
       getNodeTypeName
