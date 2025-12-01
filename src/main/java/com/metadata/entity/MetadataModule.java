@@ -2,6 +2,7 @@ package com.metadata.entity;
 
 import lombok.Data;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /**
  * 抽象模块实体
@@ -18,6 +19,7 @@ public class MetadataModule {
     private String icon;   // 图标
     private String routePath;  // 路由路径
     private String componentPath;  // 组件路径
+    private List<String> tableCodes;  // 关联的表编码列表
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -12,6 +12,7 @@ public interface MetadataTableMapper {
     int insert(MetadataTable table);
     int update(MetadataTable table);
     int deleteById(Long id);
+    int batchDelete(@Param("ids") List<Long> ids);
     MetadataTable selectByCode(String tableCode);
     MetadataTable selectById(Long id);
     List<MetadataTable> selectAll(@Param("tableName") String tableName);

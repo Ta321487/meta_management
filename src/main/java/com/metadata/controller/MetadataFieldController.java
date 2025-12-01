@@ -69,6 +69,23 @@ public class MetadataFieldController {
     }
 
     /**
+     * 批量删除字段
+     */
+    @PostMapping("/batchDelete")
+    @Operation(summary = "批量删除字段", description = "根据ID列表批量删除元数据字段")
+    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody Map<String, Object> params) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Integer> intIds = (List<Integer>) params.get("ids");
+            List<Long> ids = intIds.stream().map(Long::valueOf).collect(java.util.stream.Collectors.toList());
+            fieldService.batchDelete(ids);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
      * 查询表的所有字段（支持分页）
      */
     @GetMapping("/list/{tableCode}")

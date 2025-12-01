@@ -100,6 +100,18 @@ public class MetadataFieldService {
             throw new RuntimeException("字段不存在");
         }
         
+        // 增强主键字段判断：检查formComponent或字段名为id/uuid
+        boolean isPrimaryKey = "primary_key".equals(field.getFormComponent()) || "id".equals(field.getFieldName()) || "uuid".equals(field.getFieldName());
+        if (isPrimaryKey) {
+            throw new RuntimeException("主键字段不允许删除");
+        }
+        
+        // 检查表中字段数量，不能删除最后一个字段
+        Long fieldCount = fieldMapper.countByTableCode(field.getTableCode());
+        if (fieldCount <= 1) {
+            throw new RuntimeException("不能删除表中最后一个字段");
+        }
+        
         // 生成并执行ALTER TABLE DROP COLUMN语句
         try {
             String alterSql = codeGeneratorService.generateAlterTableDropColumnSQL(field.getTableCode(), field.getFieldName());
@@ -115,6 +127,20 @@ public class MetadataFieldService {
         
         fieldMapper.deleteById(id);
         logService.logSuccess("admin", "DELETE", "删除字段：" + JSON.toJSONString(field));
+    }
+
+    /**
+     * 批量删除字段
+     */
+    @Transactional
+    public void batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new RuntimeException("删除ID列表不能为空");
+        }
+        // 为每个ID调用单个删除方法，确保物理结构删除和日志记录正确
+        for (Long id : ids) {
+            delete(id);
+        }
     }
 
     /**

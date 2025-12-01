@@ -220,20 +220,9 @@ export default {
         }
 
         // 使用monaco-editor的格式化功能
-        const model = editor.getModel()
-        if (model) {
-          monaco.editor.executeEdits('format', [
-            {
-              range: model.getFullModelRange(),
-              text: sqlText, // 这里可以添加更复杂的SQL格式化逻辑
-              forceMoveMarkers: true
-            }
-          ])
-          
-          // 触发格式化命令
-          monaco.editor.getAction(editor, 'editor.action.formatDocument').run()
-          ElMessage.success('SQL格式化成功')
-        }
+        // 直接触发格式化命令
+        editor.getAction('editor.action.formatDocument').run()
+        ElMessage.success('SQL格式化成功')
       } catch (error) {
         ElMessage.error('SQL格式化失败: ' + (error.message || '未知错误'))
       }

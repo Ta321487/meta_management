@@ -53,7 +53,7 @@ public class SqlExecuteService {
      * @return 执行结果
      */
     @Transactional
-    private Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck) {
+    public Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck) {
         Map<String, Object> result = new HashMap<>();
         
         if (sql == null || sql.trim().isEmpty()) {
@@ -126,8 +126,8 @@ public class SqlExecuteService {
                 result.put("message", "执行成功");
                 result.put("affectedRows", affectedRows);
                 
-                // 如果是 CREATE TABLE 语句，自动同步字段到元数据系统
-                if (upperSql.startsWith("CREATE TABLE")) {
+                // 如果是 CREATE TABLE 或 ALTER TABLE 语句，自动同步字段到元数据系统
+                if (upperSql.startsWith("CREATE TABLE") || upperSql.startsWith("ALTER TABLE")) {
                     try {
                         String tableName = extractTableName(sql);
                         if (tableName != null) {
@@ -195,7 +195,46 @@ public class SqlExecuteService {
         String safeTableName = tableName.trim().replace("`", "").replace("'", "").replace("\"", "");
         String dropSql = "DROP TABLE IF EXISTS `" + safeTableName + "`";
         
-        return executeSqlInternal(dropSql, true);
+        Map<String, Object> result = executeSqlInternal(dropSql, true);
+        
+        // 如果DROP TABLE执行成功，清理metadata_field表中的相关字段
+        if ((Boolean) result.get("success")) {
+            try {
+                // 查找对应的表编码
+                String tableCode = safeTableName.toUpperCase();
+                MetadataTable table = tableMapper.selectByCode(tableCode);
+                
+                if (table != null) {
+                    // 删除该表的所有字段
+                    fieldMapper.deleteByTableCode(tableCode);
+                    logService.logSuccess("admin", "SYNC_FIELDS", "删除表字段: " + tableCode);
+                    
+                    // 删除表记录
+                    tableMapper.deleteById(table.getId());
+                    logService.logSuccess("admin", "SYNC_TABLE", "删除表记录: " + tableCode);
+                } else {
+                    // 尝试通过表名查找
+                    List<MetadataTable> tables = tableMapper.selectAll(null);
+                    for (MetadataTable t : tables) {
+                        if (safeTableName.equalsIgnoreCase(t.getTableName())) {
+                            // 删除该表的所有字段
+                            fieldMapper.deleteByTableCode(t.getTableCode());
+                            logService.logSuccess("admin", "SYNC_FIELDS", "删除表字段: " + t.getTableCode());
+                            
+                            // 删除表记录
+                            tableMapper.deleteById(t.getId());
+                            logService.logSuccess("admin", "SYNC_TABLE", "删除表记录: " + t.getTableCode());
+                            break;
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                // 清理失败不影响DROP TABLE执行结果，只记录日志
+                logService.logError("admin", "CLEAN_FIELDS", "清理表字段失败: " + safeTableName, e.getMessage());
+            }
+        }
+        
+        return result;
     }
 
     /**
@@ -248,11 +287,12 @@ public class SqlExecuteService {
     }
 
     /**
-     * 从 CREATE TABLE 语句中提取表名
+     * 从 CREATE TABLE 或 ALTER TABLE 语句中提取表名
      */
     private String extractTableName(String sql) {
         // 匹配 CREATE TABLE `table_name` 或 CREATE TABLE table_name
-        Pattern pattern = Pattern.compile("CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:`)?([a-zA-Z0-9_]+)(?:`)?", Pattern.CASE_INSENSITIVE);
+        // 匹配 ALTER TABLE `table_name` 或 ALTER TABLE table_name
+        Pattern pattern = Pattern.compile("(?:CREATE|ALTER)\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:`)?([a-zA-Z0-9_]+)(?:`)?", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(sql);
         if (matcher.find()) {
             return matcher.group(1);
@@ -351,14 +391,6 @@ public class SqlExecuteService {
             tableCode = table.getTableCode();
         }
 
-        // 检查是否已有字段，如果有且不是新创建的表，则跳过（避免重复同步）
-        List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode);
-        if (!existingFields.isEmpty() && !tableCreated) {
-            // 已有字段，可以选择更新或跳过
-            // 这里选择跳过，避免覆盖用户手动配置的字段
-            return;
-        }
-        
         // 先获取主键信息，判断是否有自增主键
         String autoIncrementPkColumn = null;
         try (ResultSet primaryKeys = metaData.getPrimaryKeys(catalog, schema, tableName)) {
@@ -380,6 +412,7 @@ public class SqlExecuteService {
         }
         
         // 使用 DatabaseMetaData 获取表结构
+        Map<String, MetadataField> physicalFields = new HashMap<>();
         try (ResultSet columns = metaData.getColumns(catalog, schema, tableName, null)) {
             int sort = 0;
             while (columns.next()) {
@@ -399,11 +432,6 @@ public class SqlExecuteService {
                 
                 // 生成字段编码（使用列名的大写形式）
                 String fieldCode = columnName.toUpperCase();
-                
-                // 检查字段是否已存在
-                if (fieldMapper.countByCode(tableCode, fieldCode) > 0) {
-                    continue;
-                }
                 
                 // 创建字段对象
                 MetadataField field = new MetadataField();
@@ -429,9 +457,127 @@ public class SqlExecuteService {
                 }
                 
                 field.setSort(sort++);
+                field.setIsEnabled(1);
                 
-                // 插入字段
-                fieldMapper.insert(field);
+                physicalFields.put(fieldCode, field);
+            }
+        }
+        
+        // 获取表的CHECK约束
+        Map<String, String> checkConstraints = new HashMap<>();
+        try (Connection conn = dataSource.getConnection();
+             Statement stmt = conn.createStatement()) {
+            // 查询表的CHECK约束
+            String checkSql = "SELECT COLUMN_NAME, CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS cc " +
+                             "JOIN information_schema.KEY_COLUMN_USAGE kcu ON cc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME " +
+                             "WHERE kcu.TABLE_SCHEMA = '" + schema + "' AND kcu.TABLE_NAME = '" + tableName + "'";
+            ResultSet rs = stmt.executeQuery(checkSql);
+            while (rs.next()) {
+                String columnName = rs.getString("COLUMN_NAME");
+                String checkClause = rs.getString("CHECK_CLAUSE");
+                checkConstraints.put(columnName, checkClause);
+            }
+        } catch (Exception e) {
+            // 如果查询失败，尝试使用另一种方式查询
+            try (Connection conn = dataSource.getConnection();
+                 Statement stmt = conn.createStatement()) {
+                // 对于某些数据库，可能需要使用不同的方式查询CHECK约束
+                String checkSql = "SHOW CREATE TABLE `" + tableName + "`";
+                ResultSet rs = stmt.executeQuery(checkSql);
+                if (rs.next()) {
+                    String createTableSql = rs.getString(2);
+                    // 解析CREATE TABLE语句，提取CHECK约束
+                    java.util.regex.Pattern checkPattern = java.util.regex.Pattern.compile(
+                        "CHECK\\s*\\(([^\\)]+)\\)\\s*(?:,|\\))", 
+                        java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.MULTILINE
+                    );
+                    java.util.regex.Matcher checkMatcher = checkPattern.matcher(createTableSql);
+                    while (checkMatcher.find()) {
+                        String checkClause = checkMatcher.group(1);
+                        // 提取字段名
+                        java.util.regex.Pattern fieldPattern = java.util.regex.Pattern.compile(
+                            "`?([a-zA-Z0-9_]+)`?\\s*(?:REGEXP|IN|BETWEEN)",
+                            java.util.regex.Pattern.CASE_INSENSITIVE
+                        );
+                        java.util.regex.Matcher fieldMatcher = fieldPattern.matcher(checkClause);
+                        if (fieldMatcher.find()) {
+                            String columnName = fieldMatcher.group(1);
+                            checkConstraints.put(columnName, "CHECK (" + checkClause + ")");
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                // 如果两种方式都失败，记录日志并继续，不影响其他操作
+                logService.logError("admin", "GET_CHECK_CONSTRAINTS", "获取表CHECK约束失败: " + tableName, ex.getMessage());
+            }
+        }
+        
+        // 获取现有字段
+        List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode);
+        Map<String, MetadataField> existingFieldMap = new HashMap<>();
+        for (MetadataField field : existingFields) {
+            existingFieldMap.put(field.getFieldCode(), field);
+        }
+        
+        // 1. 更新或添加字段
+        for (Map.Entry<String, MetadataField> entry : physicalFields.entrySet()) {
+            String fieldCode = entry.getKey();
+            MetadataField physicalField = entry.getValue();
+            String columnName = physicalField.getFieldName();
+            
+            // 检查是否有对应的CHECK约束
+            if (checkConstraints.containsKey(columnName)) {
+                String checkConstraint = checkConstraints.get(columnName);
+                String validateRule = parseCheckConstraint(checkConstraint);
+                if (validateRule != null) {
+                    physicalField.setValidateRule(validateRule);
+                }
+            }
+            
+            if (existingFieldMap.containsKey(fieldCode)) {
+                // 字段已存在，更新字段信息
+                MetadataField existingField = existingFieldMap.get(fieldCode);
+                
+                // 更新字段信息（只更新物理表相关的字段，保留用户手动配置的其他字段）
+                existingField.setFieldName(physicalField.getFieldName());
+                existingField.setFieldType(physicalField.getFieldType());
+                existingField.setIsRequired(physicalField.getIsRequired());
+                existingField.setSort(physicalField.getSort());
+                
+                // 只有当字段备注不为空时才更新label，避免覆盖用户手动设置的label
+                if (physicalField.getLabel() != null && !physicalField.getLabel().isEmpty() && 
+                    !physicalField.getLabel().equals(physicalField.getFieldName())) {
+                    existingField.setLabel(physicalField.getLabel());
+                }
+                
+                // 只有当表单组件为空时才设置默认值，保留用户手动配置的表单组件
+                if ((existingField.getFormComponent() == null || existingField.getFormComponent().isEmpty()) && 
+                    physicalField.getFormComponent() != null && !physicalField.getFormComponent().isEmpty()) {
+                    existingField.setFormComponent(physicalField.getFormComponent());
+                }
+                
+                // 只有当validateRule为空时才设置，避免覆盖用户手动配置的校验规则
+                if ((existingField.getValidateRule() == null || existingField.getValidateRule().isEmpty()) && 
+                    physicalField.getValidateRule() != null && !physicalField.getValidateRule().isEmpty()) {
+                    existingField.setValidateRule(physicalField.getValidateRule());
+                }
+                
+                fieldMapper.update(existingField);
+                logService.logSuccess("admin", "SYNC_FIELDS", "更新字段: " + tableCode + "." + fieldCode);
+            } else {
+                // 字段不存在，添加新字段
+                fieldMapper.insert(physicalField);
+                logService.logSuccess("admin", "SYNC_FIELDS", "添加字段: " + tableCode + "." + fieldCode);
+            }
+        }
+        
+        // 2. 删除物理表中不存在的字段
+        for (MetadataField existingField : existingFields) {
+            String fieldCode = existingField.getFieldCode();
+            if (!physicalFields.containsKey(fieldCode)) {
+                // 物理表中不存在该字段，删除元数据中的字段
+                fieldMapper.deleteById(existingField.getId());
+                logService.logSuccess("admin", "SYNC_FIELDS", "删除字段: " + tableCode + "." + fieldCode);
             }
         }
     }
@@ -728,6 +874,59 @@ public class SqlExecuteService {
             // 如果哈希生成失败，使用截断的方式（不推荐，但作为后备方案）
             return simpleCode.substring(0, 50);
         }
+    }
+    
+    /**
+     * 解析CHECK约束字符串，转换为JSON格式的校验规则
+     * @param checkConstraint CHECK约束字符串
+     * @return JSON格式的校验规则
+     */
+    private String parseCheckConstraint(String checkConstraint) {
+        if (checkConstraint == null || checkConstraint.trim().isEmpty()) {
+            return null;
+        }
+        
+        String constraint = checkConstraint.trim();
+        
+        // 正则表达式约束：CHECK (field REGEXP 'pattern')
+        String regexPattern = "^CHECK \\s*\\([^\\)]*REGEXP \\s*'([^']+)'\\)";
+        java.util.regex.Pattern regex = java.util.regex.Pattern.compile(regexPattern, java.util.regex.Pattern.CASE_INSENSITIVE);
+        java.util.regex.Matcher matcher = regex.matcher(constraint);
+        if (matcher.find()) {
+            String pattern = matcher.group(1);
+            return "{\"pattern\": \"" + pattern.replace("\\", "\\\\") + ", \"message\": \"\"}";
+        }
+        
+        // BETWEEN AND约束：CHECK (field BETWEEN min AND max)
+        String betweenPattern = "^CHECK \\s*\\([^\\)]*BETWEEN \\s+([0-9]+) \\s+AND \\s+([0-9]+)\\)";
+        regex = java.util.regex.Pattern.compile(betweenPattern, java.util.regex.Pattern.CASE_INSENSITIVE);
+        matcher = regex.matcher(constraint);
+        if (matcher.find()) {
+            String min = matcher.group(1);
+            String max = matcher.group(2);
+            return "{\"min\": " + min + ", \"max\": " + max + ", \"message\": \"\"}";
+        }
+        
+        // IN约束：CHECK (field IN ('value1', 'value2', ...))
+        String inPattern = "^CHECK \\s*\\([^\\)]*IN \\s*\\(([^\\)]+)\\)\\)";
+        regex = java.util.regex.Pattern.compile(inPattern, java.util.regex.Pattern.CASE_INSENSITIVE);
+        matcher = regex.matcher(constraint);
+        if (matcher.find()) {
+            String valuesStr = matcher.group(1);
+            // 处理值列表，去除单引号和空格
+            String[] values = valuesStr.split(",");
+            StringBuilder options = new StringBuilder();
+            for (int i = 0; i < values.length; i++) {
+                String value = values[i].trim().replace("'", "");
+                if (i > 0) {
+                    options.append(", ");
+                }
+                options.append("\"").append(value).append("\"");
+            }
+            return "{\"options\": [" + options.toString() + "], \"message\": \"\"}";
+        }
+        
+        return null;
     }
 }
 

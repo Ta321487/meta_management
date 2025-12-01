@@ -12,6 +12,7 @@ public interface MetadataModuleMapper {
     int insert(MetadataModule module);
     int update(MetadataModule module);
     int deleteById(Long id);
+    int batchDelete(@Param("ids") List<Long> ids);
     MetadataModule selectByCode(String moduleCode);
     MetadataModule selectById(Long id);
     List<MetadataModule> selectAll(@Param("moduleName") String moduleName, 

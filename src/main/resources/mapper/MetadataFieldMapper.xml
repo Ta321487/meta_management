@@ -46,6 +46,13 @@
         DELETE FROM metadata_field WHERE table_code = #{tableCode}
     </delete>
 
+    <delete id="batchDelete">
+        DELETE FROM metadata_field WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
     <select id="selectById" resultMap="BaseResultMap">
         SELECT * FROM metadata_field WHERE id = #{id}
     </select>

@@ -11,6 +11,7 @@ export const getModuleByCode = (moduleCode) => request.get(`/module/${moduleCode
 export const addModule = (data) => request.post('/module/add', data)
 export const updateModule = (data) => request.post('/module/update', data)
 export const deleteModule = (data) => request.post('/module/delete', data)
+export const batchDeleteModule = (data) => request.post('/module/batchDelete', data)
 export const updateModuleStatus = (data) => request.post('/module/updateStatus', data)
 
 // 表相关
@@ -19,6 +20,7 @@ export const getTableByCode = (tableCode) => request.get(`/table/${tableCode}`)
 export const addTable = (data) => request.post('/table/add', data)
 export const updateTable = (data) => request.post('/table/update', data)
 export const deleteTable = (data) => request.post('/table/delete', data)
+export const batchDeleteTable = (data) => request.post('/table/batchDelete', data)
 export const getTablesByModule = (moduleCode) => request.get(`/table/listByModule/${moduleCode}`)
 
 // 字段相关
@@ -26,6 +28,7 @@ export const getFieldList = (tableCode, params) => request.get(`/field/list/${ta
 export const addField = (data) => request.post('/field/add', data)
 export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (data) => request.post('/field/delete', data)
+export const batchDeleteField = (data) => request.post('/field/batchDelete', data)
 
 // 功能节点相关
 export const getNodeList = (moduleCode, params) => request.get(`/node/list/${moduleCode}`, { params })

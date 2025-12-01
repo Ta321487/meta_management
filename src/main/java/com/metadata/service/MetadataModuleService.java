@@ -123,6 +123,20 @@ public class MetadataModuleService {
     }
 
     /**
+     * 批量删除模块
+     */
+    @Transactional
+    public void batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new RuntimeException("删除ID列表不能为空");
+        }
+        // 为每个ID调用单个删除方法，确保关联关系和日志记录正确
+        for (Long id : ids) {
+            delete(id);
+        }
+    }
+
+    /**
      * 查询模块详情
      */
     public MetadataModule getByCode(String moduleCode) {
@@ -133,7 +147,9 @@ public class MetadataModuleService {
      * 查询所有模块
      */
     public List<MetadataModule> list(String moduleName, String moduleType, Integer status) {
-        return moduleMapper.selectAll(moduleName, moduleType, status);
+        List<MetadataModule> modules = moduleMapper.selectAll(moduleName, moduleType, status);
+        // 为每个模块添加关联的表编码列表
+        return setTableCodesForModules(modules);
     }
 
     /**
@@ -142,7 +158,21 @@ public class MetadataModuleService {
     public PageResult<MetadataModule> page(String moduleName, String moduleType, Integer status, PageRequest pageRequest) {
         Long total = moduleMapper.count(moduleName, moduleType, status);
         List<MetadataModule> records = moduleMapper.selectPage(moduleName, moduleType, status, pageRequest);
+        // 为每个模块添加关联的表编码列表
+        records = setTableCodesForModules(records);
         return new PageResult<>(total, records);
+    }
+
+    /**
+     * 为模块列表设置关联的表编码列表
+     */
+    private List<MetadataModule> setTableCodesForModules(List<MetadataModule> modules) {
+        for (MetadataModule module : modules) {
+            // 查询模块关联的表编码列表
+            List<String> tableCodes = moduleTableMapper.selectTableCodesByModuleCode(module.getModuleCode());
+            module.setTableCodes(tableCodes);
+        }
+        return modules;
     }
 
     /**

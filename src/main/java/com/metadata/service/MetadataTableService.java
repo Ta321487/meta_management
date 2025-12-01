@@ -207,6 +207,20 @@ public class MetadataTableService {
     }
 
     /**
+     * 批量删除表
+     */
+    @Transactional
+    public void batchDelete(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            throw new RuntimeException("删除ID列表不能为空");
+        }
+        // 为每个ID调用单个删除方法，确保物理结构删除和关联关系处理正确
+        for (Long id : ids) {
+            delete(id);
+        }
+    }
+
+    /**
      * 查询表详情
      */
     public MetadataTable getByCode(String tableCode) {

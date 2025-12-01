@@ -13,12 +13,14 @@
                 :value="table.tableCode"
               />
             </el-select>
+            <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode">批量删除</el-button>
             <el-button type="primary" @click="handleAdd" :disabled="!selectedTableCode">新增字段</el-button>
           </div>
         </div>
       </template>
 
-      <el-table :data="fieldData" border style="width: 100%" v-loading="loading">
+      <el-table :data="fieldData" border style="width: 100%" v-loading="loading" ref="tableRef" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="fieldCode" label="字段编码" width="150" />
         <el-table-column prop="fieldName" label="字段名称" />
         <el-table-column prop="fieldType" label="字段类型" width="150" />
@@ -78,13 +80,71 @@
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="字段编码" prop="fieldCode" v-if="!form.id">
-          <el-input v-model="form.fieldCode" placeholder="如：FIELD_001" />
+          <el-input v-model="form.fieldCode" placeholder="如：FIELD_001（只能包含字母、数字和下划线）" />
         </el-form-item>
         <el-form-item label="字段名称" prop="fieldName">
           <el-input v-model="form.fieldName" placeholder="请输入字段名称" />
         </el-form-item>
-        <el-form-item label="字段类型" prop="fieldType">
-          <el-input v-model="form.fieldType" placeholder="如：varchar(100)" />
+        <el-form-item label="字段类型" prop="baseFieldType">
+          <el-select v-model="form.baseFieldType" placeholder="请选择基础字段类型" style="width: 100%">
+            <el-option
+              v-for="type in baseFieldTypes"
+              :key="type.value"
+              :label="type.label"
+              :value="type.value"
+            />
+          </el-select>
+        </el-form-item>
+        
+        <!-- 长度输入框（用于VARCHAR, CHAR等） -->
+        <el-form-item 
+          v-if="form.baseFieldType === 'VARCHAR' || form.baseFieldType === 'CHAR'" 
+          label="长度"
+        >
+          <el-input-number 
+            v-model="typeParams.length" 
+            :min="1" 
+            :max="form.baseFieldType === 'CHAR' ? 255 : 65535" 
+            style="width: 100%"
+            placeholder="请输入长度"
+          />
+        </el-form-item>
+        
+        <!-- 精度和小数位数输入框（用于DECIMAL, NUMERIC等） -->
+        <el-form-item 
+          v-if="form.baseFieldType === 'DECIMAL' || form.baseFieldType === 'NUMERIC'" 
+          label="精度和小数位数"
+          class="precision-scale-form-item"
+        >
+          <div class="precision-scale-inputs">
+            <el-input-number 
+              v-model="typeParams.precision" 
+              :min="1" 
+              :max="65" 
+              style="width: 120px; margin-right: 10px"
+              placeholder="精度"
+            />
+            <span style="margin-right: 10px">,</span>
+            <el-input-number 
+              v-model="typeParams.scale" 
+              :min="0" 
+              :max="Math.min(typeParams.precision, 30)" 
+              style="width: 120px"
+              placeholder="小数位数"
+            />
+          </div>
+        </el-form-item>
+        
+        <!-- 枚举值输入框（用于ENUM类型） -->
+        <el-form-item 
+          v-if="form.baseFieldType === 'ENUM'" 
+          label="枚举值"
+        >
+          <el-input 
+            v-model="typeParams.enumValues" 
+            style="width: 100%"
+            placeholder="请输入逗号分隔的枚举值，如：value1,value2,value3"
+          />
         </el-form-item>
         <el-form-item label="显示名" prop="label">
           <el-input v-model="form.label" placeholder="请输入显示名" />
@@ -129,9 +189,9 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, getFieldList, addField, updateField, deleteField } from '../api'
+import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField } from '../api'
 import JsonEditor from '../components/JsonEditor'
 
 export default {
@@ -147,6 +207,8 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增字段')
     const formRef = ref(null)
+    const tableRef = ref(null)
+    const selectedRows = ref([])
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -158,6 +220,7 @@ export default {
       tableCode: '',
       fieldName: '',
       fieldType: '',
+      baseFieldType: '',
       label: '',
       isRequired: 0,
       formComponent: 'input',
@@ -173,10 +236,142 @@ export default {
         form.formComponent = 'primary_key'
       }
     })
+    // 基础字段类型列表
+    const baseFieldTypes = ref([
+      { label: 'INT', value: 'INT' },
+      { label: 'BIGINT', value: 'BIGINT' },
+      { label: 'TINYINT', value: 'TINYINT' },
+      { label: 'VARCHAR', value: 'VARCHAR' },
+      { label: 'CHAR', value: 'CHAR' },
+      { label: 'TEXT', value: 'TEXT' },
+      { label: 'LONGTEXT', value: 'LONGTEXT' },
+      { label: 'DECIMAL', value: 'DECIMAL' },
+      { label: 'NUMERIC', value: 'NUMERIC' },
+      { label: 'ENUM', value: 'ENUM' },
+      { label: 'DATE', value: 'DATE' },
+      { label: 'DATETIME', value: 'DATETIME' },
+      { label: 'TIMESTAMP', value: 'TIMESTAMP' },
+      { label: 'BOOLEAN', value: 'BOOLEAN' }
+    ])
+
+    // 需要参数的字段类型
+    const typesWithParams = ['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC', 'ENUM']
+
+    // 类型参数
+    const typeParams = reactive({
+      length: 50, // 用于VARCHAR, CHAR等
+      precision: 10, // 用于DECIMAL, NUMERIC等
+      scale: 2, // 用于DECIMAL, NUMERIC等
+      enumValues: '' // 用于ENUM类型，默认空字符串
+    })
+
+    // 解析字段类型，提取基础类型和参数
+    const parseFieldType = (fullType) => {
+      if (!fullType) return { baseType: '', length: 50, precision: 10, scale: 2, enumValues: '' }
+      
+      // 匹配VARCHAR(50)或CHAR(10)格式
+      const varcharMatch = fullType.match(/^(VARCHAR|CHAR)\((\d+)\)$/i)
+      if (varcharMatch) {
+        return {
+          baseType: varcharMatch[1].toUpperCase(),
+          length: parseInt(varcharMatch[2]),
+          precision: 10,
+          scale: 2,
+          enumValues: ''
+        }
+      }
+      
+      // 匹配DECIMAL(10,2)或NUMERIC(8,3)格式
+      const decimalMatch = fullType.match(/^(DECIMAL|NUMERIC)\((\d+),(\d+)\)$/i)
+      if (decimalMatch) {
+        return {
+          baseType: decimalMatch[1].toUpperCase(),
+          length: 50,
+          precision: parseInt(decimalMatch[2]),
+          scale: parseInt(decimalMatch[3]),
+          enumValues: ''
+        }
+      }
+      
+      // 匹配ENUM('value1','value2')格式
+      const enumMatch = fullType.match(/^ENUM\((.*)\)$/i)
+      if (enumMatch) {
+        // 提取枚举值，去除引号并转换为逗号分隔的字符串
+        const enumValues = enumMatch[1]
+          .split(',')
+          .map(val => val.trim().replace(/^['"]|['"]$/g, ''))
+          .join(',')
+        return {
+          baseType: 'ENUM',
+          length: 50,
+          precision: 10,
+          scale: 2,
+          enumValues: enumValues
+        }
+      }
+      
+      // 其他类型直接返回
+      return {
+        baseType: fullType.toUpperCase(),
+        length: 50,
+        precision: 10,
+        scale: 2,
+        enumValues: ''
+      }
+    }
+
+    // 计算完整字段类型
+    const computedFieldType = computed(() => {
+      const baseType = form.baseFieldType
+      if (!baseType) return ''
+      
+      if (baseType === 'VARCHAR' || baseType === 'CHAR') {
+        return `${baseType}(${typeParams.length})`
+      }
+      
+      if (baseType === 'DECIMAL' || baseType === 'NUMERIC') {
+        return `${baseType}(${typeParams.precision},${typeParams.scale})`
+      }
+      
+      if (baseType === 'ENUM') {
+        // 将逗号分隔的枚举值转换为带引号的格式，如'value1','value2','value3'
+        const enumValues = typeParams.enumValues
+          .split(',')
+          .map(val => `'${val.trim()}'`)
+          .join(',')
+        return `${baseType}(${enumValues})`
+      }
+      
+      return baseType
+    })
+
+    // 监听计算字段类型变化，更新表单字段类型
+    watch(computedFieldType, (newValue) => {
+      form.fieldType = newValue
+    })
+
+    // 监听表单字段类型变化（用于编辑场景）
+    watch(() => form.fieldType, (newValue) => {
+      if (newValue) {
+        const { baseType, length, precision, scale } = parseFieldType(newValue)
+        form.baseFieldType = baseType
+        typeParams.length = length
+        typeParams.precision = precision
+        typeParams.scale = scale
+      }
+    })
+
     const rules = {
-      fieldCode: [{ required: true, message: '请输入字段编码', trigger: 'blur' }],
-      fieldName: [{ required: true, message: '请输入字段名称', trigger: 'blur' }],
-      fieldType: [{ required: true, message: '请输入字段类型', trigger: 'blur' }],
+      fieldCode: [
+        { required: true, message: '请输入字段编码', trigger: 'blur' },
+        { pattern: /^[A-Za-z0-9_]{1,50}$/, message: '字段编码只能包含字母、数字和下划线，长度1-50', trigger: 'blur' }
+      ],
+      fieldName: [
+        { required: true, message: '请输入字段名称', trigger: 'blur' },
+        { pattern: /^[A-Za-z0-9_]{1,50}$/, message: '字段名称只能包含字母、数字和下划线，长度1-50', trigger: 'blur' }
+      ],
+      baseFieldType: [{ required: true, message: '请选择基础字段类型', trigger: 'change' }],
+      fieldType: [{ required: true, message: '请选择字段类型', trigger: 'change' }],
       label: [{ required: true, message: '请输入显示名', trigger: 'blur' }],
       formComponent: [{ required: true, message: '请选择表单组件', trigger: 'change' }]
     }
@@ -268,11 +463,20 @@ export default {
         tableCode: selectedTableCode.value,
         fieldName: '',
         fieldType: '',
+        baseFieldType: '',
         label: '',
         isRequired: 0,
         formComponent: 'input',
         validateRule: '',
         sort: newSort // 默认为计算的排序号
+      })
+      
+      // 重置类型参数
+      Object.assign(typeParams, {
+        length: 50,
+        precision: 10,
+        scale: 2,
+        enumValues: ''
       })
       
       dialogVisible.value = true
@@ -286,12 +490,22 @@ export default {
         tableCode: row.tableCode,
         fieldName: row.fieldName,
         fieldType: row.fieldType,
+        baseFieldType: '', // 会通过watch自动解析
         label: row.label,
         isRequired: row.isRequired,
         formComponent: row.formComponent,
         validateRule: row.validateRule || '',
         sort: row.sort
       })
+      
+      // 解析字段类型，自动填充baseFieldType和typeParams
+      if (row.fieldType) {
+        const { baseType, length, precision, scale } = parseFieldType(row.fieldType)
+        form.baseFieldType = baseType
+        typeParams.length = length
+        typeParams.precision = precision
+        typeParams.scale = scale
+      }
       
       // 对于主键字段（字段名为id或uuid），确保设置为必填且设置默认表单组件
       if (row.fieldName === 'id' || row.fieldName === 'uuid') {
@@ -425,20 +639,20 @@ export default {
     }
 
     const handleDelete = (row) => {
-      // 检查是否为唯一的主键字段（仅基于formComponent判断）
-      const isPrimaryKey = row.formComponent === 'primary_key'
+      // 增强主键字段判断：检查formComponent或字段名为id/uuid
+      const isPrimaryKey = row.formComponent === 'primary_key' || row.fieldName === 'id' || row.fieldName === 'uuid'
+      
+      // 检查是否为表中最后一个字段
+      const isLastField = fieldData.value.length <= 1
       
       if (isPrimaryKey) {
-        // 检查是否还有其他主键字段
-        const hasOtherPrimaryKey = fieldData.value.some(field => 
-          field.id !== row.id && // 排除当前字段
-          field.formComponent === 'primary_key'
-        )
-        
-        if (!hasOtherPrimaryKey) {
-          ElMessage.error('当前表必须有且只有一个主键字段，无法删除唯一的主键字段')
-          return
-        }
+        ElMessage.error('主键字段不允许删除')
+        return
+      }
+      
+      if (isLastField) {
+        ElMessage.error('不能删除表中最后一个字段')
+        return
       }
       
       ElMessageBox.confirm('确定要删除该字段吗？', '提示', {
@@ -490,6 +704,55 @@ export default {
       formRef.value?.resetFields()
     }
 
+    // 处理表格选择变化
+    const handleSelectionChange = (selection) => {
+      selectedRows.value = selection
+    }
+
+    // 处理批量删除
+    const handleBatchDelete = async () => {
+      if (!selectedRows.value || selectedRows.value.length === 0) {
+        ElMessage.warning('请选择要删除的字段')
+        return
+      }
+      
+      // 增强主键字段判断：检查formComponent或字段名为id/uuid
+      const hasPrimaryKey = selectedRows.value.some(row => 
+        row.formComponent === 'primary_key' || row.fieldName === 'id' || row.fieldName === 'uuid'
+      )
+      
+      // 检查删除后是否会导致表中字段数量为0
+      const remainingFieldsCount = fieldData.value.length - selectedRows.value.length
+      if (remainingFieldsCount <= 0) {
+        ElMessage.error('不能删除表中所有字段')
+        return
+      }
+      
+      if (hasPrimaryKey) {
+        ElMessage.error('选中的字段中包含主键字段，主键字段不允许删除')
+        return
+      }
+      
+      ElMessageBox.confirm('确定要删除选中的字段吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const ids = selectedRows.value.map(row => row.id)
+          await batchDeleteField({ ids })
+          ElMessage.success('批量删除成功')
+          loadFields()
+          selectedRows.value = []
+        } catch (error) {
+          const errorMsg = error.response?.data?.message || error.data?.message || error.message || '批量删除失败'
+          ElMessage.error(errorMsg)
+        }
+      }).catch(() => {
+        // 处理用户取消操作
+      })
+    }
+
     onMounted(() => {
       loadTables()
     })
@@ -502,9 +765,13 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
+      tableRef,
+      selectedRows,
       pagination,
       form,
       rules,
+      baseFieldTypes,
+      typeParams,
       loadFields,
       handleSizeChange,
       handleCurrentChange,
@@ -513,7 +780,9 @@ export default {
       handleSubmit,
       handleToggleEnable,
       handleDelete,
-      handleDialogClose
+      handleDialogClose,
+      handleSelectionChange,
+      handleBatchDelete
     }
   }
 }
@@ -528,6 +797,30 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.precision-scale-inputs {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 确保精度和小数位数表单项在同一行 */
+.precision-scale-form-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.precision-scale-form-item .el-form-item__label {
+  margin-right: 10px;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+
+.precision-scale-form-item .el-form-item__content {
+  flex: 1;
+  margin-left: 0 !important;
 }
 </style>
 

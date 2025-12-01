@@ -4,7 +4,10 @@
       <template #header>
         <div class="card-header">
           <span>模块管理</span>
-          <el-button type="primary" @click="handleAdd">新增模块</el-button>
+          <div>
+            <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0">批量删除</el-button>
+            <el-button type="primary" @click="handleAdd">新增模块</el-button>
+          </div>
         </div>
       </template>
 
@@ -34,11 +37,29 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="tableData" border style="width: 100%">
+      <el-table :data="tableData" border style="width: 100%" ref="tableRef" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="moduleCode" label="模块编码" width="150" />
         <el-table-column prop="moduleName" label="模块名称" />
         <el-table-column prop="moduleType" label="模块类型" width="150" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
+        <el-table-column prop="tableCodes" label="关联表" width="150">
+          <template #default="{ row }">
+            <el-tag v-for="tableCode in row.tableCodes" :key="tableCode" size="small" style="margin-right: 5px;">
+              {{ tableCode }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="icon" label="图标" width="120">
+          <template #default="{ row }">
+            <div class="icon-item">
+              <el-icon :size="24"><component :is="row.icon" /></el-icon>
+              <span class="icon-text">{{ row.icon }}</span>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="routePath" label="路由路径" width="150" />
+        <el-table-column prop="componentPath" label="组件路径" width="200" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.status === 1 ? 'success' : 'danger'">
@@ -156,6 +177,7 @@ import {
   addModule,
   updateModule,
   deleteModule,
+  batchDeleteModule,
   updateModuleStatus,
   getModuleTypeList,
   getTableList,
@@ -172,6 +194,8 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增模块')
     const formRef = ref(null)
+    const tableRef = ref(null)
+    const selectedRows = ref([])
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -368,18 +392,59 @@ export default {
       })
     }
 
-    const handleToggleStatus = async (row) => {
-      try {
-        await updateModuleStatus({
-          id: row.id,
-          status: row.status === 1 ? 0 : 1
-        })
-        ElMessage.success('操作成功')
-        loadData()
-      } catch (error) {
-        // 显示后端返回的具体错误信息，适配多种错误格式
-        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '操作失败')
+    // 处理选中行变化
+    const handleSelectionChange = (selection) => {
+      selectedRows.value = selection
+    }
+
+    // 批量删除
+    const handleBatchDelete = () => {
+      if (selectedRows.value.length === 0) {
+        ElMessage.warning('请选择要删除的模块')
+        return
       }
+      
+      ElMessageBox.confirm(`确定要删除选中的 ${selectedRows.value.length} 个模块吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const ids = selectedRows.value.map(row => row.id)
+          await batchDeleteModule({ ids })
+          ElMessage.success('批量删除成功')
+          loadData()
+          // 清空选中状态
+          selectedRows.value = []
+        } catch (error) {
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '批量删除失败')
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
+    }
+
+    const handleToggleStatus = async (row) => {
+      ElMessageBox.confirm(`确定要${row.status === 1 ? '禁用' : '启用'}该模块吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await updateModuleStatus({
+            id: row.id,
+            status: row.status === 1 ? 0 : 1
+          })
+          ElMessage.success('操作成功')
+          loadData()
+        } catch (error) {
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '操作失败')
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
     }
 
     const handleDialogClose = () => {
@@ -399,6 +464,8 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
+      tableRef,
+      selectedRows,
       searchForm,
       form,
       rules,
@@ -410,8 +477,10 @@ export default {
       handleEdit,
       handleSubmit,
       handleDelete,
+      handleBatchDelete,
       handleToggleStatus,
       handleDialogClose,
+      handleSelectionChange,
       handleSizeChange,
       handleCurrentChange
     }
@@ -441,6 +510,23 @@ export default {
   display: flex;
   gap: 10px;
   align-items: center;
+}
+
+.icon-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.icon-text {
+  font-size: 12px;
+  margin-top: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100px;
 }
 </style>
 

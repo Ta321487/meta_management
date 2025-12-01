@@ -20,5 +20,11 @@ CREATE TABLE IF NOT EXISTS `${tableName}` (
   <#else>
   ,PRIMARY KEY (`id`)
   </#if>
+  <#-- 添加CHECK约束 -->
+  <#if checkConstraints?has_content>
+    <#list checkConstraints as constraint>
+      ,CONSTRAINT ${constraint}
+    </#list>
+  </#if>
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='${table.description!table.tableName}';
 

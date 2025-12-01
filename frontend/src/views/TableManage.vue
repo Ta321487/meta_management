@@ -4,7 +4,10 @@
       <template #header>
         <div class="card-header">
           <span>表管理</span>
-          <el-button type="primary" @click="handleAdd">新增表</el-button>
+          <div>
+            <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0">批量删除</el-button>
+            <el-button type="primary" @click="handleAdd">新增表</el-button>
+          </div>
         </div>
       </template>
 
@@ -18,7 +21,8 @@
         </el-form-item>
       </el-form>
 
-      <el-table :data="tableData" border style="width: 100%">
+      <el-table :data="tableData" border style="width: 100%" ref="tableRef" @selection-change="handleSelectionChange">
+        <el-table-column type="selection" width="55" />
         <el-table-column prop="tableCode" label="表编码" width="150" />
         <el-table-column prop="tableName" label="表名称" />
         <el-table-column prop="pkStrategy" label="主键策略" width="120" />
@@ -95,7 +99,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable } from '../api'
+import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable } from '../api'
 
 export default {
   name: 'TableManage',
@@ -104,6 +108,8 @@ export default {
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增表')
     const formRef = ref(null)
+    const tableRef = ref(null)
+    const selectedRows = ref([])
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -280,6 +286,39 @@ export default {
       })
     }
 
+    // 处理选中行变化
+    const handleSelectionChange = (selection) => {
+      selectedRows.value = selection
+    }
+
+    // 批量删除
+    const handleBatchDelete = () => {
+      if (selectedRows.value.length === 0) {
+        ElMessage.warning('请选择要删除的表')
+        return
+      }
+      
+      ElMessageBox.confirm(`确定要删除选中的 ${selectedRows.value.length} 个表吗？删除后关联的字段也会被删除`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const ids = selectedRows.value.map(row => row.id)
+          await batchDeleteTable({ ids })
+          ElMessage.success('批量删除成功')
+          loadData()
+          // 清空选中状态
+          selectedRows.value = []
+        } catch (error) {
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '批量删除失败')
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
+    }
+
     const handleDialogClose = () => {
       formRef.value?.resetFields()
     }
@@ -293,6 +332,8 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
+      tableRef,
+      selectedRows,
       pagination,
       searchForm,
       form,
@@ -306,6 +347,8 @@ export default {
       handleSubmit,
       handleToggleEnable,
       handleDelete,
+      handleBatchDelete,
+      handleSelectionChange,
       handleDialogClose
     }
   }

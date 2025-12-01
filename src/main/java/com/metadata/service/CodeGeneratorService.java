@@ -59,11 +59,23 @@ public class CodeGeneratorService {
 
         // 为每个字段添加转换后的属性
         List<Map<String, Object>> fieldList = prepareFieldList(fields);
+        
+        // 生成CHECK约束列表
+        List<String> checkConstraints = new ArrayList<>();
+        String tableName = convertToTableName(table.getTableCode());
+        for (MetadataField field : fields) {
+            String checkConstraint = generateCheckConstraint(field);
+            if (checkConstraint != null && !checkConstraint.isEmpty()) {
+                String constraintName = "ck_" + tableName + "_" + field.getFieldName();
+                checkConstraints.add(constraintName + " " + checkConstraint);
+            }
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
-        data.put("tableName", convertToTableName(table.getTableCode()));
+        data.put("tableName", tableName);
+        data.put("checkConstraints", checkConstraints);
 
         Template template = freemarkerConfig.getTemplate("create_table.sql.ftl");
         StringWriter writer = new StringWriter();
@@ -109,6 +121,8 @@ public class CodeGeneratorService {
         // 初始化默认值，避免模板访问时出错
         rules.put("hasPattern", false);
         rules.put("hasOptions", false);
+        rules.put("hasLength", false);
+        rules.put("hasRange", false);
         
         if (validateRule == null || validateRule.trim().isEmpty()) {
             return rules;
@@ -137,24 +151,36 @@ public class CodeGeneratorService {
                 rules.put("hasOptions", false);
             }
             
-            // 提取其他校验规则（如min、max等）
-            if (jsonObject.containsKey("min")) {
-                rules.put("min", jsonObject.get("min"));
-            }
-            if (jsonObject.containsKey("max")) {
-                rules.put("max", jsonObject.get("max"));
-            }
+            // 提取长度限制
+            boolean hasLength = false;
             if (jsonObject.containsKey("minLength")) {
                 rules.put("minLength", jsonObject.get("minLength"));
+                hasLength = true;
             }
             if (jsonObject.containsKey("maxLength")) {
                 rules.put("maxLength", jsonObject.get("maxLength"));
+                hasLength = true;
             }
+            rules.put("hasLength", hasLength);
+            
+            // 提取数值范围
+            boolean hasRange = false;
+            if (jsonObject.containsKey("min")) {
+                rules.put("min", jsonObject.get("min"));
+                hasRange = true;
+            }
+            if (jsonObject.containsKey("max")) {
+                rules.put("max", jsonObject.get("max"));
+                hasRange = true;
+            }
+            rules.put("hasRange", hasRange);
             
         } catch (Exception e) {
             // JSON解析失败，忽略校验规则
             rules.put("hasPattern", false);
             rules.put("hasOptions", false);
+            rules.put("hasLength", false);
+            rules.put("hasRange", false);
         }
         
         return rules;
@@ -500,6 +526,59 @@ public class CodeGeneratorService {
              f.getFieldType().toLowerCase().contains("double"))
         );
     }
+    
+    /**
+     * 生成CHECK约束
+     */
+    private String generateCheckConstraint(MetadataField field) {
+        Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
+        StringBuilder checkConstraint = new StringBuilder();
+        
+        // 处理正则表达式
+        if (validationRules.containsKey("hasPattern") && (Boolean) validationRules.get("hasPattern")) {
+            String pattern = (String) validationRules.get("pattern");
+            checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` REGEXP '").append(pattern).append("')");
+        }
+        
+        // 处理数值范围
+        if (validationRules.containsKey("hasRange") && (Boolean) validationRules.get("hasRange")) {
+            Number min = (Number) validationRules.get("min");
+            Number max = (Number) validationRules.get("max");
+            
+            if (min != null && max != null) {
+                checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` BETWEEN ").append(min).append(" AND ").append(max).append(")");
+            } else if (min != null) {
+                checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` >= ").append(min).append(")");
+            } else if (max != null) {
+                checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` <= ").append(max).append(")");
+            }
+        }
+        
+        // 处理枚举值
+        if (validationRules.containsKey("hasOptions") && (Boolean) validationRules.get("hasOptions")) {
+            Object options = validationRules.get("options");
+            if (options instanceof com.alibaba.fastjson2.JSONArray) {
+                com.alibaba.fastjson2.JSONArray optionsArray = (com.alibaba.fastjson2.JSONArray) options;
+                if (!optionsArray.isEmpty()) {
+                    checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` IN (");
+                    for (int i = 0; i < optionsArray.size(); i++) {
+                        if (i > 0) {
+                            checkConstraint.append(", ");
+                        }
+                        Object option = optionsArray.get(i);
+                        if (option instanceof String) {
+                            checkConstraint.append("'").append(option).append("'");
+                        } else {
+                            checkConstraint.append(option);
+                        }
+                    }
+                    checkConstraint.append(")");
+                }
+            }
+        }
+        
+        return checkConstraint.length() > 0 ? checkConstraint.toString() : null;
+    }
 
     /**
      * 生成添加字段的ALTER TABLE语句
@@ -509,7 +588,20 @@ public class CodeGeneratorService {
         StringBuilder sql = new StringBuilder();
         sql.append("ALTER TABLE `").append(tableName).append("`");
         sql.append(" ADD COLUMN `").append(field.getFieldName()).append("` ");
-        sql.append(field.getFieldType());
+        
+        // 处理字段类型和长度
+        String fieldType = field.getFieldType();
+        Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
+        
+        // 转换长度限制
+        if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
+            Integer maxLength = (Integer) validationRules.get("maxLength");
+            if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
+                fieldType = "VARCHAR(" + maxLength + ")";
+            }
+        }
+        
+        sql.append(fieldType);
         
         // 添加NOT NULL约束
         if (field.getIsRequired() != null && field.getIsRequired() == 1) {
@@ -521,6 +613,15 @@ public class CodeGeneratorService {
         // 添加注释
         if (field.getLabel() != null && !field.getLabel().trim().isEmpty()) {
             sql.append(" COMMENT '").append(field.getLabel().replace("'", "''")).append("'");
+        }
+        
+        // 添加CHECK约束
+        String checkConstraint = generateCheckConstraint(field);
+        if (checkConstraint != null && !checkConstraint.isEmpty()) {
+            sql.append(", ADD CONSTRAINT ")
+               .append("ck_").append(tableName).append("_")
+               .append(field.getFieldName()).append(" ")
+               .append(checkConstraint);
         }
         
         return sql.toString();
@@ -534,7 +635,20 @@ public class CodeGeneratorService {
         StringBuilder sql = new StringBuilder();
         sql.append("ALTER TABLE `").append(tableName).append("`");
         sql.append(" MODIFY COLUMN `").append(field.getFieldName()).append("` ");
-        sql.append(field.getFieldType());
+        
+        // 处理字段类型和长度
+        String fieldType = field.getFieldType();
+        Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
+        
+        // 转换长度限制
+        if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
+            Integer maxLength = (Integer) validationRules.get("maxLength");
+            if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
+                fieldType = "VARCHAR(" + maxLength + ")";
+            }
+        }
+        
+        sql.append(fieldType);
         
         // 添加NOT NULL约束
         if (field.getIsRequired() != null && field.getIsRequired() == 1) {
@@ -546,6 +660,13 @@ public class CodeGeneratorService {
         // 添加注释
         if (field.getLabel() != null && !field.getLabel().trim().isEmpty()) {
             sql.append(" COMMENT '").append(field.getLabel().replace("'", "''")).append("'");
+        }
+        
+        // 添加CHECK约束
+        String checkConstraint = generateCheckConstraint(field);
+        if (checkConstraint != null && !checkConstraint.isEmpty()) {
+            String constraintName = "ck_" + tableName + "_" + field.getFieldName();
+            sql.append(", ADD CONSTRAINT ").append(constraintName).append(" ").append(checkConstraint);
         }
         
         return sql.toString();

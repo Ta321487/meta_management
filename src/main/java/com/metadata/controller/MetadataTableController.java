@@ -69,6 +69,23 @@ public class MetadataTableController {
     }
 
     /**
+     * 批量删除表
+     */
+    @PostMapping("/batchDelete")
+    @Operation(summary = "批量删除表", description = "根据ID列表批量删除元数据表")
+    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody Map<String, Object> params) {
+        try {
+            @SuppressWarnings("unchecked")
+            List<Integer> intIds = (List<Integer>) params.get("ids");
+            List<Long> ids = intIds.stream().map(Long::valueOf).collect(java.util.stream.Collectors.toList());
+            tableService.batchDelete(ids);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
      * 查询表详情
      */
     @GetMapping("/{tableCode}")

@@ -12,6 +12,7 @@ public interface MetadataFieldMapper {
     int update(MetadataField field);
     int deleteById(Long id);
     int deleteByTableCode(String tableCode);
+    int batchDelete(@Param("ids") List<Long> ids);
     MetadataField selectById(Long id);
     MetadataField selectByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode);
     List<MetadataField> selectByTableCode(String tableCode);
