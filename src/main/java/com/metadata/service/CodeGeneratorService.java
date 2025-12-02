@@ -453,7 +453,7 @@ public class CodeGeneratorService {
     /**
      * 工具方法：转换为表名（下划线）
      */
-    private String convertToTableName(String code) {
+    public String convertToTableName(String code) {
         // 将 TABLE_CODE 转换为 table_code
         return code.toLowerCase().replace("_TABLE", "");
     }
@@ -530,7 +530,7 @@ public class CodeGeneratorService {
     /**
      * 生成CHECK约束
      */
-    private String generateCheckConstraint(MetadataField field) {
+    public String generateCheckConstraint(MetadataField field) {
         Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
         StringBuilder checkConstraint = new StringBuilder();
         
@@ -662,12 +662,59 @@ public class CodeGeneratorService {
             sql.append(" COMMENT '").append(field.getLabel().replace("'", "''")).append("'");
         }
         
-        // 添加CHECK约束
-        String checkConstraint = generateCheckConstraint(field);
-        if (checkConstraint != null && !checkConstraint.isEmpty()) {
-            String constraintName = "ck_" + tableName + "_" + field.getFieldName();
-            sql.append(", ADD CONSTRAINT ").append(constraintName).append(" ").append(checkConstraint);
+        // 注意：修改字段时不再添加CHECK约束，因为这会导致重复约束名错误
+        // 如果需要修改CHECK约束，请手动删除后重新添加
+        // String checkConstraint = generateCheckConstraint(field);
+        // if (checkConstraint != null && !checkConstraint.isEmpty()) {
+        //     String constraintName = "ck_" + tableName + "_" + field.getFieldName();
+        //     sql.append(", ADD CONSTRAINT ").append(constraintName).append(" ").append(checkConstraint);
+        // }
+        
+        return sql.toString();
+    }
+    
+    /**
+     * 生成修改字段名称和属性的ALTER TABLE语句
+     */
+    public String generateAlterTableChangeColumnSQL(String tableCode, String oldFieldName, MetadataField field) throws Exception {
+        String tableName = convertToTableName(tableCode);
+        StringBuilder sql = new StringBuilder();
+        sql.append("ALTER TABLE `").append(tableName).append("`");
+        sql.append(" CHANGE COLUMN `").append(oldFieldName).append("` `").append(field.getFieldName()).append("` ");
+        
+        // 处理字段类型和长度
+        String fieldType = field.getFieldType();
+        Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
+        
+        // 转换长度限制
+        if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
+            Integer maxLength = (Integer) validationRules.get("maxLength");
+            if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
+                fieldType = "VARCHAR(" + maxLength + ")";
+            }
         }
+        
+        sql.append(fieldType);
+        
+        // 添加NOT NULL约束
+        if (field.getIsRequired() != null && field.getIsRequired() == 1) {
+            sql.append(" NOT NULL");
+        } else {
+            sql.append(" NULL");
+        }
+        
+        // 添加注释
+        if (field.getLabel() != null && !field.getLabel().trim().isEmpty()) {
+            sql.append(" COMMENT '").append(field.getLabel().replace("'", "''")).append("'");
+        }
+        
+        // 注意：修改字段时不再添加CHECK约束，因为这会导致重复约束名错误
+        // 如果需要修改CHECK约束，请手动删除后重新添加
+        // String checkConstraint = generateCheckConstraint(field);
+        // if (checkConstraint != null && !checkConstraint.isEmpty()) {
+        //     String constraintName = "ck_" + tableName + "_" + field.getFieldName();
+        //     sql.append(", ADD CONSTRAINT ").append(constraintName).append(" ").append(checkConstraint);
+        // }
         
         return sql.toString();
     }

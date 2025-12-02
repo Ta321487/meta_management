@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * 字段服务
@@ -76,17 +77,84 @@ public class MetadataFieldService {
         fieldMapper.update(field);
         logService.logSuccess("admin", "EDIT", "更新字段：" + JSON.toJSONString(field));
         
-        // 生成并执行ALTER TABLE MODIFY COLUMN语句
+        // 检查字段名称是否变化以及validate_rule是否变化
+        boolean fieldNameChanged = !Objects.equals(existing.getFieldName(), field.getFieldName());
+        boolean validateRuleChanged = !Objects.equals(existing.getValidateRule(), field.getValidateRule());
+        
+        // 如果字段名称变化或validate_rule变化，需要先处理CHECK约束
+        if (fieldNameChanged || validateRuleChanged) {
+            try {
+                String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
+                
+                // 生成旧约束名
+                String oldConstraintName = "ck_" + tableName + "_" + existing.getFieldName();
+                
+                // 先删除旧的CHECK约束（如果存在）
+                String dropOldSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + oldConstraintName + "`";
+                // 执行删除旧约束的SQL语句（忽略失败，因为约束可能不存在）
+                sqlExecuteService.executeSql(dropOldSql, true);
+            } catch (Exception e) {
+                // 记录错误日志，但不影响主流程
+                logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "删除旧CHECK约束失败", e.getMessage());
+            }
+        }
+        
+        // 生成并执行ALTER TABLE语句
         try {
-            String alterSql = codeGeneratorService.generateAlterTableModifyColumnSQL(field.getTableCode(), field);
+            String alterSql;
+            String operationType;
+            
+            // 检查字段名称是否发生了变化
+            if (fieldNameChanged) {
+                // 字段名称发生了变化，执行CHANGE COLUMN语句
+                alterSql = codeGeneratorService.generateAlterTableChangeColumnSQL(field.getTableCode(), existing.getFieldName(), field);
+                operationType = "ALTER_TABLE_CHANGE_COLUMN";
+            } else {
+                // 字段名称没有变化，执行MODIFY COLUMN语句
+                alterSql = codeGeneratorService.generateAlterTableModifyColumnSQL(field.getTableCode(), field);
+                operationType = "ALTER_TABLE_MODIFY_COLUMN";
+            }
+            
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw new RuntimeException("执行ALTER TABLE MODIFY COLUMN失败: " + sqlResult.get("message"));
+                throw new RuntimeException("执行" + operationType + "失败: " + sqlResult.get("message"));
             }
-            logService.logSuccess("admin", "ALTER_TABLE_MODIFY_COLUMN", "执行ALTER TABLE MODIFY COLUMN成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
+            logService.logSuccess("admin", operationType, "执行" + operationType + "成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
         } catch (Exception e) {
-            logService.logError("admin", "ALTER_TABLE_MODIFY_COLUMN", "执行ALTER TABLE MODIFY COLUMN失败", e.getMessage());
-            throw new RuntimeException("执行ALTER TABLE MODIFY COLUMN失败: " + e.getMessage());
+            logService.logError("admin", "ALTER_TABLE_OPERATION", "执行ALTER TABLE操作失败", e.getMessage());
+            throw new RuntimeException("执行ALTER TABLE操作失败: " + e.getMessage());
+        }
+        
+        // 如果validate_rule变化，添加新的CHECK约束
+        if (validateRuleChanged) {
+            try {
+                String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
+                
+                // 生成新的约束名
+                String newConstraintName = "ck_" + tableName + "_" + field.getFieldName();
+                
+                // 生成删除新CHECK约束的SQL语句（以防万一，确保没有重复约束）
+                String dropNewSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + newConstraintName + "`";
+                // 执行删除新约束的SQL语句（忽略失败，因为约束可能不存在）
+                sqlExecuteService.executeSql(dropNewSql, true);
+                
+                // 生成新的CHECK约束
+                String checkConstraint = codeGeneratorService.generateCheckConstraint(field);
+                
+                // 如果有新的CHECK约束，执行添加新CHECK约束的SQL语句
+                if (checkConstraint != null && !checkConstraint.isEmpty()) {
+                    String addSql = "ALTER TABLE `" + tableName + "` ADD CONSTRAINT `" + newConstraintName + "` " + checkConstraint;
+                    Map<String, Object> addResult = sqlExecuteService.executeSql(addSql, true);
+                    if (Boolean.TRUE.equals(addResult.get("success"))) {
+                        logService.logSuccess("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束成功: " + newConstraintName);
+                    } else {
+                        logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", String.valueOf(addResult.get("message")));
+                    }
+                }
+            } catch (Exception e) {
+                // 记录错误日志，但不影响主流程
+                logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", e.getMessage());
+            }
         }
     }
 

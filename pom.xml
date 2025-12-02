@@ -204,7 +204,7 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
-                            <outputDirectory>${project.build.directory}/classes/static</outputDirectory>
+                            <outputDirectory>${project.build.directory}/classes</outputDirectory>
                             <resources>
                                 <resource>
                                     <directory>frontend/dist</directory>

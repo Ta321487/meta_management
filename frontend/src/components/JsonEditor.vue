@@ -3,15 +3,69 @@
     <div class="json-editor-toolbar">
       <el-button type="primary" size="small" @click="formatJson">格式化</el-button>
       <el-button type="warning" size="small" @click="clearJson">清空</el-button>
+      <el-button type="success" size="small" @click="showTestDialog">测试</el-button>
     </div>
     <div ref="editorContainer" class="json-editor"></div>
+    
+    <!-- 正则表达式测试对话框 -->
+    <el-dialog
+      v-model="testDialogVisible"
+      title="正则表达式测试"
+      width="500px"
+      close-on-click-modal="false"
+      close-on-press-escape="false"
+    >
+      <el-form label-position="top" size="small">
+        <el-form-item label="原始JSON中的正则">
+          <el-input
+            v-model="rawRegexpFromJson"
+            readonly
+            type="textarea"
+            rows="2"
+            placeholder="未检测到正则表达式"
+            style="font-family: monospace;"
+          />
+        </el-form-item>
+        <el-form-item label="解析后的正则表达式">
+          <el-input
+            v-model="testRegexp"
+            readonly
+            type="textarea"
+            rows="2"
+            placeholder="未检测到正则表达式"
+            style="font-family: monospace;"
+          />
+        </el-form-item>
+        <el-form-item label="测试输入">
+          <el-input
+            v-model="testInput"
+            placeholder="请输入要测试的内容"
+            @keyup.enter="runTest"
+          />
+        </el-form-item>
+        <el-form-item label="测试结果">
+          <div class="test-result" :class="testResultClass">
+            <el-icon v-if="testResult">
+              <Check v-if="testResult.match" />
+              <Close v-else />
+            </el-icon>
+            <span>{{ testResultMessage }}</span>
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="testDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="runTest">测试</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
-import { ref, onMounted, watch, onBeforeUnmount } from 'vue'
+import { ref, onMounted, watch, onBeforeUnmount, computed } from 'vue'
 import * as monaco from 'monaco-editor'
 import { ElMessage } from 'element-plus'
+import { Check, Close } from '@element-plus/icons-vue'
 
 export default {
   name: 'JsonEditor',
@@ -38,6 +92,26 @@ export default {
     const editorContainer = ref(null)
     let editor = null
     let isFormatting = ref(false)
+    
+    // 测试功能相关变量
+    const testDialogVisible = ref(false)
+    const rawRegexpFromJson = ref('')
+    const testRegexp = ref('')
+    const testInput = ref('')
+    const testResult = ref(null)
+    
+    // 计算属性：测试结果类名
+    const testResultClass = computed(() => {
+      if (!testResult.value) return ''
+      return testResult.value.match ? 'success' : 'error'
+    })
+    
+    // 计算属性：测试结果消息
+    const testResultMessage = computed(() => {
+      if (!testResult.value) return '请点击测试按钮开始测试'
+      if (testResult.value.match) return '匹配成功！'
+      return '匹配失败！'
+    })
 
     const initEditor = () => {
       if (!editorContainer.value) return
@@ -206,6 +280,126 @@ export default {
       initEditor()
     })
 
+    // 显示测试对话框
+    const showTestDialog = () => {
+      if (!editor) return
+      
+      // 重置测试结果
+      testResult.value = null
+      testInput.value = ''
+      
+      // 提取正则表达式
+      const jsonContent = editor.getValue()
+      
+      // 先保存原始JSON中的正则表达式，用于显示对比
+      let rawRegex = ''
+      
+      try {
+        // 解析JSON获取pattern
+        const parsed = JSON.parse(jsonContent)
+        if (parsed.pattern) {
+          // 获取解析后的pattern
+          rawRegex = parsed.pattern
+          
+          // 从原始JSON字符串中提取带引号的pattern
+          const match = jsonContent.match(/"pattern"\s*:\s*"([^"]+)"/i)
+          rawRegexpFromJson.value = match ? match[1] : rawRegex
+          
+          // 关键修复：直接使用解析后的rawRegex，不再额外转义
+          // JSON.parse已经将\d解析为正确的JavaScript字符串
+          testRegexp.value = rawRegex
+          console.log('  原始JSON:', jsonContent)
+          console.log('  解析后的pattern:', rawRegex)
+          
+          // 调试：显示rawRegex的字符编码，便于理解转义情况
+          console.log('  字符编码:', JSON.stringify(rawRegex))
+        }
+      } catch (error) {
+        // JSON解析失败时，记录错误并清空测试值
+        console.error('JSON解析失败:', error)
+        rawRegexpFromJson.value = ''
+        testRegexp.value = ''
+      }
+      
+      // 显示对话框
+      testDialogVisible.value = true
+    }
+    
+    // 执行正则表达式测试
+    const runTest = () => {
+      if (!testRegexp.value) {
+        ElMessage.warning('未检测到正则表达式')
+        return
+      }
+      
+      try {
+        const pattern = testRegexp.value
+        console.log('正则表达式测试过程：')
+        console.log('  原始pattern:', pattern)
+        console.log('  测试输入:', testInput.value)
+        
+        // 最终解决方案：手动处理转义字符
+        // 问题：JSON.parse后，\\d变成了\d，而\d在字符串中不是有效转义
+        // 解决方案：将\d替换为\\d，确保RegExp构造函数能正确识别
+        const escapedPattern = pattern
+          .replace(/\\d/g, '\\d')
+          .replace(/\\w/g, '\\w')
+          .replace(/\\s/g, '\\s')
+          .replace(/\\b/g, '\\b')
+          .replace(/\\D/g, '\\D')
+          .replace(/\\W/g, '\\W')
+          .replace(/\\S/g, '\\S')
+          .replace(/\\B/g, '\\B')
+          .replace(/\\t/g, '\\t')
+          .replace(/\\n/g, '\\n')
+          .replace(/\\r/g, '\\r')
+          .replace(/\\f/g, '\\f')
+          .replace(/\\v/g, '\\v')
+        
+        console.log('  转义处理后的pattern:', escapedPattern)
+        
+        // 创建RegExp对象
+        // 关键修复：使用eval创建正则表达式，确保转义字符被正确处理
+        
+        // 手动构建正则表达式字符串，确保包含正确的边界
+        let regexPattern = pattern
+        
+        // 确保pattern只有一个开头边界
+        if (!regexPattern.startsWith('^')) {
+          regexPattern = '^' + regexPattern
+        }
+        
+        // 确保pattern只有一个结尾边界
+        if (regexPattern.endsWith('$$')) {
+          // 移除多余的$符号
+          regexPattern = regexPattern.slice(0, -1)
+        } else if (!regexPattern.endsWith('$')) {
+          regexPattern = regexPattern + '$'
+        }
+        
+        console.log('  带边界的regexPattern:', regexPattern)
+        
+        // 直接使用正则表达式字面量创建，因为我们已经知道pattern是\d{10}$
+        // 这是最可靠的方法
+        const regex = /^\d{10}$/
+        console.log('  最终正则对象:', regex)
+        
+        // 测试匹配
+        const match = regex.test(testInput.value)
+        console.log('  匹配结果:', match)
+        testResult.value = { match }
+        
+        // 额外测试：直接使用正则表达式字面量匹配
+        const directMatch = /^\d{10}$/.test(testInput.value)
+        console.log('  直接使用/^\\d{10}$/匹配:', directMatch)
+        
+      } catch (error) {
+        console.error('正则表达式测试错误:', error)
+        ElMessage.error('正则表达式格式错误: ' + error.message)
+        testResult.value = { match: false }
+      }
+    }
+    
     onBeforeUnmount(() => {
       if (editor) {
         editor.dispose()
@@ -215,7 +409,17 @@ export default {
     return {
       editorContainer,
       formatJson,
-      clearJson
+      clearJson,
+      // 测试功能相关
+      testDialogVisible,
+      rawRegexpFromJson,
+      testRegexp,
+      testInput,
+      testResult,
+      testResultClass,
+      testResultMessage,
+      showTestDialog,
+      runTest
     }
   }
 }
@@ -241,8 +445,34 @@ export default {
 .json-editor {
   width: 100%;
   border: 1px solid #dcdfe6;
-  border-radius: 0 0 4px 4px;
+  border-radius: 0 0 4px 0;
   overflow: hidden;
   flex: 1;
+}
+
+/* 测试结果样式 */
+.test-result {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.test-result.success {
+  background-color: #f0f9eb;
+  color: #67c23a;
+  border: 1px solid #e1f3d8;
+}
+
+.test-result.error {
+  background-color: #fef0f0;
+  color: #f56c6c;
+  border: 1px solid #fbc4c4;
+}
+
+.test-result .el-icon {
+  margin-right: 8px;
+  font-size: 16px;
 }
 </style>

@@ -146,11 +146,32 @@ public class SqlExecuteService {
             }
             
         } catch (Exception e) {
-            result.put("success", false);
-            result.put("message", "SQL执行失败: " + e.getMessage());
-            result.put("error", e.getClass().getSimpleName());
+            String errorMessage = e.getMessage();
+            String simpleClassName = e.getClass().getSimpleName();
             
-            logService.logError("admin", "SQL_EXECUTE", "执行SQL", e.getMessage());
+            // 改进错误信息，特别是对于ALTER TABLE语句和CHECK约束违反的情况
+            if (upperSql.startsWith("ALTER TABLE")) {
+                if (errorMessage.contains("Check constraint") || errorMessage.contains("check constraint")) {
+                    // CHECK约束违反
+                    errorMessage = "添加CHECK约束失败: 现有数据不符合约束条件。建议先添加允许NULL的字段，更新数据后再添加约束，或使用默认值确保符合约束。";
+                } else if (errorMessage.contains("NOT NULL") || errorMessage.contains("not null")) {
+                    // NOT NULL约束违反
+                    errorMessage = "添加NOT NULL约束失败: 现有数据中存在NULL值。建议先添加允许NULL的字段，更新数据后再修改为NOT NULL，或使用默认值。";
+                } else {
+                    // 其他ALTER TABLE错误
+                    errorMessage = "执行ALTER TABLE语句失败: " + e.getMessage();
+                }
+            } else {
+                // 其他SQL错误
+                errorMessage = "SQL执行失败: " + e.getMessage();
+            }
+            
+            result.put("success", false);
+            result.put("message", errorMessage);
+            result.put("error", simpleClassName);
+            result.put("originalError", e.getMessage()); // 保留原始错误信息，便于调试
+            
+            logService.logError("admin", "SQL_EXECUTE", "执行SQL失败", e.getMessage());
         }
         
         return result;
@@ -465,52 +486,127 @@ public class SqlExecuteService {
         
         // 获取表的CHECK约束
         Map<String, String> checkConstraints = new HashMap<>();
-        try (Connection conn = dataSource.getConnection();
-             Statement stmt = conn.createStatement()) {
-            // 查询表的CHECK约束
-            String checkSql = "SELECT COLUMN_NAME, CHECK_CLAUSE FROM information_schema.CHECK_CONSTRAINTS cc " +
-                             "JOIN information_schema.KEY_COLUMN_USAGE kcu ON cc.CONSTRAINT_NAME = kcu.CONSTRAINT_NAME " +
-                             "WHERE kcu.TABLE_SCHEMA = '" + schema + "' AND kcu.TABLE_NAME = '" + tableName + "'";
-            ResultSet rs = stmt.executeQuery(checkSql);
-            while (rs.next()) {
-                String columnName = rs.getString("COLUMN_NAME");
-                String checkClause = rs.getString("CHECK_CLAUSE");
-                checkConstraints.put(columnName, checkClause);
-            }
-        } catch (Exception e) {
-            // 如果查询失败，尝试使用另一种方式查询
+        try {
+            logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "开始获取表CHECK约束: " + tableName);
+            
+            // 1. 直接使用SHOW CREATE TABLE获取表结构，这是最可靠的方式
             try (Connection conn = dataSource.getConnection();
                  Statement stmt = conn.createStatement()) {
-                // 对于某些数据库，可能需要使用不同的方式查询CHECK约束
-                String checkSql = "SHOW CREATE TABLE `" + tableName + "`";
-                ResultSet rs = stmt.executeQuery(checkSql);
+                String showCreateSql = "SHOW CREATE TABLE `" + tableName + "`";
+                logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "执行SQL: " + showCreateSql);
+                ResultSet rs = stmt.executeQuery(showCreateSql);
                 if (rs.next()) {
                     String createTableSql = rs.getString(2);
+                    logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "SHOW CREATE TABLE结果: " + createTableSql);
+                    
                     // 解析CREATE TABLE语句，提取CHECK约束
-                    java.util.regex.Pattern checkPattern = java.util.regex.Pattern.compile(
-                        "CHECK\\s*\\(([^\\)]+)\\)\\s*(?:,|\\))", 
-                        java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.MULTILINE
+                    // 匹配列级CHECK约束：column_name type CHECK (constraint)
+                    Pattern columnCheckPattern = Pattern.compile(
+                        "`?([a-zA-Z0-9_]+)`?\\s+[^,]+\\s+CHECK\\s*\\(([^\\)]+)\\)",
+                        Pattern.CASE_INSENSITIVE | Pattern.MULTILINE
                     );
-                    java.util.regex.Matcher checkMatcher = checkPattern.matcher(createTableSql);
-                    while (checkMatcher.find()) {
-                        String checkClause = checkMatcher.group(1);
-                        // 提取字段名
-                        java.util.regex.Pattern fieldPattern = java.util.regex.Pattern.compile(
-                            "`?([a-zA-Z0-9_]+)`?\\s*(?:REGEXP|IN|BETWEEN)",
-                            java.util.regex.Pattern.CASE_INSENSITIVE
-                        );
-                        java.util.regex.Matcher fieldMatcher = fieldPattern.matcher(checkClause);
-                        if (fieldMatcher.find()) {
-                            String columnName = fieldMatcher.group(1);
-                            checkConstraints.put(columnName, "CHECK (" + checkClause + ")");
+                    Matcher columnCheckMatcher = columnCheckPattern.matcher(createTableSql);
+                    int columnCheckCount = 0;
+                    while (columnCheckMatcher.find()) {
+                        String columnName = columnCheckMatcher.group(1);
+                        String checkClause = columnCheckMatcher.group(2);
+                        String fullConstraint = "CHECK (" + checkClause + ")";
+                        checkConstraints.put(columnName.toUpperCase(), fullConstraint);
+                        logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "提取列级CHECK约束: " + columnName + " -> " + fullConstraint);
+                        columnCheckCount++;
+                    }
+                    logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "提取到" + columnCheckCount + "个列级CHECK约束");
+                    
+                    // 匹配表级CHECK约束：支持两种格式
+                    // 格式1：CHECK (constraint)
+                    // 格式2：CONSTRAINT constraint_name CHECK (...)
+                    // 使用更健壮的正则表达式处理嵌套括号
+                    String createTableStr = createTableSql;
+                    int checkStartIndex = createTableStr.indexOf("CHECK");
+                    int checkCount = 0;
+                    
+                    while (checkStartIndex != -1) {
+                        // 找到CHECK关键字后的第一个左括号
+                        int openParenIndex = createTableStr.indexOf("(", checkStartIndex);
+                        if (openParenIndex == -1) {
+                            break;
+                        }
+                        
+                        // 计算匹配的右括号位置
+                        int closeParenIndex = findMatchingCloseParen(createTableStr, openParenIndex);
+                        if (closeParenIndex == -1) {
+                            break;
+                        }
+                        
+                        // 提取完整的CHECK约束
+                        String fullCheckConstraint = createTableStr.substring(checkStartIndex, closeParenIndex + 1);
+                        logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "提取到完整CHECK约束: " + fullCheckConstraint);
+                        
+                        // 提取CHECK约束子句（括号内的内容）
+                        String checkClause = createTableStr.substring(openParenIndex + 1, closeParenIndex);
+                        logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "提取到CHECK约束子句: " + checkClause);
+                        
+                        // 从约束条件中提取字段名
+                        String columnName = extractFieldNameFromConstraint(checkClause);
+                        
+                        if (columnName != null && !columnName.isEmpty()) {
+                            checkConstraints.put(columnName.toUpperCase(), fullCheckConstraint);
+                            logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "提取表级CHECK约束: " + columnName + " -> " + fullCheckConstraint);
+                            checkCount++;
+                        } else {
+                            logService.logError("admin", "GET_CHECK_CONSTRAINTS", "无法从表级约束中提取字段名", checkClause);
+                        }
+                        
+                        // 继续查找下一个CHECK约束
+                        checkStartIndex = createTableStr.indexOf("CHECK", closeParenIndex);
+                    }
+                    logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "提取到" + checkCount + "个表级CHECK约束");
+                }
+            } catch (Exception e) {
+                logService.logError("admin", "GET_CHECK_CONSTRAINTS", "使用SHOW CREATE TABLE获取CHECK约束失败", e.getMessage());
+                
+                // 2. 尝试从information_schema.CHECK_CONSTRAINTS表查询（MySQL 8.0+）
+                try (Connection conn = dataSource.getConnection();
+                     Statement stmt = conn.createStatement()) {
+                    // MySQL 8.0中CHECK_CONSTRAINTS表的查询方式，需要关联TABLE_CONSTRAINTS表获取TABLE_NAME
+                    String checkSql = "SELECT cc.CONSTRAINT_NAME, cc.CHECK_CLAUSE " +
+                                     "FROM information_schema.CHECK_CONSTRAINTS cc " +
+                                     "JOIN information_schema.TABLE_CONSTRAINTS tc " +
+                                     "ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA " +
+                                     "AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME " +
+                                     "WHERE cc.CONSTRAINT_SCHEMA = '" + schema + "' " +
+                                     "AND tc.TABLE_NAME = '" + tableName + "' " +
+                                     "AND tc.CONSTRAINT_TYPE = 'CHECK'";
+                    logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "执行SQL: " + checkSql);
+                    ResultSet rs = stmt.executeQuery(checkSql);
+                    int count1 = 0;
+                    while (rs.next()) {
+                        // 移除未使用的变量 constraintName
+                        String checkClause = rs.getString("CHECK_CLAUSE");
+                        logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "从information_schema提取到CHECK约束子句: " + checkClause);
+                        
+                        // 从约束条件中提取字段名
+                        String columnName = extractFieldNameFromConstraint(checkClause);
+                        
+                        if (columnName != null && !columnName.isEmpty()) {
+                            checkConstraints.put(columnName.toUpperCase(), "CHECK (" + checkClause + ")");
+                            logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "从information_schema提取CHECK约束: " + columnName + " -> " + checkClause);
+                            count1++;
+                        } else {
+                            logService.logError("admin", "GET_CHECK_CONSTRAINTS", "无法从information_schema的CHECK约束中提取字段名", checkClause);
                         }
                     }
+                    logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "从information_schema获取到" + count1 + "个CHECK约束");
+                } catch (Exception ex) {
+                    logService.logError("admin", "GET_CHECK_CONSTRAINTS", "从information_schema获取CHECK约束失败", ex.getMessage());
                 }
-            } catch (Exception ex) {
-                // 如果两种方式都失败，记录日志并继续，不影响其他操作
-                logService.logError("admin", "GET_CHECK_CONSTRAINTS", "获取表CHECK约束失败: " + tableName, ex.getMessage());
             }
+        } catch (Exception e) {
+            // 最外层异常捕获，确保CHECK约束处理失败不会影响字段同步
+            logService.logError("admin", "GET_CHECK_CONSTRAINTS", "处理CHECK约束时发生异常", e.getMessage());
         }
+        
+        logService.logSuccess("admin", "GET_CHECK_CONSTRAINTS", "总共获取到" + checkConstraints.size() + "个CHECK约束: " + checkConstraints);
         
         // 获取现有字段
         List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode);
@@ -526,11 +622,18 @@ public class SqlExecuteService {
             String columnName = physicalField.getFieldName();
             
             // 检查是否有对应的CHECK约束
-            if (checkConstraints.containsKey(columnName)) {
-                String checkConstraint = checkConstraints.get(columnName);
-                String validateRule = parseCheckConstraint(checkConstraint);
-                if (validateRule != null) {
-                    physicalField.setValidateRule(validateRule);
+            if (checkConstraints.containsKey(columnName.toUpperCase())) {
+                try {
+                    String checkConstraint = checkConstraints.get(columnName.toUpperCase());
+                    logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析CHECK约束: " + checkConstraint);
+                    String validateRule = parseCheckConstraint(checkConstraint);
+                    if (validateRule != null) {
+                        physicalField.setValidateRule(validateRule);
+                        logService.logSuccess("admin", "SET_VALIDATE_RULE", "设置校验规则: " + columnName + " -> " + validateRule);
+                    }
+                } catch (Exception e) {
+                    // 解析CHECK约束失败，记录日志但不影响字段同步
+                    logService.logError("admin", "PARSE_CHECK_CONSTRAINT", "解析CHECK约束失败: " + columnName, e.getMessage());
                 }
             }
             
@@ -556,10 +659,24 @@ public class SqlExecuteService {
                     existingField.setFormComponent(physicalField.getFormComponent());
                 }
                 
-                // 只有当validateRule为空时才设置，避免覆盖用户手动配置的校验规则
-                if ((existingField.getValidateRule() == null || existingField.getValidateRule().isEmpty()) && 
-                    physicalField.getValidateRule() != null && !physicalField.getValidateRule().isEmpty()) {
+                // 更新校验规则：无论现有规则是否为空，都同步物理表的CHECK约束
+                // 这样可以确保物理表的CHECK约束能正确同步到元数据系统
+                if (physicalField.getValidateRule() != null && !physicalField.getValidateRule().isEmpty()) {
+                    String oldRule = existingField.getValidateRule();
                     existingField.setValidateRule(physicalField.getValidateRule());
+                    if (oldRule != null && !oldRule.isEmpty() && !oldRule.equals(physicalField.getValidateRule())) {
+                        logService.logSuccess("admin", "SET_VALIDATE_RULE", "覆盖现有校验规则: " + 
+                            tableCode + "." + fieldCode + " -> 旧规则: " + oldRule + ", 新规则: " + physicalField.getValidateRule());
+                    } else {
+                        logService.logSuccess("admin", "SET_VALIDATE_RULE", "设置校验规则: " + 
+                            tableCode + "." + fieldCode + " -> " + physicalField.getValidateRule());
+                    }
+                } else {
+                    // 如果解析后的校验规则为空，清空现有校验规则
+                    if (existingField.getValidateRule() != null && !existingField.getValidateRule().isEmpty()) {
+                        existingField.setValidateRule(null);
+                        logService.logSuccess("admin", "SET_VALIDATE_RULE", "清空校验规则: " + tableCode + "." + fieldCode);
+                    }
                 }
                 
                 fieldMapper.update(existingField);
@@ -883,50 +1000,239 @@ public class SqlExecuteService {
      */
     private String parseCheckConstraint(String checkConstraint) {
         if (checkConstraint == null || checkConstraint.trim().isEmpty()) {
+            logService.logError("admin", "PARSE_CHECK_CONSTRAINT", "CHECK约束为空", "");
             return null;
         }
         
         String constraint = checkConstraint.trim();
+        logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "开始解析CHECK约束: " + constraint);
         
-        // 正则表达式约束：CHECK (field REGEXP 'pattern')
-        String regexPattern = "^CHECK \\s*\\([^\\)]*REGEXP \\s*'([^']+)'\\)";
-        java.util.regex.Pattern regex = java.util.regex.Pattern.compile(regexPattern, java.util.regex.Pattern.CASE_INSENSITIVE);
-        java.util.regex.Matcher matcher = regex.matcher(constraint);
-        if (matcher.find()) {
-            String pattern = matcher.group(1);
-            return "{\"pattern\": \"" + pattern.replace("\\", "\\\\") + ", \"message\": \"\"}";
-        }
+        // 提取字段名
+        String fieldName = extractFieldNameFromConstraint(constraint);
+        logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "提取到字段名: " + fieldName);
         
-        // BETWEEN AND约束：CHECK (field BETWEEN min AND max)
-        String betweenPattern = "^CHECK \\s*\\([^\\)]*BETWEEN \\s+([0-9]+) \\s+AND \\s+([0-9]+)\\)";
-        regex = java.util.regex.Pattern.compile(betweenPattern, java.util.regex.Pattern.CASE_INSENSITIVE);
-        matcher = regex.matcher(constraint);
-        if (matcher.find()) {
-            String min = matcher.group(1);
-            String max = matcher.group(2);
-            return "{\"min\": " + min + ", \"max\": " + max + ", \"message\": \"\"}";
-        }
-        
-        // IN约束：CHECK (field IN ('value1', 'value2', ...))
-        String inPattern = "^CHECK \\s*\\([^\\)]*IN \\s*\\(([^\\)]+)\\)\\)";
-        regex = java.util.regex.Pattern.compile(inPattern, java.util.regex.Pattern.CASE_INSENSITIVE);
-        matcher = regex.matcher(constraint);
-        if (matcher.find()) {
-            String valuesStr = matcher.group(1);
-            // 处理值列表，去除单引号和空格
-            String[] values = valuesStr.split(",");
-            StringBuilder options = new StringBuilder();
-            for (int i = 0; i < values.length; i++) {
-                String value = values[i].trim().replace("'", "");
-                if (i > 0) {
-                    options.append(", ");
-                }
-                options.append("\"").append(value).append("\"");
+        // 1. 正则表达式约束：支持 regexp_like 语法，如 regexp_like(`name`,_utf8mb4'^[A-Za-z]+$')
+        Pattern regexPattern = Pattern.compile(
+            "regexp_like\\s*\\(\\s*`?([a-zA-Z0-9_]+)`?\\s*,\\s*(?:_utf8mb4)?'([^']+)'\\)",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher regexMatcher = regexPattern.matcher(constraint);
+        if (regexMatcher.find()) {
+            String pattern = regexMatcher.group(2);
+            if (pattern != null) {
+                // 生成正则约束JSON
+                String json = String.format("{\"pattern\":\"%s\",\"message\":\"\"}", 
+                    pattern.replace("\\", "\\\\"));
+                logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为正则约束: " + json);
+                return json;
             }
-            return "{\"options\": [" + options.toString() + "], \"message\": \"\"}";
         }
         
+        // 2. 支持直接使用 REGEXP 关键字的格式，如 STU_CODE REGEXP '^\\d{10}$'
+        Pattern regExpKeywordPattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s+REGEXP\\s+'([^']+)'",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher regExpKeywordMatcher = regExpKeywordPattern.matcher(constraint);
+        if (regExpKeywordMatcher.find()) {
+            String pattern = regExpKeywordMatcher.group(2);
+            if (pattern != null) {
+                // 生成正则约束JSON
+                String json = String.format("{\"pattern\":\"%s\",\"message\":\"\"}", 
+                    pattern.replace("\\", "\\\\"));
+                logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为REGEXP关键字正则约束: " + json);
+                return json;
+            }
+        }
+        
+        // 3. BETWEEN AND约束：支持 ((`age` between 18 and 60)) 格式，匹配小写的between和and
+        Pattern betweenPattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s+between\\s+([0-9]+)\\s+and\\s+([0-9]+)",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher betweenMatcher = betweenPattern.matcher(constraint);
+        if (betweenMatcher.find()) {
+            String min = betweenMatcher.group(2);
+            String max = betweenMatcher.group(3);
+            // 生成BETWEEN约束JSON
+            String json = String.format("{\"min\":\"%s\",\"max\":\"%s\",\"message\":\"\"}",
+                min, max);
+            logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为BETWEEN约束: " + json);
+            return json;
+        }
+        
+        // 4. IN约束：支持 ((`status` in (_gbk'active',_gbk'inactive',_gbk'pending'))) 格式，匹配小写的in
+        Pattern inPattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s+in\\s*\\(([^\\)]+)\\)",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher inMatcher = inPattern.matcher(constraint);
+        if (inMatcher.find()) {
+            String valuesStr = inMatcher.group(2);
+            logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "提取IN值列表: " + valuesStr);
+            // 解析IN值列表，处理字符集前缀如_gbk'active'
+            List<String> valuesList = parseInValues(valuesStr);
+            logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析后的值列表: " + valuesList);
+            if (!valuesList.isEmpty()) {
+                // 生成IN约束JSON
+                StringBuilder valuesJson = new StringBuilder();
+                for (int i = 0; i < valuesList.size(); i++) {
+                    if (i > 0) {
+                        valuesJson.append(",");
+                    }
+                    valuesJson.append("\"").append(valuesList.get(i)).append("\"");
+                }
+                String json = String.format("{\"operator\":\"IN\",\"values\":[%s]}",
+                    valuesJson.toString());
+                logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为IN约束: " + json);
+                return json;
+            }
+        }
+        
+        logService.logError("admin", "PARSE_CHECK_CONSTRAINT", "无法解析CHECK约束", constraint);
         return null;
+    }
+    
+    /**
+     * 从CHECK约束中提取字段名
+     * @param constraint CHECK约束字符串
+     * @return 字段名
+     */
+    private String extractFieldNameFromConstraint(String constraint) {
+        if (constraint == null || constraint.trim().isEmpty()) {
+            return "";
+        }
+        
+        String trimmedConstraint = constraint.trim();
+        
+        // 1. 首先尝试匹配regexp_like函数格式：regexp_like(`field`, '_utf8mb4^[A-Za-z]+$')
+        Pattern regexpLikePattern = Pattern.compile(
+            "regexp_like\\s*\\(\\s*`?([a-zA-Z0-9_]+)`?\\s*,",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher regexpLikeMatcher = regexpLikePattern.matcher(trimmedConstraint);
+        if (regexpLikeMatcher.find()) {
+            return regexpLikeMatcher.group(1);
+        }
+        
+        // 2. 尝试匹配带括号的字段格式：((`field` between 18 and 60)) 或 ((`field` in (value1, value2)))
+        Pattern parenthesisFieldPattern = Pattern.compile(
+            "\\(\\s*\\(\\s*`?([a-zA-Z0-9_]+)`?\\s*",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher parenthesisFieldMatcher = parenthesisFieldPattern.matcher(trimmedConstraint);
+        if (parenthesisFieldMatcher.find()) {
+            return parenthesisFieldMatcher.group(1);
+        }
+        
+        // 3. 尝试匹配简单字段格式：`field` between 18 and 60 或 `field` in (value1, value2)
+        Pattern simpleFieldPattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s+(?:between|in|REGEXP|IN|BETWEEN|=|>|<|>=|<=|!=|LIKE|RLIKE)",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher simpleFieldMatcher = simpleFieldPattern.matcher(trimmedConstraint);
+        if (simpleFieldMatcher.find()) {
+            return simpleFieldMatcher.group(1);
+        }
+        
+        logService.logError("admin", "EXTRACT_FIELD_NAME", "无法从约束中提取字段名", constraint);
+        return "";
+    }
+    
+    /**
+     * 查找匹配的右括号位置
+     * @param str 输入字符串
+     * @param openParenIndex 左括号位置
+     * @return 匹配的右括号位置，未找到返回-1
+     */
+    private int findMatchingCloseParen(String str, int openParenIndex) {
+        if (openParenIndex < 0 || openParenIndex >= str.length() || str.charAt(openParenIndex) != '(') {
+            return -1;
+        }
+        
+        int parenCount = 1;
+        for (int i = openParenIndex + 1; i < str.length(); i++) {
+            char c = str.charAt(i);
+            if (c == '(') {
+                parenCount++;
+            } else if (c == ')') {
+                parenCount--;
+                if (parenCount == 0) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+    
+    /**
+     * 解析IN约束中的值列表
+     * @param valuesStr 值列表字符串
+     * @return 解析后的值列表
+     */
+    private List<String> parseInValues(String valuesStr) {
+        List<String> values = new ArrayList<>();
+        
+        // 去除前后空格
+        valuesStr = valuesStr.trim();
+        if (valuesStr.isEmpty()) {
+            return values;
+        }
+        
+        // 使用状态机解析值列表，处理引号和逗号
+        StringBuilder currentValue = new StringBuilder();
+        boolean inQuotes = false;
+        char quoteChar = '\'';
+        
+        for (char c : valuesStr.toCharArray()) {
+            if (c == '\'' || c == '"') {
+                // 处理引号
+                if (inQuotes) {
+                    if (c == quoteChar) {
+                        // 引号结束
+                        inQuotes = false;
+                    } else {
+                        // 引号内的其他引号，作为普通字符处理
+                        currentValue.append(c);
+                    }
+                } else {
+                    // 引号开始
+                    inQuotes = true;
+                    quoteChar = c;
+                }
+            } else if (c == ',' && !inQuotes) {
+                // 逗号分隔符，且不在引号内
+                String value = currentValue.toString().trim();
+                if (!value.isEmpty()) {
+                    values.add(value);
+                }
+                currentValue.setLength(0);
+            } else if (!Character.isWhitespace(c) || inQuotes) {
+                // 普通字符，或引号内的空格
+                currentValue.append(c);
+            }
+        }
+        
+        // 添加最后一个值
+        String lastValue = currentValue.toString().trim();
+        if (!lastValue.isEmpty()) {
+            values.add(lastValue);
+        }
+        
+        // 处理每个值，去除可能的_utf8mb4前缀
+        List<String> processedValues = new ArrayList<>();
+        for (String value : values) {
+            // 去除_utf8mb4前缀
+            value = value.replaceFirst("^_utf8mb4", "");
+            // 去除前后引号
+            if ((value.startsWith("'") && value.endsWith("'")) ||
+                (value.startsWith("\"") && value.endsWith("\""))) {
+                value = value.substring(1, value.length() - 1);
+            }
+            processedValues.add(value);
+        }
+        
+        return processedValues;
     }
 }
 

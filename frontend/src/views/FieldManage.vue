@@ -557,60 +557,38 @@ export default {
         }
       }
       
-      // 特殊处理主键字段：如果是主键字段（字段名为id）且表单组件为空，则跳过表单组件验证
-      let isValid = true
-      let errorMessage = ''
-      
+      // 表单验证
+      let valid = true
       if (form.fieldName === 'id') {
-        // 对主键字段进行简化验证，跳过表单组件验证
+        // 主键字段简化验证，跳过表单组件验证
         if (!form.fieldCode) {
-          isValid = false
-          errorMessage = '请输入字段编码'
+          valid = false
+          ElMessage.error('请输入字段编码')
         } else if (!form.fieldName) {
-          isValid = false
-          errorMessage = '请输入字段名称'
+          valid = false
+          ElMessage.error('请输入字段名称')
         } else if (!form.fieldType) {
-          isValid = false
-          errorMessage = '请输入字段类型'
+          valid = false
+          ElMessage.error('请输入字段类型')
         } else if (!form.label) {
-          isValid = false
-          errorMessage = '请输入显示名'
-        }
-        
-        if (!isValid) {
-          ElMessage.error(errorMessage)
-          return
+          valid = false
+          ElMessage.error('请输入显示名')
         }
       } else {
         // 非主键字段使用正常的表单验证
-        await formRef.value.validate(async (valid) => {
-          if (valid) {
-            try {
-              // 处理校验规则：如果是{}，转换为null
-              const submitForm = { ...form }
-              if (submitForm.validateRule === '{}' || submitForm.validateRule === '{\n}') {
-                submitForm.validateRule = null
-              }
-              
-              if (form.id) {
-                await updateField(submitForm)
-              } else {
-                await addField(submitForm)
-              }
-              ElMessage.success('操作成功')
-              dialogVisible.value = false
-              loadFields()
-            } catch (error) {
-              // 显示后端返回的具体错误消息，如果没有则显示通用错误
-              const errorMsg = error.response?.data?.message || '操作失败'
-              ElMessage.error(errorMsg)
-            }
-          }
-        })
+        try {
+          await formRef.value.validate()
+        } catch (error) {
+          valid = false
+          // 表单验证失败，Element Plus会自动显示错误信息
+        }
+      }
+      
+      if (!valid) {
         return
       }
       
-      // 主键字段的保存逻辑
+      // 统一保存逻辑
       try {
         // 确保主键字段的排序号为0
         const submitForm = { ...form }

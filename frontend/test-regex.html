@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Regex Test</title>
+    <script>
+        // 模拟从JSON中解析出的正则表达式
+        const json = '{"pattern": "^\\\\d{10}$"}';
+        console.log('原始JSON:', json);
+        
+        // 使用JSON.parse解析
+        const parsed = JSON.parse(json);
+        console.log('解析后的pattern:', parsed.pattern);
+        console.log('pattern长度:', parsed.pattern.length);
+        console.log('pattern字符:', [...parsed.pattern].map(c => `'${c}'`));
+        
+        // 直接使用RegExp构造函数
+        const regex1 = new RegExp(parsed.pattern);
+        console.log('RegExp构造函数结果:', regex1);
+        console.log('测试1234567890:', regex1.test('1234567890'));
+        
+        // 使用Function构造函数
+        const testFunc = new Function('input', `return /${parsed.pattern}/.test(input);`);
+        console.log('Function构造函数测试1234567890:', testFunc('1234567890'));
+        
+        // 直接使用正则表达式字面量
+        const regexLiteral = /^\d{10}$/;
+        console.log('正则字面量结果:', regexLiteral);
+        console.log('测试1234567890:', regexLiteral.test('1234567890'));
+        
+        // 动态构建正则表达式
+        const dynamicRegex = new RegExp('^\\d{10}$');
+        console.log('动态构建结果:', dynamicRegex);
+        console.log('测试1234567890:', dynamicRegex.test('1234567890'));
+    </script>
+</head>
+<body>
+    <h1>Regex Test</h1>
+    <p>Check the console for results.</p>
+</body>
+</html>
