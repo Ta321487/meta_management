@@ -109,8 +109,19 @@ export default {
     // 计算属性：测试结果消息
     const testResultMessage = computed(() => {
       if (!testResult.value) return '请点击测试按钮开始测试'
-      if (testResult.value.match) return '匹配成功！'
-      return '匹配失败！'
+      if (testResult.value.match) {
+        // 匹配成功，显示通过
+        return '通过'
+      } else {
+        // 匹配失败
+        if (testResult.value.message === null || testResult.value.message === undefined || testResult.value.message === '') {
+          // message为空、null或undefined，显示undefined
+          return 'undefined'
+        } else {
+          // 有message内容，直接显示
+          return testResult.value.message
+        }
+      }
     })
 
     const initEditor = () => {
@@ -370,6 +381,7 @@ export default {
           // 支持字符串和数字类型的匹配
           const values = parsed.values
           let matchResult = false
+          let message = ''
           
           for (const value of values) {
             if (String(value) === String(testInputValue)) {
@@ -378,8 +390,13 @@ export default {
             }
           }
           
-          console.log('  匹配结果:', matchResult)
-          testResult.value = { match: matchResult }
+          if (!matchResult) {
+            // 使用JSON中的message字段
+            message = parsed.message || ''
+          }
+          
+          console.log('  匹配结果:', matchResult, ' 消息:', message)
+          testResult.value = { match: matchResult, message }
           return
         } else if (parsed.min && parsed.max) {
           // between约束测试逻辑
@@ -393,17 +410,26 @@ export default {
           const inputValue = Number(testInputValue)
           const min = Number(parsed.min)
           const max = Number(parsed.max)
+          let matchResult = false
+          let message = ''
           
           // 检查是否为有效数值
           if (isNaN(inputValue)) {
-            console.log('  匹配结果: false (输入不是有效数值)')
-            testResult.value = { match: false }
+            // 使用JSON中的message字段
+            message = parsed.message || ''
+            console.log('  匹配结果: false (输入不是有效数值) 消息:', message)
+            testResult.value = { match: false, message }
             return
           }
           
-          const matchResult = inputValue >= min && inputValue <= max
-          console.log('  匹配结果:', matchResult)
-          testResult.value = { match: matchResult }
+          matchResult = inputValue >= min && inputValue <= max
+          if (!matchResult) {
+            // 使用JSON中的message字段
+            message = parsed.message || ''
+          }
+          
+          console.log('  匹配结果:', matchResult, ' 消息:', message)
+          testResult.value = { match: matchResult, message }
           return
         }
         
@@ -461,8 +487,13 @@ export default {
         
         // 测试匹配
         const match = regex.test(testInput.value)
-        console.log('  匹配结果:', match)
-        testResult.value = { match }
+        let message = ''
+        if (!match) {
+          // 使用JSON中的message字段
+          message = parsed.message || ''
+        }
+        console.log('  匹配结果:', match, ' 消息:', message)
+        testResult.value = { match, message }
         
         // 额外测试：直接使用正则表达式字面量匹配
         const directMatch = /^\d{10}$/.test(testInput.value)
