@@ -321,6 +321,11 @@ export default {
           
           // 调试：显示rawRegex的字符编码，便于理解转义情况
           console.log('  字符编码:', JSON.stringify(rawRegex))
+        } else if (parsed.min && parsed.max) {
+          // 处理between约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          testRegexp.value = `between ${parsed.min} and ${parsed.max}`
+          console.log('  检测到between约束:', parsed)
         } else {
           // 其他约束类型，显示原始JSON
           rawRegexpFromJson.value = jsonContent
@@ -373,6 +378,30 @@ export default {
             }
           }
           
+          console.log('  匹配结果:', matchResult)
+          testResult.value = { match: matchResult }
+          return
+        } else if (parsed.min && parsed.max) {
+          // between约束测试逻辑
+          console.log('between约束测试过程：')
+          console.log('  测试输入:', testInputValue)
+          console.log('  between约束:', parsed)
+          console.log('  范围:', `${parsed.min} - ${parsed.max}`)
+          
+          // 检查测试输入是否在指定范围内
+          // 支持数值类型的匹配
+          const inputValue = Number(testInputValue)
+          const min = Number(parsed.min)
+          const max = Number(parsed.max)
+          
+          // 检查是否为有效数值
+          if (isNaN(inputValue)) {
+            console.log('  匹配结果: false (输入不是有效数值)')
+            testResult.value = { match: false }
+            return
+          }
+          
+          const matchResult = inputValue >= min && inputValue <= max
           console.log('  匹配结果:', matchResult)
           testResult.value = { match: matchResult }
           return
