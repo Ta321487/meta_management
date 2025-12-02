@@ -295,9 +295,17 @@ export default {
       let rawRegex = ''
       
       try {
-        // 解析JSON获取pattern
+        // 解析JSON获取约束类型
         const parsed = JSON.parse(jsonContent)
-        if (parsed.pattern) {
+        
+        // 检测IN约束
+        if (parsed.operator === 'IN' && parsed.values) {
+          // 处理IN约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          testRegexp.value = JSON.stringify(parsed.values, null, 2)
+          console.log('  检测到IN约束:', parsed)
+        } else if (parsed.pattern) {
+          // 原有正则表达式逻辑
           // 获取解析后的pattern
           rawRegex = parsed.pattern
           
@@ -313,6 +321,11 @@ export default {
           
           // 调试：显示rawRegex的字符编码，便于理解转义情况
           console.log('  字符编码:', JSON.stringify(rawRegex))
+        } else {
+          // 其他约束类型，显示原始JSON
+          rawRegexpFromJson.value = jsonContent
+          testRegexp.value = ''
+          console.log('  检测到其他约束类型:', parsed)
         }
       } catch (error) {
         // JSON解析失败时，记录错误并清空测试值
@@ -328,15 +341,48 @@ export default {
     // 执行正则表达式测试
     const runTest = () => {
       if (!testRegexp.value) {
-        ElMessage.warning('未检测到正则表达式')
+        ElMessage.warning('未检测到约束条件')
         return
       }
       
       try {
+        // 获取编辑器中的原始JSON内容
+        const jsonContent = editor.getValue()
+        const testInputValue = testInput.value
+        
+        // 解析JSON获取约束类型
+        const parsed = JSON.parse(jsonContent)
+        
+        // 检测IN约束
+        if (parsed.operator === 'IN' && parsed.values) {
+          // IN约束测试逻辑
+          console.log('IN约束测试过程：')
+          console.log('  测试输入:', testInputValue)
+          console.log('  IN约束:', parsed)
+          console.log('  可选项:', parsed.values)
+          
+          // 检查测试输入是否在values数组中
+          // 支持字符串和数字类型的匹配
+          const values = parsed.values
+          let matchResult = false
+          
+          for (const value of values) {
+            if (String(value) === String(testInputValue)) {
+              matchResult = true
+              break
+            }
+          }
+          
+          console.log('  匹配结果:', matchResult)
+          testResult.value = { match: matchResult }
+          return
+        }
+        
+        // 原有正则表达式测试逻辑
         const pattern = testRegexp.value
         console.log('正则表达式测试过程：')
         console.log('  原始pattern:', pattern)
-        console.log('  测试输入:', testInput.value)
+        console.log('  测试输入:', testInputValue)
         
         // 最终解决方案：手动处理转义字符
         // 问题：JSON.parse后，\\d变成了\d，而\d在字符串中不是有效转义
@@ -394,8 +440,8 @@ export default {
         console.log('  直接使用/^\\d{10}$/匹配:', directMatch)
         
       } catch (error) {
-        console.error('正则表达式测试错误:', error)
-        ElMessage.error('正则表达式格式错误: ' + error.message)
+        console.error('约束测试错误:', error)
+        ElMessage.error('约束测试错误: ' + error.message)
         testResult.value = { match: false }
       }
     }
