@@ -15,6 +15,7 @@
             </el-select>
             <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode">批量删除</el-button>
             <el-button type="primary" @click="handleAdd" :disabled="!selectedTableCode">新增字段</el-button>
+            <el-button type="info" @click="handleViewConstraints" :disabled="!selectedTableCode">查看约束</el-button>
           </div>
         </div>
       </template>
@@ -185,13 +186,36 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 约束列表对话框 -->
+    <el-dialog
+      v-model="constraintDialogVisible"
+      title="约束列表"
+      width="1000px"
+      @open="loadConstraints"
+    >
+      <el-table :data="constraints" border style="width: 100%" v-loading="constraintLoading">
+        <el-table-column prop="constraintContent" label="约束内容" width="400" />
+        <el-table-column prop="constraintType" label="约束类型" width="150" />
+        <el-table-column prop="fieldName" label="作用列名" width="150" />
+        <el-table-column prop="constraintLevel" label="约束级别" width="150" />
+        <el-table-column label="操作" width="150" fixed="right">
+          <template #default="{ row }">
+            <el-button type="danger" size="small" @click="handleDeleteConstraint(row)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="constraintDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField } from '../api'
+import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField, getConstraintList, deleteConstraint } from '../api'
 import JsonEditor from '../components/JsonEditor'
 
 export default {
@@ -214,6 +238,10 @@ export default {
       size: 10,
       total: 0
     })
+    // 约束相关
+    const constraintDialogVisible = ref(false)
+    const constraints = ref([])
+    const constraintLoading = ref(false)
     const form = reactive({
       id: null,
       fieldCode: '',
@@ -358,6 +386,13 @@ export default {
         typeParams.length = length
         typeParams.precision = precision
         typeParams.scale = scale
+      }
+    })
+
+    // 监听表切换，自动刷新约束列表
+    watch(selectedTableCode, (newValue, oldValue) => {
+      if (newValue && newValue !== oldValue && constraintDialogVisible.value) {
+        loadConstraints()
       }
     })
 
@@ -731,6 +766,46 @@ export default {
       })
     }
 
+    // 约束相关方法
+    const handleViewConstraints = () => {
+      constraintDialogVisible.value = true
+    }
+
+    const loadConstraints = async () => {
+      if (!selectedTableCode.value) return
+      constraintLoading.value = true
+      try {
+        const res = await getConstraintList(selectedTableCode.value)
+        if (res.code === 200) {
+          constraints.value = res.data || []
+        }
+      } catch (error) {
+        ElMessage.error('加载约束列表失败')
+        constraints.value = []
+      } finally {
+        constraintLoading.value = false
+      }
+    }
+
+    const handleDeleteConstraint = (row) => {
+      ElMessageBox.confirm('确定要删除该约束吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await deleteConstraint(row)
+          ElMessage.success('删除成功')
+          loadConstraints()
+        } catch (error) {
+          const errorMsg = error.response?.data?.message || error.data?.message || error.message || '删除失败'
+          ElMessage.error(errorMsg)
+        }
+      }).catch(() => {
+        // 处理用户取消操作
+      })
+    }
+
     onMounted(() => {
       loadTables()
     })
@@ -750,6 +825,11 @@ export default {
       rules,
       baseFieldTypes,
       typeParams,
+      // 约束相关
+      constraintDialogVisible,
+      constraints,
+      constraintLoading,
+      // 方法
       loadFields,
       handleSizeChange,
       handleCurrentChange,
@@ -760,7 +840,11 @@ export default {
       handleDelete,
       handleDialogClose,
       handleSelectionChange,
-      handleBatchDelete
+      handleBatchDelete,
+      // 约束相关方法
+      handleViewConstraints,
+      loadConstraints,
+      handleDeleteConstraint
     }
   }
 }

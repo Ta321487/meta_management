@@ -35,6 +35,10 @@ public class MetadataFieldController {
             fieldService.add(field);
             return Result.success();
         } catch (Exception e) {
+            // 处理SQL唯一约束异常
+            if (e.getMessage().contains("Duplicate entry") || e.getMessage().contains("uk_table_field")) {
+                return Result.error("字段编码已存在");
+            }
             return Result.error(e.getMessage());
         }
     }
@@ -105,6 +109,36 @@ public class MetadataFieldController {
         // 否则使用非分页查询（兼容旧接口）
         List<MetadataField> list = fieldService.listByTableCode(tableCode);
         return Result.success(list);
+    }
+
+    /**
+     * 获取表的约束列表
+     */
+    @GetMapping("/constraint/list/{tableCode}")
+    @Operation(summary = "获取约束列表", description = "根据表编码查询约束列表")
+    public Result<?> getConstraints(
+            @Parameter(description = "表编码") @PathVariable String tableCode) {
+        try {
+            List<Map<String, Object>> constraints = fieldService.getConstraints(tableCode);
+            return Result.success(constraints);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 删除约束
+     */
+    @PostMapping("/constraint/delete")
+    @Operation(summary = "删除约束", description = "删除表的约束")
+    public Result<?> deleteConstraint(
+            @Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
+        try {
+            fieldService.deleteConstraint(params);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
     }
 }
 

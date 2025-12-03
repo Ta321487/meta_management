@@ -29,6 +29,8 @@ export const addField = (data) => request.post('/field/add', data)
 export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (data) => request.post('/field/delete', data)
 export const batchDeleteField = (data) => request.post('/field/batchDelete', data)
+export const getConstraintList = (tableCode) => request.get(`/field/constraint/list/${tableCode}`)
+export const deleteConstraint = (data) => request.post('/field/constraint/delete', data)
 
 // 功能节点相关
 export const getNodeList = (moduleCode, params) => request.get(`/node/list/${moduleCode}`, { params })

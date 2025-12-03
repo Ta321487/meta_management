@@ -480,9 +480,8 @@ export default {
         
         console.log('  带边界的regexPattern:', regexPattern)
         
-        // 直接使用正则表达式字面量创建，因为我们已经知道pattern是\d{10}$
-        // 这是最可靠的方法
-        const regex = /^\d{10}$/
+        // 动态构建正则表达式对象
+        const regex = new RegExp(regexPattern)
         console.log('  最终正则对象:', regex)
         
         // 测试匹配
@@ -494,10 +493,6 @@ export default {
         }
         console.log('  匹配结果:', match, ' 消息:', message)
         testResult.value = { match, message }
-        
-        // 额外测试：直接使用正则表达式字面量匹配
-        const directMatch = /^\d{10}$/.test(testInput.value)
-        console.log('  直接使用/^\\d{10}$/匹配:', directMatch)
         
       } catch (error) {
         console.error('约束测试错误:', error)

@@ -123,6 +123,7 @@ public class CodeGeneratorService {
         rules.put("hasOptions", false);
         rules.put("hasLength", false);
         rules.put("hasRange", false);
+        rules.put("hasOperator", false);
         
         if (validateRule == null || validateRule.trim().isEmpty()) {
             return rules;
@@ -175,12 +176,36 @@ public class CodeGeneratorService {
             }
             rules.put("hasRange", hasRange);
             
+            // 提取操作符（IN、BETWEEN等）
+            if (jsonObject.containsKey("operator")) {
+                String operator = jsonObject.getString("operator");
+                rules.put("hasOperator", true);
+                rules.put("operator", operator);
+                
+                // 提取IN操作符的values
+                if ("IN".equalsIgnoreCase(operator) && jsonObject.containsKey("values")) {
+                    Object values = jsonObject.get("values");
+                    rules.put("values", values);
+                }
+                
+                // 提取BETWEEN操作符的min和max
+                if ("BETWEEN".equalsIgnoreCase(operator)) {
+                    if (jsonObject.containsKey("min")) {
+                        rules.put("min", jsonObject.get("min"));
+                    }
+                    if (jsonObject.containsKey("max")) {
+                        rules.put("max", jsonObject.get("max"));
+                    }
+                }
+            }
+            
         } catch (Exception e) {
             // JSON解析失败，忽略校验规则
             rules.put("hasPattern", false);
             rules.put("hasOptions", false);
             rules.put("hasLength", false);
             rules.put("hasRange", false);
+            rules.put("hasOperator", false);
         }
         
         return rules;
@@ -573,6 +598,43 @@ public class CodeGeneratorService {
                         }
                     }
                     checkConstraint.append(")");
+                }
+            }
+        }
+        
+        // 处理操作符（IN、BETWEEN等）
+        if (validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
+            String operator = (String) validationRules.get("operator");
+            
+            // 处理IN操作符
+            if ("IN".equalsIgnoreCase(operator)) {
+                Object values = validationRules.get("values");
+                if (values instanceof com.alibaba.fastjson2.JSONArray) {
+                    com.alibaba.fastjson2.JSONArray valuesArray = (com.alibaba.fastjson2.JSONArray) values;
+                    if (!valuesArray.isEmpty()) {
+                        checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` IN (");
+                        for (int i = 0; i < valuesArray.size(); i++) {
+                            if (i > 0) {
+                                checkConstraint.append(", ");
+                            }
+                            Object value = valuesArray.get(i);
+                            if (value instanceof String) {
+                                checkConstraint.append("'").append(value).append("'");
+                            } else {
+                                checkConstraint.append(value);
+                            }
+                        }
+                        checkConstraint.append(")");
+                    }
+                }
+            }
+            
+            // 处理BETWEEN操作符
+            else if ("BETWEEN".equalsIgnoreCase(operator)) {
+                Number min = (Number) validationRules.get("min");
+                Number max = (Number) validationRules.get("max");
+                if (min != null && max != null) {
+                    checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` BETWEEN ").append(min).append(" AND ").append(max).append(")");
                 }
             }
         }
