@@ -179,15 +179,35 @@ export default {
     
     const rules = {
 <#list fields as field>
-      <#if field.field.fieldName != "id" && (field.field.isRequired == 1 || (field.validationRules?? && field.validationRules.hasPattern!false))>
+      <#if field.field.fieldName != "id" && (field.field.isRequired == 1 || (field.validationRules?? && (field.validationRules.hasPattern!false || field.validationRules.hasLength!false || field.validationRules.hasRange!false)) || field.field.fieldType?contains("int") || field.field.fieldType?contains("decimal") || field.field.fieldType?contains("double") || field.field.fieldType?contains("float"))>
       ${field.camelCaseName}: [
         <#if field.field.isRequired == 1>
-        { required: true, message: '请输入${field.field.label}', trigger: 'blur' }<#if (field.validationRules?? && field.validationRules.hasPattern!false)>,</#if>
+        { required: true, message: '请输入${field.field.label}', trigger: 'blur' },
+        </#if>
+        <#if field.field.fieldType?contains("int") || field.field.fieldType?contains("decimal") || field.field.fieldType?contains("double") || field.field.fieldType?contains("float")>
+        { type: 'number', message: '请输入有效的数字', trigger: 'blur' },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasPattern!false)>
         { 
           pattern: new RegExp('${escapeRegexPattern(field.validationRules.pattern!)}'), 
           message: '${escapeJsString(field.validationRules.patternMessage!"格式不正确")}', 
+          trigger: 'blur' 
+        },
+        </#if>
+        <#if (field.validationRules?? && field.validationRules.hasLength!false)>
+        { 
+          <#if field.validationRules?exists && field.validationRules.minLength?exists>min: ${field.validationRules.minLength!0}, </#if>
+          <#if field.validationRules?exists && field.validationRules.maxLength?exists>max: ${field.validationRules.maxLength!9999}, </#if>
+          message: '${escapeJsString(field.validationRules.lengthMessage!"长度必须在${minLength}到${maxLength}之间")}', 
+          trigger: 'blur' 
+        },
+        </#if>
+        <#if (field.validationRules?? && field.validationRules.hasRange!false)>
+        { 
+          type: 'number',
+          <#if field.validationRules?exists && field.validationRules.min?exists>min: ${field.validationRules.min!-99999999}, </#if>
+          <#if field.validationRules?exists && field.validationRules.max?exists>max: ${field.validationRules.max!99999999}, </#if>
+          message: '${escapeJsString(field.validationRules.rangeMessage!"数值必须在${min}到${max}之间")}', 
           trigger: 'blur' 
         }
         </#if>
@@ -315,17 +335,15 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await ${componentName}Api.delete({ id: row.id })
+          await ${componentName}Api.delete(row.id)
           ElMessage.success('删除成功')
           loadData()
         } catch (error) {
           ElMessage.error('删除失败')
         }
+      }).catch(() => {
+        // 取消删除操作
       })
-    }
-
-    const handleSelectionChange = (selection) => {
-      multipleSelection.value = selection
     }
 
     const handleBatchDelete = () => {
@@ -333,24 +351,31 @@ export default {
         ElMessage.warning('请选择要删除的记录')
         return
       }
-      ElMessageBox.confirm('确定要删除选中的 ' + multipleSelection.value.length + ' 条记录吗？', '提示', {
+      
+      ElMessageBox.confirm('确定要批量删除选中的记录吗？', '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }).then(async () => {
         try {
-          const ids = multipleSelection.value.map(item => item.id)
-          await ${componentName}Api.batchDelete({ ids })
+          const ids = multipleSelection.value.map(row => row.id)
+          await ${componentName}Api.batchDelete(ids)
           ElMessage.success('批量删除成功')
-          multipleSelection.value = []
           loadData()
         } catch (error) {
           ElMessage.error('批量删除失败')
         }
+      }).catch(() => {
+        // 取消批量删除操作
       })
     }
 
+    const handleSelectionChange = (selection) => {
+      multipleSelection.value = selection
+    }
+
     const handleDialogClose = () => {
+      // 重置表单验证状态
       formRef.value?.resetFields()
     }
 
@@ -363,24 +388,26 @@ export default {
       dialogVisible,
       dialogTitle,
       formRef,
-      form,
-      rules,
-      pagination,
       multipleSelection,
       loading,
+      pagination,
       searchForm,
+      sortParams,
+      form,
+      rules,
+      loadData,
+      handleSearch,
+      handleReset,
+      handleSortChange,
+      handleSizeChange,
+      handleCurrentChange,
       handleAdd,
       handleEdit,
       handleSubmit,
       handleDelete,
       handleBatchDelete,
       handleSelectionChange,
-      handleDialogClose,
-      handleSizeChange,
-      handleCurrentChange,
-      handleSearch,
-      handleReset,
-      handleSortChange
+      handleDialogClose
     }
   }
 }
@@ -389,6 +416,8 @@ export default {
 <style scoped>
 .${componentName?lower_case}-list {
   height: 100%;
+  padding: 20px;
+  background-color: #f5f7fa;
 }
 
 .card-header {
@@ -399,9 +428,5 @@ export default {
 
 .search-form {
   margin-bottom: 20px;
-  padding: 20px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
 }
 </style>
-

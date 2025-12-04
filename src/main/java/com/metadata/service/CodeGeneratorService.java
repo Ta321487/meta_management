@@ -154,25 +154,31 @@ public class CodeGeneratorService {
             
             // 提取长度限制
             boolean hasLength = false;
-            if (jsonObject.containsKey("minLength")) {
-                rules.put("minLength", jsonObject.get("minLength"));
+            if (jsonObject.containsKey("minLength") || jsonObject.containsKey("maxLength")) {
+                if (jsonObject.containsKey("minLength")) {
+                    rules.put("minLength", jsonObject.get("minLength"));
+                }
+                if (jsonObject.containsKey("maxLength")) {
+                    rules.put("maxLength", jsonObject.get("maxLength"));
+                }
                 hasLength = true;
-            }
-            if (jsonObject.containsKey("maxLength")) {
-                rules.put("maxLength", jsonObject.get("maxLength"));
-                hasLength = true;
+                String lengthMessage = jsonObject.getString("lengthMessage");
+                rules.put("lengthMessage", lengthMessage != null ? lengthMessage : "长度必须在${minLength}到${maxLength}之间");
             }
             rules.put("hasLength", hasLength);
             
             // 提取数值范围
             boolean hasRange = false;
-            if (jsonObject.containsKey("min")) {
-                rules.put("min", jsonObject.get("min"));
+            if (jsonObject.containsKey("min") || jsonObject.containsKey("max")) {
+                if (jsonObject.containsKey("min")) {
+                    rules.put("min", jsonObject.get("min"));
+                }
+                if (jsonObject.containsKey("max")) {
+                    rules.put("max", jsonObject.get("max"));
+                }
                 hasRange = true;
-            }
-            if (jsonObject.containsKey("max")) {
-                rules.put("max", jsonObject.get("max"));
-                hasRange = true;
+                String rangeMessage = jsonObject.getString("rangeMessage");
+                rules.put("rangeMessage", rangeMessage != null ? rangeMessage : "数值必须在${min}到${max}之间");
             }
             rules.put("hasRange", hasRange);
             
@@ -181,6 +187,9 @@ public class CodeGeneratorService {
                 String operator = jsonObject.getString("operator");
                 rules.put("hasOperator", true);
                 rules.put("operator", operator);
+                
+                String operatorMessage = jsonObject.getString("operatorMessage");
+                rules.put("operatorMessage", operatorMessage != null ? operatorMessage : "值必须在指定范围内");
                 
                 // 提取IN操作符的values
                 if ("IN".equalsIgnoreCase(operator) && jsonObject.containsKey("values")) {

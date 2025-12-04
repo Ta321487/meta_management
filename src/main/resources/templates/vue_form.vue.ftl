@@ -32,11 +32,7 @@
             <el-option label="${option.label!option.value}" value="${option.value!option}" />
                   </#if>
                 </#list>
-              <#else>
-            <el-option label="选项1" value="1" />
               </#if>
-            <#else>
-            <el-option label="选项1" value="1" />
             </#if>
           </el-select>
           <#elseif field.field.formComponent == "datepicker" || field.field.formComponent == "date">
@@ -79,15 +75,35 @@ export default {
     
     const rules = {
 <#list fields as field>
-      <#if field.field.formComponent != "primary_key" && (field.field.isRequired == 1 || (field.validationRules?? && field.validationRules.hasPattern!false))>
+      <#if field.field.formComponent != "primary_key" && (field.field.isRequired == 1 || (field.validationRules?? && (field.validationRules.hasPattern!false || field.validationRules.hasLength!false || field.validationRules.hasRange!false)) || field.field.fieldType?contains("int") || field.field.fieldType?contains("decimal") || field.field.fieldType?contains("double") || field.field.fieldType?contains("float"))>
       ${field.camelCaseName}: [
         <#if field.field.isRequired == 1>
-        { required: true, message: '请输入${field.field.label}', trigger: 'blur' }<#if (field.validationRules?? && field.validationRules.hasPattern!false)>,</#if>
+        { required: true, message: '请输入${field.field.label}', trigger: 'blur' },
+        </#if>
+        <#if field.field.fieldType?contains("int") || field.field.fieldType?contains("decimal") || field.field.fieldType?contains("double") || field.field.fieldType?contains("float")>
+        { type: 'number', message: '请输入有效的数字', trigger: 'blur' },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasPattern!false)>
         { 
           pattern: new RegExp('${escapeRegexPattern(field.validationRules.pattern!)}'), 
           message: '${escapeJsString(field.validationRules.patternMessage!"格式不正确")}', 
+          trigger: 'blur' 
+        },
+        </#if>
+        <#if (field.validationRules?? && field.validationRules.hasLength!false)>
+        { 
+          <#if field.validationRules?exists && field.validationRules.minLength?exists>min: ${field.validationRules.minLength!0}, </#if>
+          <#if field.validationRules?exists && field.validationRules.maxLength?exists>max: ${field.validationRules.maxLength!9999}, </#if>
+          message: '${escapeJsString(field.validationRules.lengthMessage!"长度必须在${minLength}到${maxLength}之间")}', 
+          trigger: 'blur' 
+        },
+        </#if>
+        <#if (field.validationRules?? && field.validationRules.hasRange!false)>
+        { 
+          type: 'number',
+          <#if field.validationRules?exists && field.validationRules.min?exists>min: ${field.validationRules.min!-99999999}, </#if>
+          <#if field.validationRules?exists && field.validationRules.max?exists>max: ${field.validationRules.max!99999999}, </#if>
+          message: '${escapeJsString(field.validationRules.rangeMessage!"数值必须在${min}到${max}之间")}', 
           trigger: 'blur' 
         }
         </#if>
@@ -157,4 +173,3 @@ export default {
   align-items: center;
 }
 </style>
-
