@@ -1,5 +1,6 @@
 package com.metadata.service;
 
+import com.alibaba.fastjson2.JSON;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
@@ -10,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.alibaba.fastjson2.JSONObject;
 
 import javax.sql.DataSource;
 import java.security.MessageDigest;
@@ -313,7 +315,7 @@ public class SqlExecuteService {
     private String extractTableName(String sql) {
         // 匹配 CREATE TABLE `table_name` 或 CREATE TABLE table_name
         // 匹配 ALTER TABLE `table_name` 或 ALTER TABLE table_name
-        Pattern pattern = Pattern.compile("(?:CREATE|ALTER)\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:`)?([a-zA-Z0-9_]+)(?:`)?", Pattern.CASE_INSENSITIVE);
+        Pattern pattern = Pattern.compile("(?:CREATE|ALTER)\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:`)?([^\\s`]+)(?:`)?", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(sql);
         if (matcher.find()) {
             return matcher.group(1);
@@ -682,8 +684,8 @@ public class SqlExecuteService {
                     // 合并原始message字段
                     if (oldRule != null && !oldRule.isEmpty()) {
                         try {
-                            com.alibaba.fastjson2.JSONObject oldJson = com.alibaba.fastjson2.JSON.parseObject(oldRule);
-                            com.alibaba.fastjson2.JSONObject newJson = com.alibaba.fastjson2.JSON.parseObject(newRule);
+                            JSONObject oldJson = JSON.parseObject(oldRule);
+                            JSONObject newJson = JSON.parseObject(newRule);
                             
                             // 如果原始规则有message字段，保留它
                             if (oldJson.containsKey("message")) {
@@ -1122,6 +1124,92 @@ public class SqlExecuteService {
                 logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为IN约束: " + json);
                 return json;
             }
+        }
+        
+        // 5. 数值范围约束：支持 >、<、>=、<=，如 ((`age` >= 18)) 或 ((`salary` < 10000))
+        Pattern rangePattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s*([><]=?|<=?|>=?)\\s*([0-9]+)",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher rangeMatcher = rangePattern.matcher(constraint);
+        if (rangeMatcher.find()) {
+            String operator = rangeMatcher.group(2);
+            String value = rangeMatcher.group(3);
+            JSONObject jsonObj = new JSONObject();
+            jsonObj.put("message", "");
+            
+            int intValue = Integer.parseInt(value);
+            
+            // 处理各种运算符
+            switch (operator) {
+                case ">":
+                case ">=" :
+                    jsonObj.put("min", intValue);
+                    break;
+                case "<":
+                case "<=" :
+                    jsonObj.put("max", intValue);
+                    break;
+                default:
+                    // 未知运算符，记录日志
+                    logService.logError("admin", "PARSE_CHECK_CONSTRAINT", "未知的数值范围运算符", operator);
+                    return null;
+            }
+            
+            String json = jsonObj.toJSONString();
+            logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为数值范围约束: " + json);
+            return json;
+        }
+        
+        // 6. 等于/不等于约束：支持 =、!=，如 ((`status` = 'active')) 或 ((`type` != 'admin'))
+        Pattern equalPattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s*(!?=)\\s*'?([^']+)'?",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher equalMatcher = equalPattern.matcher(constraint);
+        if (equalMatcher.find()) {
+            String operator = equalMatcher.group(2);
+            String value = equalMatcher.group(3);
+            JSONObject jsonObj = new JSONObject();
+            jsonObj.put("message", "");
+            
+            if ("=".equals(operator)) {
+                jsonObj.put("operator", "=");
+                jsonObj.put("value", value);
+            } else if ("!=".equals(operator)) {
+                jsonObj.put("operator", "!");
+                jsonObj.put("value", value);
+            }
+            
+            String json = jsonObj.toJSONString();
+            logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为等于/不等于约束: " + json);
+            return json;
+        }
+        
+        // 7. LIKE/RLIKE约束：支持 LIKE 'pattern' 或 RLIKE 'pattern'
+        Pattern likePattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s+(LIKE|RLIKE)\\s+'([^']+)'",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher likeMatcher = likePattern.matcher(constraint);
+        if (likeMatcher.find()) {
+            String likeOperator = likeMatcher.group(2);
+            String pattern = likeMatcher.group(3);
+            JSONObject jsonObj = new JSONObject();
+            jsonObj.put("message", "");
+            
+            if ("RLIKE".equalsIgnoreCase(likeOperator)) {
+                // RLIKE等价于正则表达式
+                jsonObj.put("pattern", pattern);
+            } else if ("LIKE".equalsIgnoreCase(likeOperator)) {
+                // LIKE转换为正则表达式
+                String regexPatternStr = pattern.replace("%", ".*");
+                jsonObj.put("pattern", regexPatternStr);
+            }
+            
+            String json = jsonObj.toJSONString();
+            logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为LIKE/RLIKE约束: " + json);
+            return json;
         }
         
         logService.logError("admin", "PARSE_CHECK_CONSTRAINT", "无法解析CHECK约束", constraint);
