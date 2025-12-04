@@ -663,13 +663,34 @@ public class SqlExecuteService {
                 // 这样可以确保物理表的CHECK约束能正确同步到元数据系统
                 if (physicalField.getValidateRule() != null && !physicalField.getValidateRule().isEmpty()) {
                     String oldRule = existingField.getValidateRule();
-                    existingField.setValidateRule(physicalField.getValidateRule());
-                    if (oldRule != null && !oldRule.isEmpty() && !oldRule.equals(physicalField.getValidateRule())) {
+                    String newRule = physicalField.getValidateRule();
+                    
+                    // 合并原始message字段
+                    if (oldRule != null && !oldRule.isEmpty()) {
+                        try {
+                            com.alibaba.fastjson2.JSONObject oldJson = com.alibaba.fastjson2.JSON.parseObject(oldRule);
+                            com.alibaba.fastjson2.JSONObject newJson = com.alibaba.fastjson2.JSON.parseObject(newRule);
+                            
+                            // 如果原始规则有message字段，保留它
+                            if (oldJson.containsKey("message")) {
+                                String message = oldJson.getString("message");
+                                if (message != null && !message.isEmpty()) {
+                                    newJson.put("message", message);
+                                    newRule = newJson.toJSONString();
+                                }
+                            }
+                        } catch (Exception e) {
+                            // 解析失败，使用新规则
+                        }
+                    }
+                    
+                    existingField.setValidateRule(newRule);
+                    if (oldRule != null && !oldRule.isEmpty() && !oldRule.equals(newRule)) {
                         logService.logSuccess("admin", "SET_VALIDATE_RULE", "覆盖现有校验规则: " + 
-                            tableCode + "." + fieldCode + " -> 旧规则: " + oldRule + ", 新规则: " + physicalField.getValidateRule());
+                            tableCode + "." + fieldCode + " -> 旧规则: " + oldRule + ", 新规则: " + newRule);
                     } else {
                         logService.logSuccess("admin", "SET_VALIDATE_RULE", "设置校验规则: " + 
-                            tableCode + "." + fieldCode + " -> " + physicalField.getValidateRule());
+                            tableCode + "." + fieldCode + " -> " + newRule);
                     }
                 } else {
                     // 如果解析后的校验规则为空，清空现有校验规则

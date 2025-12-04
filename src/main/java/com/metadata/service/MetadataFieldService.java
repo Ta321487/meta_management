@@ -50,6 +50,20 @@ public class MetadataFieldService {
         if (field.getIsEnabled() == null) {
             field.setIsEnabled(1);
         }
+        
+        // 保存原始校验规则的message字段
+        String originalMessage = null;
+        if (field.getValidateRule() != null && !field.getValidateRule().trim().isEmpty()) {
+            try {
+                JSONObject originalJson = JSON.parseObject(field.getValidateRule());
+                if (originalJson.containsKey("message")) {
+                    originalMessage = originalJson.getString("message");
+                }
+            } catch (Exception e) {
+                // 解析失败，忽略
+            }
+        }
+        
         fieldMapper.insert(field);
         logService.logSuccess("admin", "ADD", "新增字段：" + JSON.toJSONString(field));
         
@@ -64,6 +78,47 @@ public class MetadataFieldService {
         } catch (Exception e) {
             logService.logError("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN失败", e.getMessage());
             throw new RuntimeException("执行ALTER TABLE ADD COLUMN失败: " + e.getMessage());
+        }
+        
+        // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息）
+        MetadataField latestField = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode());
+        
+        // 如果原始校验规则有message字段，且最新的校验规则不为空，合并message字段
+        if (originalMessage != null && !originalMessage.isEmpty() && latestField.getValidateRule() != null && !latestField.getValidateRule().trim().isEmpty()) {
+            try {
+                JSONObject latestJson = JSON.parseObject(latestField.getValidateRule());
+                latestJson.put("message", originalMessage);
+                String mergedValidateRule = latestJson.toJSONString();
+                
+                // 更新合并后的校验规则到数据库
+                MetadataField updatedField = new MetadataField();
+                updatedField.setId(latestField.getId());
+                updatedField.setValidateRule(mergedValidateRule);
+                fieldMapper.update(updatedField);
+                
+                // 更新当前field对象的校验规则，确保后续操作使用合并后的规则
+                field.setValidateRule(mergedValidateRule);
+            } catch (Exception e) {
+                // 合并失败，忽略
+            }
+        } else if (originalMessage != null && !originalMessage.isEmpty()) {
+            // 如果最新的校验规则为空，直接设置为包含message字段的规则
+            try {
+                JSONObject messageJson = new JSONObject();
+                messageJson.put("message", originalMessage);
+                String messageValidateRule = messageJson.toJSONString();
+                
+                // 更新包含message字段的校验规则到数据库
+                MetadataField updatedField = new MetadataField();
+                updatedField.setId(latestField.getId());
+                updatedField.setValidateRule(messageValidateRule);
+                fieldMapper.update(updatedField);
+                
+                // 更新当前field对象的校验规则
+                field.setValidateRule(messageValidateRule);
+            } catch (Exception e) {
+                // 合并失败，忽略
+            }
         }
     }
 
@@ -141,8 +196,8 @@ public class MetadataFieldService {
             throw new RuntimeException("执行ALTER TABLE操作失败: " + e.getMessage());
         }
         
-        // 如果validate_rule变化，添加新的CHECK约束
-        if (validateRuleChanged) {
+        // 如果字段名称变化或validate_rule变化，添加新的CHECK约束
+        if (fieldNameChanged || validateRuleChanged) {
             try {
                 String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
                 
