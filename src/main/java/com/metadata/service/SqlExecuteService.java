@@ -432,22 +432,36 @@ public class SqlExecuteService {
             logService.logError("admin", "GET_PRIMARY_KEY", "获取主键信息失败: " + tableName, e.getMessage());
         }
         
-        // 使用 DatabaseMetaData 获取表结构
+        // 使用 SHOW COLUMNS 获取表结构（直接查询数据库，确保获取最新字段信息）
         Map<String, MetadataField> physicalFields = new HashMap<>();
-        try (ResultSet columns = metaData.getColumns(catalog, schema, tableName, null)) {
+        try (Statement stmt = connection.createStatement()) {
+            String columnsSql = "SHOW FULL COLUMNS FROM `" + tableName + "`";
+            ResultSet columns = stmt.executeQuery(columnsSql);
             int sort = 0;
             while (columns.next()) {
-                String columnName = columns.getString("COLUMN_NAME");
-                String columnType = columns.getString("TYPE_NAME");
-                int columnSize = columns.getInt("COLUMN_SIZE");
-                int nullable = columns.getInt("NULLABLE");
-                String remarks = columns.getString("REMARKS");
-                String isAutoIncrement = columns.getString("IS_AUTOINCREMENT");
+                String columnName = columns.getString("Field");
+                String columnTypeFull = columns.getString("Type");
+                String nullableStr = columns.getString("Null");
+                String extra = columns.getString("Extra");
+                String comments = columns.getString("Comment");
+                
+                // 解析字段类型和大小
+                String columnType = columnTypeFull;
+                int columnSize = 0;
+                // 提取字段类型（如 VARCHAR(10) -> VARCHAR）
+                Pattern typePattern = Pattern.compile("^(\\\\w+)(?:\\\\((\\\\d+)\\\\))?");
+                Matcher typeMatcher = typePattern.matcher(columnTypeFull);
+                if (typeMatcher.find()) {
+                    columnType = typeMatcher.group(1);
+                    if (typeMatcher.group(2) != null) {
+                        columnSize = Integer.parseInt(typeMatcher.group(2));
+                    }
+                }
                 
                 // 构建字段类型字符串
                 String fieldType = columnType;
-                if (columnSize > 0 && (columnType.equals("VARCHAR") || columnType.equals("CHAR") || 
-                    columnType.equals("DECIMAL") || columnType.equals("NUMERIC"))) {
+                if (columnSize > 0 && (columnType.equalsIgnoreCase("VARCHAR") || columnType.equalsIgnoreCase("CHAR") || 
+                    columnType.equalsIgnoreCase("DECIMAL") || columnType.equalsIgnoreCase("NUMERIC"))) {
                     fieldType = columnType + "(" + columnSize + ")";
                 }
                 
@@ -460,12 +474,12 @@ public class SqlExecuteService {
                 field.setTableCode(tableCode);
                 field.setFieldName(columnName);
                 field.setFieldType(fieldType);
-                field.setLabel(remarks != null && !remarks.isEmpty() ? remarks : columnName);
+                field.setLabel(comments != null && !comments.isEmpty() ? comments : columnName);
                 
                 // 判断是否是自增主键
                 boolean isAutoIncrementPk = (autoIncrementPkColumn != null && 
                     autoIncrementPkColumn.equalsIgnoreCase(columnName)) ||
-                    "YES".equalsIgnoreCase(isAutoIncrement);
+                    (extra != null && extra.contains("auto_increment"));
                 
                 if (isAutoIncrementPk) {
                     // 自增主键：不需要表单组件，对用户来说不是必填
@@ -473,7 +487,7 @@ public class SqlExecuteService {
                     field.setIsRequired(0); // 对用户来说不需要填写
                 } else {
                     // 普通字段：根据字段类型设置表单组件和必填状态
-                    field.setIsRequired(nullable == DatabaseMetaData.columnNoNulls ? 1 : 0);
+                    field.setIsRequired("NO".equalsIgnoreCase(nullableStr) ? 1 : 0);
                     field.setFormComponent(getDefaultFormComponent(fieldType));
                 }
                 
