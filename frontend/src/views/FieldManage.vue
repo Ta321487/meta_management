@@ -195,6 +195,7 @@
       @open="loadConstraints"
     >
       <el-table :data="constraints" border style="width: 100%" v-loading="constraintLoading">
+        <el-table-column prop="constraintName" label="约束名" width="200" />
         <el-table-column prop="constraintContent" label="约束内容" width="400" />
         <el-table-column prop="constraintType" label="约束类型" width="150" />
         <el-table-column prop="fieldName" label="作用列名" width="150" />

@@ -371,6 +371,7 @@ public class MetadataFieldService {
             String columnName = (String) constraint.get("COLUMN_NAME");
             String constraintName = (String) constraint.get("CONSTRAINT_NAME");
             String constraintLevel = (String) constraint.get("constraint_level");
+            String constraintContent = (String) constraint.get("constraint_content");
             
             // 确保约束类型不为null
             if (constraintType == null) {
@@ -380,6 +381,11 @@ public class MetadataFieldService {
             // 确保约束级别不为null
             if (constraintLevel == null) {
                 constraintLevel = "COLUMN";
+            }
+            
+            // 确保约束内容不为null
+            if (constraintContent == null) {
+                constraintContent = constraintName;
             }
             
             // 将约束级别转换为中文显示
@@ -402,41 +408,22 @@ public class MetadataFieldService {
             MetadataField field = columnName != null ? fieldMap.get(columnName) : null;
             
             // 设置约束基本信息
+            constraintItem.put("constraintName", constraintName);
             constraintItem.put("constraintType", constraintTypeCn);
             constraintItem.put("fieldName", columnName != null ? columnName : "");
             constraintItem.put("constraintLevel", constraintLevelCn);
             
-            // 根据约束类型设置约束内容
-            if ("CHECK".equals(constraintType)) {
-                if (field != null && field.getValidateRule() != null && !field.getValidateRule().trim().isEmpty()) {
-                    // CHECK约束使用validateRule作为约束内容
-                    constraintItem.put("id", field.getId());
-                    constraintItem.put("fieldCode", field.getFieldCode());
-                    constraintItem.put("tableCode", field.getTableCode());
-                    constraintItem.put("constraintContent", field.getValidateRule());
-                    result.add(constraintItem);
-                } else {
-                    // 没有validateRule的CHECK约束，使用约束名称作为约束内容
-                    constraintItem.put("constraintContent", constraintName);
-                    // 没有对应字段的CHECK约束，id等字段可能为空
-                    if (field != null) {
-                        constraintItem.put("id", field.getId());
-                        constraintItem.put("fieldCode", field.getFieldCode());
-                        constraintItem.put("tableCode", field.getTableCode());
-                    }
-                    result.add(constraintItem);
-                }
-            } else {
-                // 其他类型约束使用约束名称作为约束内容
-                constraintItem.put("constraintContent", constraintName);
-                // 非CHECK约束可能没有对应的字段，所以id等字段可能为空
-                if (field != null) {
-                    constraintItem.put("id", field.getId());
-                    constraintItem.put("fieldCode", field.getFieldCode());
-                    constraintItem.put("tableCode", field.getTableCode());
-                }
-                result.add(constraintItem);
+            // 设置约束内容
+            constraintItem.put("constraintContent", constraintContent);
+            
+            // 添加字段相关信息
+            if (field != null) {
+                constraintItem.put("id", field.getId());
+                constraintItem.put("fieldCode", field.getFieldCode());
+                constraintItem.put("tableCode", field.getTableCode());
             }
+            
+            result.add(constraintItem);
         }
         
         return result;

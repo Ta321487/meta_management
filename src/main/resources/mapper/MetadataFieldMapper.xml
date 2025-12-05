@@ -114,7 +114,11 @@
             CASE 
                 WHEN kcu.column_name IS NOT NULL THEN 'COLUMN' 
                 ELSE 'TABLE' 
-            END AS constraint_level
+            END AS constraint_level,
+            CASE
+                WHEN tc.constraint_type = 'CHECK' THEN cc.check_clause
+                ELSE tc.constraint_name
+            END AS constraint_content
         FROM 
             information_schema.table_constraints tc
         LEFT JOIN 
@@ -122,6 +126,10 @@
             ON tc.constraint_name = kcu.constraint_name 
             AND tc.table_schema = kcu.table_schema 
             AND tc.table_name = kcu.table_name
+        LEFT JOIN
+            information_schema.check_constraints cc
+            ON tc.constraint_name = cc.constraint_name
+            AND tc.table_schema = cc.constraint_schema
         WHERE 
             tc.table_schema = DATABASE() 
             AND tc.table_name = #{tableName}
