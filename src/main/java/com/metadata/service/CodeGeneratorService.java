@@ -156,10 +156,10 @@ public class CodeGeneratorService {
             boolean hasLength = false;
             if (jsonObject.containsKey("minLength") || jsonObject.containsKey("maxLength")) {
                 if (jsonObject.containsKey("minLength")) {
-                    rules.put("minLength", jsonObject.get("minLength"));
+                    rules.put("minLength", convertToNumber(jsonObject.get("minLength")));
                 }
                 if (jsonObject.containsKey("maxLength")) {
-                    rules.put("maxLength", jsonObject.get("maxLength"));
+                    rules.put("maxLength", convertToNumber(jsonObject.get("maxLength")));
                 }
                 hasLength = true;
                 String lengthMessage = jsonObject.getString("lengthMessage");
@@ -171,10 +171,10 @@ public class CodeGeneratorService {
             boolean hasRange = false;
             if (jsonObject.containsKey("min") || jsonObject.containsKey("max")) {
                 if (jsonObject.containsKey("min")) {
-                    rules.put("min", jsonObject.get("min"));
+                    rules.put("min", convertToNumber(jsonObject.get("min")));
                 }
                 if (jsonObject.containsKey("max")) {
-                    rules.put("max", jsonObject.get("max"));
+                    rules.put("max", convertToNumber(jsonObject.get("max")));
                 }
                 hasRange = true;
                 String rangeMessage = jsonObject.getString("rangeMessage");
@@ -200,10 +200,10 @@ public class CodeGeneratorService {
                 // 提取BETWEEN操作符的min和max
                 if ("BETWEEN".equalsIgnoreCase(operator)) {
                     if (jsonObject.containsKey("min")) {
-                        rules.put("min", jsonObject.get("min"));
+                        rules.put("min", convertToNumber(jsonObject.get("min")));
                     }
                     if (jsonObject.containsKey("max")) {
-                        rules.put("max", jsonObject.get("max"));
+                        rules.put("max", convertToNumber(jsonObject.get("max")));
                     }
                 }
             }
@@ -218,6 +218,31 @@ public class CodeGeneratorService {
         }
         
         return rules;
+    }
+    
+    /**
+     * 将对象转换为Number类型，如果是字符串则尝试解析为数值
+     */
+    private Number convertToNumber(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof Number) {
+            return (Number) value;
+        }
+        if (value instanceof String) {
+            String strValue = (String) value;
+            try {
+                if (strValue.contains(".")) {
+                    return Double.parseDouble(strValue);
+                } else {
+                    return Long.parseLong(strValue);
+                }
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /**
@@ -576,8 +601,8 @@ public class CodeGeneratorService {
         
         // 处理数值范围
         if (validationRules.containsKey("hasRange") && (Boolean) validationRules.get("hasRange")) {
-            Number min = (Number) validationRules.get("min");
-            Number max = (Number) validationRules.get("max");
+            Number min = convertToNumber(validationRules.get("min"));
+            Number max = convertToNumber(validationRules.get("max"));
             
             if (min != null && max != null) {
                 checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` BETWEEN ").append(min).append(" AND ").append(max).append(")");
@@ -640,8 +665,8 @@ public class CodeGeneratorService {
             
             // 处理BETWEEN操作符
             else if ("BETWEEN".equalsIgnoreCase(operator)) {
-                Number min = (Number) validationRules.get("min");
-                Number max = (Number) validationRules.get("max");
+                Number min = convertToNumber(validationRules.get("min"));
+                Number max = convertToNumber(validationRules.get("max"));
                 if (min != null && max != null) {
                     checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` BETWEEN ").append(min).append(" AND ").append(max).append(")");
                 }
@@ -666,7 +691,8 @@ public class CodeGeneratorService {
         
         // 转换长度限制
         if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
-            Integer maxLength = (Integer) validationRules.get("maxLength");
+            Number maxLengthNum = convertToNumber(validationRules.get("maxLength"));
+            Integer maxLength = maxLengthNum != null ? maxLengthNum.intValue() : null;
             if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
                 fieldType = "VARCHAR(" + maxLength + ")";
             }
@@ -713,7 +739,8 @@ public class CodeGeneratorService {
         
         // 转换长度限制
         if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
-            Integer maxLength = (Integer) validationRules.get("maxLength");
+            Number maxLengthNum = convertToNumber(validationRules.get("maxLength"));
+            Integer maxLength = maxLengthNum != null ? maxLengthNum.intValue() : null;
             if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
                 fieldType = "VARCHAR(" + maxLength + ")";
             }
@@ -759,7 +786,8 @@ public class CodeGeneratorService {
         
         // 转换长度限制
         if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
-            Integer maxLength = (Integer) validationRules.get("maxLength");
+            Number maxLengthNum = convertToNumber(validationRules.get("maxLength"));
+            Integer maxLength = maxLengthNum != null ? maxLengthNum.intValue() : null;
             if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
                 fieldType = "VARCHAR(" + maxLength + ")";
             }

@@ -354,27 +354,32 @@ export default {
 
     // 计算完整字段类型
     const computedFieldType = computed(() => {
-      const baseType = form.baseFieldType
-      if (!baseType) return ''
-      
-      if (baseType === 'VARCHAR' || baseType === 'CHAR') {
-        return `${baseType}(${typeParams.length})`
-      }
-      
-      if (baseType === 'DECIMAL' || baseType === 'NUMERIC') {
-        return `${baseType}(${typeParams.precision},${typeParams.scale})`
-      }
-      
-      if (baseType === 'ENUM') {
-        // 将逗号分隔的枚举值转换为带引号的格式，如'value1','value2','value3'
-        const enumValues = typeParams.enumValues
-          .split(',')
-          .map(val => `'${val.trim()}'`)
-          .join(',')
-        return `${baseType}(${enumValues})`
-      }
-      
-      return baseType
+        const baseType = form.baseFieldType
+        if (!baseType) return ''
+        
+        if (baseType === 'VARCHAR' || baseType === 'CHAR') {
+            // 使用有效的长度值，默认50
+            const length = typeParams.length || 50
+            return `${baseType}(${length})`
+        }
+        
+        if (baseType === 'DECIMAL' || baseType === 'NUMERIC') {
+            // 使用有效的精度和小数位值，默认10,2
+            const precision = typeParams.precision || 10
+            const scale = typeParams.scale || 2
+            return `${baseType}(${precision},${scale})`
+        }
+        
+        if (baseType === 'ENUM') {
+            // 将逗号分隔的枚举值转换为带引号的格式，如'value1','value2','value3'
+            const enumValues = typeParams.enumValues
+              .split(',')
+              .map(val => `'${val.trim()}'`)
+              .join(',')
+            return `${baseType}(${enumValues})`
+        }
+        
+        return baseType
     })
 
     // 监听计算字段类型变化，更新表单字段类型
@@ -739,7 +744,7 @@ export default {
       )
       
       // 检查删除后是否会导致表中字段数量为0
-      const remainingFieldsCount = fieldData.value.length - selectedRows.value.length
+      const remainingFieldsCount = pagination.total - selectedRows.value.length
       if (remainingFieldsCount <= 0) {
         ElMessage.error('不能删除表中所有字段')
         return

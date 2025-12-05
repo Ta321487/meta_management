@@ -664,6 +664,18 @@ public class SqlExecuteService {
                     if (validateRule != null) {
                         physicalField.setValidateRule(validateRule);
                         logService.logSuccess("admin", "SET_VALIDATE_RULE", "设置校验规则: " + columnName + " -> " + validateRule);
+                        
+                        // 检查是否为IN约束，如果是则设置字段类型为enum，表单组件为select
+                        try {
+                            com.alibaba.fastjson2.JSONObject validateJson = com.alibaba.fastjson2.JSON.parseObject(validateRule);
+                            if ("IN".equals(validateJson.getString("operator"))) {
+                                physicalField.setFieldType("enum");
+                                physicalField.setFormComponent("select");
+                                logService.logSuccess("admin", "SET_ENUM_TYPE", "设置字段为ENUM类型和select组件: " + columnName);
+                            }
+                        } catch (Exception e) {
+                            // 解析校验规则失败，忽略
+                        }
                     }
                 } catch (Exception e) {
                     // 解析CHECK约束失败，记录日志但不影响字段同步
@@ -699,7 +711,7 @@ public class SqlExecuteService {
                     String oldRule = existingField.getValidateRule();
                     String newRule = physicalField.getValidateRule();
                     
-                    // 合并原始message字段
+                    // 合并原始message字段和处理IN约束
                     if (oldRule != null && !oldRule.isEmpty()) {
                         try {
                             com.alibaba.fastjson2.JSONObject oldJson = com.alibaba.fastjson2.JSON.parseObject(oldRule);
@@ -710,15 +722,36 @@ public class SqlExecuteService {
                                 String message = oldJson.getString("message");
                                 if (message != null && !message.isEmpty()) {
                                     newJson.put("message", message);
-                                    newRule = newJson.toJSONString();
                                 }
                             }
+                            
+                            // 如果是IN约束，确保options与values一致
+                            if ("IN".equals(newJson.getString("operator"))) {
+                                // 使用values作为options，确保一致性
+                                com.alibaba.fastjson2.JSONArray values = newJson.getJSONArray("values");
+                                newJson.put("options", values);
+                            }
+                            
+                            newRule = newJson.toJSONString();
                         } catch (Exception e) {
                             // 解析失败，使用新规则
                         }
                     }
                     
                     existingField.setValidateRule(newRule);
+                    
+                    // 检查是否为IN约束，如果是则设置字段类型为enum，表单组件为select
+                    try {
+                        com.alibaba.fastjson2.JSONObject validateJson = com.alibaba.fastjson2.JSON.parseObject(newRule);
+                        if ("IN".equals(validateJson.getString("operator"))) {
+                            existingField.setFieldType("enum");
+                            existingField.setFormComponent("select");
+                            logService.logSuccess("admin", "SET_ENUM_TYPE", "更新字段为ENUM类型和select组件: " + tableCode + "." + fieldCode);
+                        }
+                    } catch (Exception e) {
+                        // 解析校验规则失败，忽略
+                    }
+                    
                     if (oldRule != null && !oldRule.isEmpty() && !oldRule.equals(newRule)) {
                         logService.logSuccess("admin", "SET_VALIDATE_RULE", "覆盖现有校验规则: " + 
                             tableCode + "." + fieldCode + " -> 旧规则: " + oldRule + ", 新规则: " + newRule);
@@ -1130,7 +1163,7 @@ public class SqlExecuteService {
             List<String> valuesList = parseInValues(valuesStr);
             logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析后的值列表: " + valuesList);
             if (!valuesList.isEmpty()) {
-                // 生成IN约束JSON
+                // 生成IN约束JSON，包含options字段
                 StringBuilder valuesJson = new StringBuilder();
                 for (int i = 0; i < valuesList.size(); i++) {
                     if (i > 0) {
@@ -1138,8 +1171,8 @@ public class SqlExecuteService {
                     }
                     valuesJson.append("\"").append(valuesList.get(i)).append("\"");
                 }
-                String json = String.format("{\"operator\":\"IN\",\"values\":[%s]}",
-                    valuesJson.toString());
+                String json = String.format("{\"operator\":\"IN\",\"values\":[%s],\"options\":[%s]}",
+                    valuesJson.toString(), valuesJson.toString());
                 logService.logSuccess("admin", "PARSE_CHECK_CONSTRAINT", "解析为IN约束: " + json);
                 return json;
             }
