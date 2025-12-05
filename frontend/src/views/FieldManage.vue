@@ -155,6 +155,9 @@
             <el-radio :label="1">是</el-radio>
             <el-radio :label="0">否</el-radio>
           </el-radio-group>
+          <div style="margin-top: 5px; font-size: 12px; color: #909399;">
+            提示：选择"是"将在数据库层面添加NOT NULL约束
+          </div>
         </el-form-item>
         <el-form-item label="表单组件" prop="formComponent">
           <el-select v-model="form.formComponent" placeholder="请选择" style="width: 100%">

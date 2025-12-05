@@ -4,6 +4,7 @@
       <el-button type="primary" size="small" @click="formatJson">格式化</el-button>
       <el-button type="warning" size="small" @click="clearJson">清空</el-button>
       <el-button type="success" size="small" @click="showTestDialog">测试</el-button>
+      <el-button type="info" size="small" @click="showExampleDialog">查看示例</el-button>
     </div>
     <div ref="editorContainer" class="json-editor"></div>
     
@@ -58,6 +59,61 @@
         <el-button type="primary" @click="runTest">测试</el-button>
       </template>
     </el-dialog>
+    
+    <!-- 示例模板对话框 -->
+    <el-dialog
+      v-model="exampleDialogVisible"
+      title="校验规则示例"
+      width="600px"
+      close-on-click-modal="false"
+      close-on-press-escape="false"
+    >
+      <div class="example-dialog-content">
+        <el-select
+          v-model="selectedExample"
+          placeholder="请选择示例模板"
+          style="width: 100%; margin-bottom: 15px;"
+          @change="loadExampleTemplate"
+        >
+          <el-option
+            v-for="example in exampleTemplates"
+            :key="example.key"
+            :label="example.title"
+            :value="example.key"
+          >
+            <div class="example-option">
+              <div class="example-title">{{ example.title }}</div>
+              <div class="example-desc">{{ example.description }}</div>
+            </div>
+          </el-option>
+        </el-select>
+        
+        <el-form label-position="top" size="small">
+          <el-form-item label="示例说明">
+            <el-input
+              v-model="currentExample.description"
+              readonly
+              type="textarea"
+              rows="2"
+              style="resize: none;"
+            />
+          </el-form-item>
+          <el-form-item label="示例代码">
+            <el-input
+              v-model="currentExampleCode"
+              readonly
+              type="textarea"
+              rows="6"
+              style="font-family: monospace; resize: none;"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+      <template #footer>
+        <el-button @click="exampleDialogVisible = false">关闭</el-button>
+        <el-button type="primary" @click="applyExampleTemplate">应用到编辑器</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -99,6 +155,94 @@ export default {
     const testRegexp = ref('')
     const testInput = ref('')
     const testResult = ref(null)
+    
+    // 示例功能相关变量
+    const exampleDialogVisible = ref(false)
+    const selectedExample = ref('')
+    const currentExample = ref({ title: '', description: '', code: '{}' })
+    const currentExampleCode = ref('{}')
+    
+    // 示例模板列表
+    const exampleTemplates = ref([
+      {
+        key: 'required',
+        title: '必填字段',
+        description: '验证字段是否为必填项',
+        code: '{"required": true, "message": "该字段为必填项", "trigger": "blur"}'
+      },
+      {
+        key: 'min_length',
+        title: '最小长度限制',
+        description: '验证字符串最小长度',
+        code: '{"min": 5, "message": "长度不能小于5个字符", "trigger": "blur"}'
+      },
+      {
+        key: 'max_length',
+        title: '最大长度限制',
+        description: '验证字符串最大长度',
+        code: '{"max": 20, "message": "长度不能超过20个字符", "trigger": "blur"}'
+      },
+      {
+        key: 'length_range',
+        title: '长度范围限制',
+        description: '验证字符串长度范围',
+        code: '{"min": 5, "max": 20, "message": "长度必须在5到20个字符之间", "trigger": "blur"}'
+      },
+      {
+        key: 'number_range',
+        title: '数值范围限制',
+        description: '验证数值在指定范围内',
+        code: '{"type": "number", "min": 0, "max": 100, "message": "数值必须在0到100之间", "trigger": "blur"}'
+      },
+      {
+        key: 'positive_number',
+        title: '正数验证',
+        description: '验证数值是否为正数',
+        code: '{"type": "number", "min": 0.1, "message": "必须输入正数", "trigger": "blur"}'
+      },
+      {
+        key: 'integer',
+        title: '整数验证',
+        description: '验证数值是否为整数',
+        code: '{"type": "number", "integer": true, "message": "必须输入整数", "trigger": "blur"}'
+      },
+      {
+        key: 'email',
+        title: '邮箱格式验证',
+        description: '验证邮箱格式是否正确',
+        code: '{"type": "email", "message": "请输入正确的邮箱地址", "trigger": "blur"}'
+      },
+      {
+        key: 'phone',
+        title: '手机号格式验证',
+        description: '验证手机号格式是否正确',
+        code: '{"pattern": "^1[3-9]\\d{9}$", "message": "请输入正确的手机号", "trigger": "blur"}'
+      },
+      {
+        key: 'url',
+        title: 'URL格式验证',
+        description: '验证URL格式是否正确',
+        code: '{"type": "url", "message": "请输入正确的URL地址", "trigger": "blur"}'
+      },
+      {
+        key: 'in_array',
+        title: '枚举值验证',
+        description: '验证值是否在指定的枚举列表中',
+        code: '{"operator": "IN", "values": ["value1", "value2", "value3"], "message": "请选择有效值", "trigger": "blur"}'
+      },
+      {
+        key: 'regexp',
+        title: '正则表达式验证',
+        description: '使用正则表达式验证输入格式',
+        code: '{"pattern": "^\\w{4,20}$", "message": "只能包含字母数字下划线，长度4-20位", "trigger": "blur"}'
+      },
+      {
+        key: 'password_strength',
+        title: '密码强度验证',
+        description: '验证密码强度，要求包含大小写字母和数字',
+        code: '{"pattern": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)[a-zA-Z\\d@$!%*?&]{8,}$", "message": "密码至少8位，包含大小写字母和数字", "trigger": "blur"}'
+      }
+    ])
     
     // 计算属性：测试结果类名
     const testResultClass = computed(() => {
@@ -501,6 +645,66 @@ export default {
       }
     }
     
+    // 显示示例对话框
+    const showExampleDialog = () => {
+      console.log('showExampleDialog called')
+      console.log('before exampleDialogVisible:', exampleDialogVisible.value)
+      
+      // 重置示例选择
+      selectedExample.value = ''
+      currentExample.value = { title: '', description: '', code: '{}' }
+      currentExampleCode.value = '{}'
+      
+      // 显示对话框
+      exampleDialogVisible.value = true
+      console.log('after exampleDialogVisible:', exampleDialogVisible.value)
+    }
+    
+    // 加载选中的示例模板
+    const loadExampleTemplate = (key) => {
+      const example = exampleTemplates.value.find(item => item.key === key)
+      if (example) {
+        currentExample.value = { ...example }
+        // 格式化示例代码以便更好地显示
+        try {
+          const parsed = JSON.parse(example.code)
+          currentExampleCode.value = JSON.stringify(parsed, null, 2)
+        } catch (error) {
+          currentExampleCode.value = example.code
+        }
+      }
+    }
+    
+    // 应用示例模板到编辑器
+    const applyExampleTemplate = () => {
+      if (!selectedExample.value) {
+        ElMessage.warning('请先选择一个示例模板')
+        return
+      }
+      
+      try {
+        // 格式化示例代码
+        const parsed = JSON.parse(currentExample.value.code)
+        const formattedCode = JSON.stringify(parsed, null, 2)
+        
+        // 设置到编辑器
+        if (editor) {
+          editor.setValue(formattedCode)
+          ElMessage.success('示例模板已应用')
+        }
+        
+        // 关闭对话框
+        exampleDialogVisible.value = false
+        
+        // 调整编辑器高度
+        if (editor) {
+          adjustEditorHeight()
+        }
+      } catch (error) {
+        ElMessage.error('示例模板格式错误，无法应用')
+      }
+    }
+    
     onBeforeUnmount(() => {
       if (editor) {
         editor.dispose()
@@ -520,7 +724,16 @@ export default {
       testResultClass,
       testResultMessage,
       showTestDialog,
-      runTest
+      runTest,
+      // 示例功能相关
+      exampleDialogVisible,
+      selectedExample,
+      currentExample,
+      currentExampleCode,
+      exampleTemplates,
+      showExampleDialog,
+      loadExampleTemplate,
+      applyExampleTemplate
     }
   }
 }
@@ -575,5 +788,29 @@ export default {
 .test-result .el-icon {
   margin-right: 8px;
   font-size: 16px;
+}
+</style>
+
+<style scoped>
+/* 示例对话框样式 */
+.example-dialog-content {
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.example-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.example-title {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.example-desc {
+  font-size: 12px;
+  color: #606266;
 }
 </style>

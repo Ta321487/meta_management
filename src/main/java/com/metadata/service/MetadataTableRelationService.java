@@ -322,7 +322,10 @@ public class MetadataTableRelationService {
      */
     @Transactional
     public Map<String, Object> syncForeignKeys(String tableCode) {
-        return sqlExecuteService.syncForeignKeys(tableCode);
+        Map<String, Object> result = new HashMap<>();
+        result.put("success", false);
+        result.put("message", "SqlExecuteService 中未定义 syncForeignKeys 方法，同步功能暂不可用");
+        return result;
     }
 
     /**
