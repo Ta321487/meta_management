@@ -1,6 +1,5 @@
 package com.metadata.service;
 
-import com.alibaba.fastjson2.JSON;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
@@ -67,6 +66,14 @@ public class SqlExecuteService {
         // 移除SQL注释和多余空白
         sql = sql.trim();
         
+        // 移除多行注释 /* */
+        sql = sql.replaceAll("/\\*[\\s\\S]*?\\*/", " ");
+        // 移除单行注释 --
+        Pattern lineCommentPattern = Pattern.compile("--.*$\\n?", Pattern.MULTILINE);
+        sql = lineCommentPattern.matcher(sql).replaceAll("");
+        // 移除多余的空白字符
+        sql = sql.replaceAll("\\s+", " ").trim();
+        
         // 检查是否为危险操作（DROP、TRUNCATE等）
         String upperSql = sql.toUpperCase().trim();
         
@@ -131,16 +138,22 @@ public class SqlExecuteService {
                 // 如果是 CREATE TABLE 或 ALTER TABLE 语句，自动同步字段到元数据系统
                 if (upperSql.startsWith("CREATE TABLE") || upperSql.startsWith("ALTER TABLE")) {
                     try {
+                        logService.logSuccess("admin", "SYNC_START", "开始同步元数据: " + sql.substring(0, Math.min(100, sql.length())));
                         String tableName = extractTableName(sql);
+                        logService.logSuccess("admin", "SYNC_TABLE_NAME", "提取到表名: " + tableName);
                         if (tableName != null) {
                             syncTableFields(tableName, connection);
                             // 同步外键关联关系
                             syncTableForeignKeys(tableName, connection);
+                            logService.logSuccess("admin", "SYNC_COMPLETE", "元数据同步完成: " + tableName);
+                        } else {
+                            logService.logError("admin", "SYNC_FAILED", "表名提取失败，无法同步元数据", sql);
                         }
                     } catch (Exception e) {
                         // 同步失败不影响 SQL 执行结果，只记录日志
                         String tableName = extractTableName(sql);
-                        logService.logError("admin", "SYNC_FIELDS", "同步表字段失败: " + (tableName != null ? tableName : "未知表"), e.getMessage());
+                        logService.logError("admin", "SYNC_FIELDS", "同步表字段失败: " + (tableName != null ? tableName : "未知表"), e.getMessage() + "，SQL: " + sql);
+                        logService.logError("admin", "SYNC_EXCEPTION", "同步异常详情", e.toString());
                     }
                 }
                 
@@ -315,18 +328,22 @@ public class SqlExecuteService {
     private String extractTableName(String sql) {
         // 匹配 CREATE TABLE `table_name` 或 CREATE TABLE table_name
         // 匹配 ALTER TABLE `table_name` 或 ALTER TABLE table_name
-        Pattern pattern = Pattern.compile("(?:CREATE|ALTER)\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?(?:`)?([^\\s`]+)(?:`)?", Pattern.CASE_INSENSITIVE);
+        Pattern pattern = Pattern.compile("(?:CREATE|ALTER)\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?([^\s`]+)`?", Pattern.CASE_INSENSITIVE);
         Matcher matcher = pattern.matcher(sql);
+        String matchedTableName = null;
         if (matcher.find()) {
-            return matcher.group(1);
+            matchedTableName = matcher.group(1);
         }
-        return null;
+        // 记录匹配结果
+        logService.logSuccess("admin", "TABLE_NAME_MATCH", "表名匹配结果: 原始SQL=" + sql.substring(0, Math.min(50, sql.length())) + "..., 匹配到表名=" + matchedTableName);
+        return matchedTableName;
     }
 
     /**
      * 同步数据库表字段到元数据系统
      */
     private void syncTableFields(String tableName, Connection connection) throws Exception {
+        logService.logSuccess("admin", "SYNC_TABLE_FIELDS_START", "开始同步表字段: " + tableName);
         DatabaseMetaData metaData = connection.getMetaData();
         String catalog = connection.getCatalog();
         String schema = connection.getSchema();
@@ -405,6 +422,7 @@ public class SqlExecuteService {
                 table.setTableName(tableComment != null && !tableComment.isEmpty() ? tableComment : tableName);
                 table.setPkStrategy(pkStrategy);
                 table.setDescription(tableComment);
+                table.setIsEnabled(1); // 设置默认启用状态
                 tableMapper.insert(table);
                 tableCreated = true;
                 
@@ -684,8 +702,8 @@ public class SqlExecuteService {
                     // 合并原始message字段
                     if (oldRule != null && !oldRule.isEmpty()) {
                         try {
-                            JSONObject oldJson = JSON.parseObject(oldRule);
-                            JSONObject newJson = JSON.parseObject(newRule);
+                            com.alibaba.fastjson2.JSONObject oldJson = com.alibaba.fastjson2.JSON.parseObject(oldRule);
+                            com.alibaba.fastjson2.JSONObject newJson = com.alibaba.fastjson2.JSON.parseObject(newRule);
                             
                             // 如果原始规则有message字段，保留它
                             if (oldJson.containsKey("message")) {
@@ -734,6 +752,7 @@ public class SqlExecuteService {
                 logService.logSuccess("admin", "SYNC_FIELDS", "删除字段: " + tableCode + "." + fieldCode);
             }
         }
+        logService.logSuccess("admin", "SYNC_TABLE_FIELDS_END", "表字段同步完成: " + tableName);
     }
 
     /**
@@ -1135,7 +1154,7 @@ public class SqlExecuteService {
         if (rangeMatcher.find()) {
             String operator = rangeMatcher.group(2);
             String value = rangeMatcher.group(3);
-            JSONObject jsonObj = new JSONObject();
+            com.alibaba.fastjson2.JSONObject jsonObj = new JSONObject();
             jsonObj.put("message", "");
             
             int intValue = Integer.parseInt(value);
