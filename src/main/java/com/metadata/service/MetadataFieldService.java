@@ -416,11 +416,13 @@ public class MetadataFieldService {
             // 设置约束内容
             constraintItem.put("constraintContent", constraintContent);
             
+            // 设置表编码
+            constraintItem.put("tableCode", tableCode);
+            
             // 添加字段相关信息
             if (field != null) {
                 constraintItem.put("id", field.getId());
                 constraintItem.put("fieldCode", field.getFieldCode());
-                constraintItem.put("tableCode", field.getTableCode());
             }
             
             result.add(constraintItem);
@@ -434,26 +436,86 @@ public class MetadataFieldService {
      */
     @Transactional
     public void deleteConstraint(Map<String, Object> params) {
-        Long id = Long.valueOf(params.get("id").toString());
-        MetadataField field = fieldMapper.selectById(id);
-        if (field == null) {
-            throw new RuntimeException("字段不存在");
+        // 检查参数中的id是否存在
+        Object idObj = params.get("id");
+        MetadataField field = null;
+        String tableName = null;
+        String constraintName = null;
+        String fieldName = null;
+        String tableCode = null;
+        
+        if (idObj != null) {
+            // 如果有id，则通过id获取字段信息
+            Long id = Long.valueOf(idObj.toString());
+            field = fieldMapper.selectById(id);
+            if (field == null) {
+                throw new RuntimeException("字段不存在");
+            }
+            tableCode = field.getTableCode();
+            tableName = codeGeneratorService.convertToTableName(tableCode);
+            fieldName = field.getFieldName();
+            constraintName = "ck_" + tableName + "_" + fieldName;
+        } else {
+            // 如果没有id，则尝试从参数中获取其他信息
+            constraintName = (String) params.get("constraintName");
+            tableName = (String) params.get("tableName");
+            tableCode = (String) params.get("tableCode");
+            fieldName = (String) params.get("fieldName");
+            
+            // 如果参数中没有表名，则通过表编码转换
+            if (tableName == null && tableCode != null) {
+                tableName = codeGeneratorService.convertToTableName(tableCode);
+            }
+            
+            // 如果没有约束名，则尝试生成约束名
+            if (constraintName == null && tableName != null && fieldName != null) {
+                constraintName = "ck_" + tableName + "_" + fieldName;
+            }
+            
+            // 如果有tableCode和fieldName，则通过tableCode和fieldName获取字段信息
+            if (tableCode != null && fieldName != null) {
+                List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
+                if (fields != null && !fields.isEmpty()) {
+                    for (MetadataField f : fields) {
+                        if (fieldName.equals(f.getFieldName())) {
+                            field = f;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // 验证必要参数
+        if (tableName == null || constraintName == null) {
+            throw new RuntimeException("缺少必要的约束信息");
         }
         
         try {
-            String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
-            // 生成约束名
-            String constraintName = "ck_" + tableName + "_" + field.getFieldName();
+            // 确定约束类型
+            String constraintType = "CHECK";
+            if (constraintName.equalsIgnoreCase("PRIMARY")) {
+                constraintType = "PRIMARY KEY";
+            }
             
-            // 删除数据库中的CHECK约束
-            String dropSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + constraintName + "`";
+            // 禁止删除主键约束
+            if (constraintType.equals("PRIMARY KEY")) {
+                throw new RuntimeException("主键约束不能被直接删除，若要修改主键请重新设计表结构");
+            }
+            
+            // 构建删除约束的SQL语句
+            String dropSql = "ALTER TABLE `" + tableName + "` DROP " + constraintType + " `" + constraintName + "`";
+            
+            // 删除数据库中的约束
             sqlExecuteService.executeSql(dropSql, true);
             
-            // 将validate_rule设置为空
-            MetadataField updateField = new MetadataField();
-            updateField.setId(id);
-            updateField.setValidateRule(null);
-            fieldMapper.update(updateField);
+            // 如果有字段信息，则将validate_rule设置为空
+            if (field != null) {
+                MetadataField updateField = new MetadataField();
+                updateField.setId(field.getId());
+                updateField.setValidateRule(null);
+                fieldMapper.update(updateField);
+            }
             
             logService.logSuccess("admin", "DELETE_CONSTRAINT", "删除约束成功: " + constraintName);
         } catch (Exception e) {

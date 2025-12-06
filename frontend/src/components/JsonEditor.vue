@@ -464,12 +464,8 @@ export default {
           // 获取解析后的pattern
           rawRegex = parsed.pattern
           
-          // 从原始JSON字符串中提取带引号的pattern
-          const match = jsonContent.match(/"pattern"\s*:\s*"([^"]+)"/i)
-          rawRegexpFromJson.value = match ? match[1] : rawRegex
-          
-          // 关键修复：直接使用解析后的rawRegex，不再额外转义
-          // JSON.parse已经将\d解析为正确的JavaScript字符串
+          // 直接使用JSON解析后的pattern值
+          rawRegexpFromJson.value = rawRegex
           testRegexp.value = rawRegex
           console.log('  原始JSON:', jsonContent)
           console.log('  解析后的pattern:', rawRegex)
@@ -582,29 +578,6 @@ export default {
         console.log('正则表达式测试过程：')
         console.log('  原始pattern:', pattern)
         console.log('  测试输入:', testInputValue)
-        
-        // 最终解决方案：手动处理转义字符
-        // 问题：JSON.parse后，\\d变成了\d，而\d在字符串中不是有效转义
-        // 解决方案：将\d替换为\\d，确保RegExp构造函数能正确识别
-        const escapedPattern = pattern
-          .replace(/\\d/g, '\\d')
-          .replace(/\\w/g, '\\w')
-          .replace(/\\s/g, '\\s')
-          .replace(/\\b/g, '\\b')
-          .replace(/\\D/g, '\\D')
-          .replace(/\\W/g, '\\W')
-          .replace(/\\S/g, '\\S')
-          .replace(/\\B/g, '\\B')
-          .replace(/\\t/g, '\\t')
-          .replace(/\\n/g, '\\n')
-          .replace(/\\r/g, '\\r')
-          .replace(/\\f/g, '\\f')
-          .replace(/\\v/g, '\\v')
-        
-        console.log('  转义处理后的pattern:', escapedPattern)
-        
-        // 创建RegExp对象
-        // 关键修复：使用eval创建正则表达式，确保转义字符被正确处理
         
         // 手动构建正则表达式字符串，确保包含正确的边界
         let regexPattern = pattern

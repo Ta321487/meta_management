@@ -780,11 +780,13 @@ export default {
       constraintDialogVisible.value = true
     }
 
-    const loadConstraints = async () => {
-      if (!selectedTableCode.value) return
+    const loadConstraints = async (tableCode) => {
+      // 使用传入的tableCode或默认使用selectedTableCode.value
+      const currentTableCode = tableCode || selectedTableCode.value
+      if (!currentTableCode) return
       constraintLoading.value = true
       try {
-        const res = await getConstraintList(selectedTableCode.value)
+        const res = await getConstraintList(currentTableCode)
         if (res.code === 200) {
           constraints.value = res.data || []
         }
@@ -805,7 +807,10 @@ export default {
         try {
           await deleteConstraint(row)
           ElMessage.success('删除成功')
-          loadConstraints()
+          // 传递row.tableCode给loadConstraints，确保使用正确的表编码刷新约束列表
+          loadConstraints(row.tableCode)
+          // 同时刷新字段列表，确保编辑字段时校验规则是最新的
+          loadFields()
         } catch (error) {
           const errorMsg = error.response?.data?.message || error.data?.message || error.message || '删除失败'
           ElMessage.error(errorMsg)
