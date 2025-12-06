@@ -93,10 +93,9 @@ public class MetadataTableService {
                     primaryKeyField.setFieldType("BIGINT");
                     primaryKeyField.setFormComponent("primary_key"); // 其他主键使用primary_key表单组件
                     primaryKeyField.setIsRequired(1);
-                }     
-
-
-
+                }   
+                // 启用主键字段
+                primaryKeyField.setIsEnabled(1);
                 
                 // 插入主键字段
             fieldMapper.insert(primaryKeyField);

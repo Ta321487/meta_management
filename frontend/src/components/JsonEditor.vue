@@ -301,6 +301,8 @@ export default {
         automaticLayout: true,
         lineNumbers: 'on',
         tabSize: 2,
+        contextmenu: true,
+        locale: 'zh-CN',
         scrollbar: {
           useShadows: false,
           verticalScrollbarSize: 10,
