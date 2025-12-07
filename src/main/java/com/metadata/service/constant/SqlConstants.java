@@ -82,6 +82,7 @@ public class SqlConstants {
     public static final String LOG_MODULE_GET_CHECK_CONSTRAINTS = "GET_CHECK_CONSTRAINTS";
     public static final String LOG_MODULE_PARSE_CHECK_CONSTRAINT = "PARSE_CHECK_CONSTRAINT";
     public static final String LOG_MODULE_SET_VALIDATE_RULE = "SET_VALIDATE_RULE";
+    public static final String LOG_MODULE_SET_FORM_COMPONENT = "SET_FORM_COMPONENT";
     public static final String LOG_MODULE_SET_ENUM_TYPE = "SET_ENUM_TYPE";
     public static final String LOG_MODULE_SYNC_FOREIGN_KEY = "SYNC_FOREIGN_KEY";
     public static final String LOG_MODULE_EXTRACT_FIELD_NAME = "EXTRACT_FIELD_NAME";

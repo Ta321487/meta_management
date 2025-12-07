@@ -178,7 +178,7 @@ public class CheckConstraintParser {
             List<String> valuesList = parseInValues(valuesStr);
             logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析后的值列表: " + valuesList);
             if (!valuesList.isEmpty()) {
-                // 生成IN约束JSON，包含options字段
+                // 生成IN约束JSON，只包含values字段
                 StringBuilder valuesJson = new StringBuilder();
                 for (int i = 0; i < valuesList.size(); i++) {
                     if (i > 0) {
@@ -186,8 +186,8 @@ public class CheckConstraintParser {
                     }
                     valuesJson.append("\"").append(valuesList.get(i)).append("\"");
                 }
-                String json = String.format("{\"operator\":\"IN\",\"values\":[%s],\"options\":[%s]}",
-                    valuesJson.toString(), valuesJson.toString());
+                String json = String.format("{\"operator\":\"IN\",\"values\":[%s]}",
+                    valuesJson.toString());
                 logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为IN约束: " + json);
                 return json;
             }
@@ -394,15 +394,8 @@ public class CheckConstraintParser {
                 // 逗号分隔符，且不在引号内
                 String value = currentValue.toString().trim();
                 if (!value.isEmpty()) {
-                    // 处理字符集前缀，如_gbk'active' -> active
-                    if (value.contains("'") || value.contains("\"")) {
-                        // 移除引号和字符集前缀
-                        Pattern valuePattern = Pattern.compile("(?:_\\w+)?(['\\\"'])(.*?)\\1");
-                        Matcher valueMatcher = valuePattern.matcher(value);
-                        if (valueMatcher.find()) {
-                            value = valueMatcher.group(2);
-                        }
-                    }
+                    // 移除字符集前缀，如_utf8mb4文学 -> 文学
+                    value = removeCharsetPrefix(value);
                     values.add(value);
                 }
                 currentValue.setLength(0);
@@ -415,18 +408,40 @@ public class CheckConstraintParser {
         // 处理最后一个值
         String lastValue = currentValue.toString().trim();
         if (!lastValue.isEmpty()) {
-            // 处理字符集前缀，如_gbk'active' -> active
-            if (lastValue.contains("'") || lastValue.contains("\"")) {
-                // 移除引号和字符集前缀
-                Pattern valuePattern = Pattern.compile("(?:_\\w+)?(['\\\"'])(.*?)\\1");
-                Matcher valueMatcher = valuePattern.matcher(lastValue);
-                if (valueMatcher.find()) {
-                    lastValue = valueMatcher.group(2);
-                }
-            }
+            // 移除字符集前缀，如_utf8mb4文学 -> 文学
+            lastValue = removeCharsetPrefix(lastValue);
             values.add(lastValue);
         }
         
         return values;
+    }
+    
+    /**
+     * 移除字符集前缀，如_utf8mb4文学 -> 文学，_gbk'active' -> active
+     * @param value 原始值
+     * @return 移除前缀后的值
+     */
+    private String removeCharsetPrefix(String value) {
+        if (value == null || value.isEmpty()) {
+            return value;
+        }
+        
+        // 首先处理带引号的情况：_gbk'active' -> active
+        if (value.contains("'") || value.contains("\"")) {
+            Pattern valuePattern = Pattern.compile("(?:_\\w+)?(['\\\"'])(.*?)\\1");
+            Matcher valueMatcher = valuePattern.matcher(value);
+            if (valueMatcher.find()) {
+                return valueMatcher.group(2);
+            }
+        }
+        
+        // 处理不带引号的情况：_utf8mb4文学 -> 文学
+        Pattern charsetPrefixPattern = Pattern.compile("^_\\w+");
+        Matcher charsetPrefixMatcher = charsetPrefixPattern.matcher(value);
+        if (charsetPrefixMatcher.find()) {
+            return charsetPrefixMatcher.replaceFirst("");
+        }
+        
+        return value;
     }
 }

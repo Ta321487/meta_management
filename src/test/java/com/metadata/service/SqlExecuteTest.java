@@ -27,7 +27,7 @@ public class SqlExecuteTest {
                     "id INT PRIMARY KEY AUTO_INCREMENT, " +
                     "name VARCHAR(50) NOT NULL " +
                     ");";
-            Map<String, Object> createTableResult = sqlExecuteService.executeSqlInternal(createTableSql, true);
+            Map<String, Object> createTableResult = sqlExecuteService.executeSql(createTableSql, true);
             System.out.println("创建测试表结果: " + createTableResult);
         } catch (Exception e) {
             System.out.println("创建测试表失败: " + e.getMessage());
@@ -36,7 +36,7 @@ public class SqlExecuteTest {
         // 先尝试删除字段（使用try-catch处理字段不存在的情况）
         try {
             String dropSql = "ALTER TABLE test_tb DROP COLUMN STU_AGE;";
-            Map<String, Object> dropResult = sqlExecuteService.executeSqlInternal(dropSql, true);
+            Map<String, Object> dropResult = sqlExecuteService.executeSql(dropSql, true);
             System.out.println("删除字段结果: " + dropResult);
         } catch (Exception e) {
             // 忽略字段不存在的错误
@@ -45,7 +45,7 @@ public class SqlExecuteTest {
         
         // 执行ALTER TABLE语句添加字段
         String alterSql = "ALTER TABLE test_tb ADD COLUMN STU_AGE int NOT NULL COMMENT '年龄' CHECK (STU_AGE > 0);";
-        Map<String, Object> alterResult = sqlExecuteService.executeSqlInternal(alterSql, true);
+        Map<String, Object> alterResult = sqlExecuteService.executeSql(alterSql, true);
         System.out.println("添加字段结果: " + alterResult);
         
         // 验证SQL执行成功
@@ -73,7 +73,7 @@ public class SqlExecuteTest {
         // 先尝试删除表（如果存在）
         try {
             String dropSql = "DROP TABLE IF EXISTS employee;";
-            Map<String, Object> dropResult = sqlExecuteService.executeSqlInternal(dropSql, true);
+            Map<String, Object> dropResult = sqlExecuteService.executeSql(dropSql, true);
             System.out.println("删除表结果: " + dropResult);
         } catch (Exception e) {
             System.out.println("删除表失败: " + e.getMessage());
@@ -91,7 +91,7 @@ public class SqlExecuteTest {
             ");";
         
         System.out.println("执行CREATE TABLE语句: " + createSql);
-        Map<String, Object> createResult = sqlExecuteService.executeSqlInternal(createSql, false);
+        Map<String, Object> createResult = sqlExecuteService.executeSql(createSql, false);
         System.out.println("创建表结果: " + createResult);
         
         // 验证SQL执行成功
