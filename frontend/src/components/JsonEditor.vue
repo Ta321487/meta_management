@@ -576,35 +576,41 @@ export default {
         }
         
         // 原有正则表达式测试逻辑
-        const pattern = testRegexp.value
+        const pattern = parsed.pattern
         console.log('正则表达式测试过程：')
         console.log('  原始pattern:', pattern)
         console.log('  测试输入:', testInputValue)
         
-        // 手动构建正则表达式字符串，确保包含正确的边界
-        let regexPattern = pattern
+        // 修复：当从JSON解析出pattern时，需要确保正则表达式语法正确
+        // 问题：JSON中的反斜杠已经被转义，需要确保正则表达式构造时正确处理
+        let fixedPattern = pattern
         
-        // 确保pattern只有一个开头边界
-        if (!regexPattern.startsWith('^')) {
-          regexPattern = '^' + regexPattern
-        }
+        // 手动解析转义字符，确保正则表达式中的元字符被正确识别
+        // 例如：将\\w转换为\w，确保它被识别为单词字符匹配符
+        fixedPattern = fixedPattern.replace(/\\\\w/g, "\\w")
+        fixedPattern = fixedPattern.replace(/\\\\d/g, "\\d")
+        fixedPattern = fixedPattern.replace(/\\\\s/g, "\\s")
+        fixedPattern = fixedPattern.replace(/\\\\b/g, "\\b")
+        fixedPattern = fixedPattern.replace(/\\\\B/g, "\\B")
+        fixedPattern = fixedPattern.replace(/\\\\d/g, "\\d")
+        fixedPattern = fixedPattern.replace(/\\\\D/g, "\\D")
+        fixedPattern = fixedPattern.replace(/\\\\s/g, "\\s")
+        fixedPattern = fixedPattern.replace(/\\\\S/g, "\\S")
+        fixedPattern = fixedPattern.replace(/\\\\w/g, "\\w")
+        fixedPattern = fixedPattern.replace(/\\\\W/g, "\\W")
         
-        // 确保pattern只有一个结尾边界
-        if (regexPattern.endsWith('$$')) {
-          // 移除多余的$符号
-          regexPattern = regexPattern.slice(0, -1)
-        } else if (!regexPattern.endsWith('$')) {
-          regexPattern = regexPattern + '$'
-        }
+        console.log('  修复后的pattern:', fixedPattern)
         
-        console.log('  带边界的regexPattern:', regexPattern)
-        
-        // 动态构建正则表达式对象
-        const regex = new RegExp(regexPattern)
+        // 使用修复后的pattern构建正则表达式对象
+        const regex = new RegExp(fixedPattern)
         console.log('  最终正则对象:', regex)
+        console.log('  正则表达式源:', regex.source)
         
-        // 测试匹配
-        const match = regex.test(testInput.value)
+        // 测试匹配，去除输入前后的空格和不可见字符
+        const trimmedInput = testInputValue.trim()
+        console.log('  修剪后的测试输入:', trimmedInput)
+        console.log('  修剪后的输入长度:', trimmedInput.length)
+        const match = regex.test(trimmedInput)
         let message = ''
         if (!match) {
           // 使用JSON中的message字段

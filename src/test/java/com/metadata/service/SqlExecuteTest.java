@@ -2,6 +2,7 @@ package com.metadata.service;
 
 import com.metadata.mapper.MetadataFieldMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +21,18 @@ public class SqlExecuteTest {
     @Test
     @Transactional
     public void testAlterTableAddColumn() throws Exception {
+        // 先创建测试表（如果不存在）
+        try {
+            String createTableSql = "CREATE TABLE IF NOT EXISTS test_tb (" +
+                    "id INT PRIMARY KEY AUTO_INCREMENT, " +
+                    "name VARCHAR(50) NOT NULL " +
+                    ");";
+            Map<String, Object> createTableResult = sqlExecuteService.executeSqlInternal(createTableSql, true);
+            System.out.println("创建测试表结果: " + createTableResult);
+        } catch (Exception e) {
+            System.out.println("创建测试表失败: " + e.getMessage());
+        }
+        
         // 先尝试删除字段（使用try-catch处理字段不存在的情况）
         try {
             String dropSql = "ALTER TABLE test_tb DROP COLUMN STU_AGE;";
@@ -36,20 +49,20 @@ public class SqlExecuteTest {
         System.out.println("添加字段结果: " + alterResult);
         
         // 验证SQL执行成功
-        assert (Boolean) alterResult.get("success");
+        Assertions.assertTrue((Boolean) alterResult.get("success"), "ALTER TABLE执行失败");
         
         // 验证字段是否同步到metadata_field表
         String tableCode = "test_tb".toUpperCase();
         String fieldCode = "STU_AGE";
         com.metadata.entity.MetadataField field = fieldMapper.selectByCode(tableCode, fieldCode);
-        assert field != null;
+        Assertions.assertNotNull(field, "字段未同步到metadata_field表");
         System.out.println("字段同步成功！字段信息: " + field);
         
         // 验证字段信息是否正确
-        assert field.getFieldName().equals("STU_AGE");
-        assert field.getFieldType().equalsIgnoreCase("INT");
-        assert field.getLabel().equals("年龄");
-        assert field.getIsRequired() == 1;
+        Assertions.assertEquals("STU_AGE", field.getFieldName(), "字段名不正确");
+        Assertions.assertTrue(field.getFieldType().equalsIgnoreCase("INT"), "字段类型不正确");
+        Assertions.assertEquals("年龄", field.getLabel(), "字段标签不正确");
+        Assertions.assertEquals(1, field.getIsRequired(), "字段必填状态不正确");
         
         System.out.println("测试通过！ALTER TABLE添加字段能正确同步到metadata_field表。");
     }
@@ -82,7 +95,7 @@ public class SqlExecuteTest {
         System.out.println("创建表结果: " + createResult);
         
         // 验证SQL执行成功
-        assert (Boolean) createResult.get("success");
+        Assertions.assertTrue((Boolean) createResult.get("success"), "CREATE TABLE执行失败");
         
         // 验证表是否同步到metadata_table表
         // 这里假设tableMapper有selectByCode方法

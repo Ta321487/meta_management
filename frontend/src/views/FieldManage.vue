@@ -775,6 +775,34 @@ export default {
       })
     }
 
+    // 解码十六进制编码的中文字符
+    const decodeHexChinese = (str) => {
+      if (!str) return str;
+      
+      // 匹配 _utf8mb4'...' 格式的字符串
+      return str.replace(/_utf8mb4\\'([^']+)\\'/g, (match, hexStr) => {
+        // 处理 UTF-8 编码的乱码字符串
+        try {
+          // 方法1：通过 encodeURIComponent 和 decodeURIComponent 转换
+          const decoded = decodeURIComponent(escape(hexStr));
+          return `'${decoded}'`;
+        } catch (e) {
+          try {
+            // 方法2：手动转换 UTF-8 字节序列
+            const bytes = new Uint8Array(hexStr.length);
+            for (let i = 0; i < hexStr.length; i++) {
+              bytes[i] = hexStr.charCodeAt(i);
+            }
+            const decoded = new TextDecoder('utf-8').decode(bytes);
+            return `'${decoded}'`;
+          } catch (e2) {
+            // 如果所有解码方法都失败，返回原始字符串
+            return match;
+          }
+        }
+      });
+    };
+
     // 约束相关方法
     const handleViewConstraints = () => {
       constraintDialogVisible.value = true
@@ -788,7 +816,11 @@ export default {
       try {
         const res = await getConstraintList(currentTableCode)
         if (res.code === 200) {
-          constraints.value = res.data || []
+          // 对约束内容进行解码处理
+          constraints.value = (res.data || []).map(constraint => ({
+            ...constraint,
+            constraintContent: decodeHexChinese(constraint.constraintContent)
+          }))
         }
       } catch (error) {
         ElMessage.error('加载约束列表失败')
