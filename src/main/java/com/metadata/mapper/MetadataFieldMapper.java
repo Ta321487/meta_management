@@ -15,11 +15,51 @@ public interface MetadataFieldMapper {
     int deleteByTableCode(String tableCode);
     int batchDelete(@Param("ids") List<Long> ids);
     MetadataField selectById(Long id);
-    MetadataField selectByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode);
-    List<MetadataField> selectByTableCode(String tableCode);
-    int countByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode);
-    Long countByTableCode(String tableCode);
-    List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode, @Param("pageRequest") com.metadata.common.PageRequest pageRequest);
+    MetadataField selectByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据表编码和字段编码查询字段（默认业务系统）
+     */
+    default MetadataField selectByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode) {
+        return selectByCode(tableCode, fieldCode, "");
+    }
+    List<MetadataField> selectByTableCode(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 查询表的所有字段（默认业务系统）
+     */
+    default List<MetadataField> selectByTableCode(String tableCode) {
+        return selectByTableCode(tableCode, "");
+    }
+    
+    int countByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据表编码和字段编码统计字段数量（默认业务系统）
+     */
+    default int countByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode) {
+        return countByCode(tableCode, fieldCode, "");
+    }
+    
+    Long countByTableCode(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据表编码统计字段数量（默认业务系统）
+     */
+    default Long countByTableCode(@Param("tableCode") String tableCode) {
+        return countByTableCode(tableCode, "");
+    }
+    List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode, 
+                                             @Param("businessCode") String businessCode,
+                                             @Param("pageRequest") com.metadata.common.PageRequest pageRequest);
+    
+    /**
+     * 分页查询表的字段（默认业务系统）
+     */
+    default List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode, 
+                                             @Param("pageRequest") com.metadata.common.PageRequest pageRequest) {
+        return selectPageByTableCode(tableCode, "", pageRequest);
+    }
     
     /**
      * 获取表的约束级别
@@ -30,5 +70,15 @@ public interface MetadataFieldMapper {
      * 获取表的所有类型约束
      */
     List<Map<String, Object>> selectAllConstraints(@Param("tableName") String tableName);
+    
+    /**
+     * 根据表编码更新字段的业务系统
+     */
+    int updateFieldsBusinessSystemByTable(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 批量根据表编码更新字段的业务系统
+     */
+    int batchUpdateFieldsBusinessSystem(@Param("tableCodes") List<String> tableCodes, @Param("businessCode") String businessCode);
 }
 

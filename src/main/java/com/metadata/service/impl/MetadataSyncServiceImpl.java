@@ -161,6 +161,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 table.setPkStrategy(pkStrategy);
                 table.setDescription(tableComment);
                 table.setIsEnabled(1); // 设置默认启用状态
+                table.setBusinessCode("DEFAULT"); // 设置默认业务系统编码
                 tableMapper.insert(table);
                 tableCreated = true;
                 
@@ -235,6 +236,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 field.setFieldName(columnName);
                 field.setFieldType(fieldType);
                 field.setLabel(comments != null && !comments.isEmpty() ? comments : columnName);
+                field.setBusinessCode("DEFAULT"); // 设置默认业务系统编码
                 
                 // 判断是否是自增主键
                 boolean isAutoIncrementPk = (autoIncrementPkColumn != null && 
@@ -563,8 +565,11 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 String relationCode = generateRelationCode(mainTableCode, slaveTableCode, 
                                                           mainField.getFieldCode(), slaveField.getFieldCode());
                 
-                // 检查关联关系是否已存在
-                if (relationMapper.countByCode(relationCode) > 0) {
+                // 获取业务系统编码（从从表获取）
+                String businessCode = table.getBusinessCode();
+                
+                // 检查关联关系是否已存在（在同一业务系统内）
+                if (relationMapper.countByCode(relationCode, businessCode) > 0) {
                     // 已存在，跳过
                     continue;
                 }
@@ -578,6 +583,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 relation.setSlaveFieldCode(slaveField.getFieldCode());
                 relation.setRelationType(SqlConstants.RELATION_TYPE_ONE_TO_MANY); // 默认一对多
                 relation.setRelationName(mainTable.getTableName() + " -> " + table.getTableName());
+                relation.setBusinessCode(businessCode); // 设置业务系统编码
                 
                 relationMapper.insert(relation);
                 createdCount++;

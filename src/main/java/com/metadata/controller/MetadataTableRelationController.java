@@ -68,17 +68,28 @@ public class MetadataTableRelationController {
 
     @GetMapping("/list")
     public Result<?> listAll(@RequestParam(required = false) Integer current,
-                             @RequestParam(required = false) Integer size) {
+                             @RequestParam(required = false) Integer size,
+                             @RequestParam(required = false) String businessCode) {
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataTableRelation> pageResult = relationService.page(pageRequest);
+            PageResult<MetadataTableRelation> pageResult;
+            if (businessCode != null && !businessCode.isEmpty()) {
+                pageResult = relationService.page(pageRequest, businessCode);
+            } else {
+                pageResult = relationService.page(pageRequest);
+            }
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataTableRelation> list = relationService.listAll();
+        List<MetadataTableRelation> list;
+        if (businessCode != null && !businessCode.isEmpty()) {
+            list = relationService.listAll(businessCode);
+        } else {
+            list = relationService.listAll();
+        }
         return Result.success(list);
     }
 

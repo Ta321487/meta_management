@@ -21,6 +21,11 @@
       <el-table :data="nodeData" border style="width: 100%" v-loading="loading">
         <el-table-column prop="nodeCode" label="节点编码" width="150" />
         <el-table-column prop="nodeName" label="节点名称" />
+        <el-table-column prop="businessCode" label="业务系统" width="120">
+          <template #default="{ row }">
+            <el-tag>{{ row.businessCode || '未关联' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="nodeType" label="节点类型" width="150">
           <template #default="{ row }">
             {{ getNodeTypeName(row.nodeType) }}
@@ -163,7 +168,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getModuleList, getNodeList, addNode, updateNode, deleteNode, getTablesByModule } from '../api'
+import { getModuleList, getNodeList, addNode, updateNode, deleteNode, getTablesByModule, getBusinessSystemList } from '../api'
 import IconSelector from '../components/IconSelector.vue'
 
 export default {
@@ -174,6 +179,7 @@ export default {
   setup() {
     const modules = ref([])
     const tables = ref([])
+    const businessSystems = ref([])
     const nodeData = ref([])
     const selectedModuleCode = ref('')
     const loading = ref(false)
@@ -215,6 +221,18 @@ export default {
         }
       } catch (error) {
         ElMessage.error('加载模块列表失败')
+      }
+    }
+
+    // 加载业务系统列表
+    const loadBusinessSystems = async () => {
+      try {
+        const res = await getBusinessSystemList({})
+        if (res.code === 200) {
+          businessSystems.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载业务系统列表失败')
       }
     }
 
@@ -386,11 +404,13 @@ export default {
 
     onMounted(() => {
       loadModules()
+      loadBusinessSystems()
     })
 
     return {
       modules,
       tables,
+      businessSystems,
       nodeData,
       selectedModuleCode,
       loading,

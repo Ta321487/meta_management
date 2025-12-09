@@ -102,6 +102,7 @@ public class MetadataTableController {
     @Operation(summary = "查询表列表", description = "查询表列表，支持分页和条件查询")
     public Result<?> list(
             @Parameter(description = "表名称") @RequestParam(required = false) String tableName,
+            @Parameter(description = "业务系统") @RequestParam(required = false) String businessCode,
             @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
             @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
         // 如果传入了分页参数，使用分页查询
@@ -109,11 +110,11 @@ public class MetadataTableController {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataTable> pageResult = tableService.page(tableName, pageRequest);
+            PageResult<MetadataTable> pageResult = tableService.page(tableName, businessCode, pageRequest);
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataTable> list = tableService.list(tableName);
+        List<MetadataTable> list = tableService.list(tableName, businessCode);
         return Result.success(list);
     }
 

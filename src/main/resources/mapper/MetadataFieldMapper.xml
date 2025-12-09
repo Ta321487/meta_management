@@ -14,27 +14,30 @@
         <result column="validate_rule" property="validateRule"/>
         <result column="sort" property="sort"/>
         <result column="is_enabled" property="isEnabled"/>
+        <result column="business_code" property="businessCode"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataField" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_field (field_code, table_code, field_name, field_type, label, 
-                                   is_required, form_component, validate_rule, sort, is_enabled)
+                                   is_required, form_component, validate_rule, sort, is_enabled, business_code)
         VALUES (#{fieldCode}, #{tableCode}, #{fieldName}, #{fieldType}, #{label},
-                #{isRequired}, #{formComponent}, #{validateRule}, #{sort}, #{isEnabled, jdbcType=INTEGER})
+                #{isRequired}, #{formComponent}, #{validateRule}, #{sort}, #{isEnabled, jdbcType=INTEGER}, #{businessCode, jdbcType=VARCHAR})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataField">
         UPDATE metadata_field
-        SET field_name = #{fieldName},
-            field_type = #{fieldType},
-            label = #{label},
-            is_required = #{isRequired},
-            form_component = #{formComponent},
-            validate_rule = #{validateRule},
-            sort = #{sort},
-            is_enabled = #{isEnabled}
+        SET 
+            field_name = #{fieldName, jdbcType=VARCHAR},
+            field_type = #{fieldType, jdbcType=VARCHAR},
+            label = #{label, jdbcType=VARCHAR},
+            is_required = #{isRequired, jdbcType=INTEGER},
+            form_component = #{formComponent, jdbcType=VARCHAR},
+            validate_rule = #{validateRule, jdbcType=VARCHAR},
+            sort = #{sort, jdbcType=INTEGER},
+            is_enabled = #{isEnabled, jdbcType=INTEGER},
+            business_code = #{businessCode, jdbcType=VARCHAR}
         WHERE id = #{id}
     </update>
 
@@ -60,26 +63,41 @@
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_field 
         WHERE table_code = #{tableCode} AND field_code = #{fieldCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectByTableCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_field 
         WHERE table_code = #{tableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY sort ASC, create_time ASC
     </select>
 
     <select id="countByCode" resultType="int">
         SELECT COUNT(*) FROM metadata_field 
         WHERE table_code = #{tableCode} AND field_code = #{fieldCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="countByTableCode" resultType="Long">
         SELECT COUNT(*) FROM metadata_field WHERE table_code = #{tableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectPageByTableCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_field 
         WHERE table_code = #{tableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY sort ASC, create_time ASC
         LIMIT #{pageRequest.offset}, #{pageRequest.size}
     </select>
@@ -135,5 +153,21 @@
             AND tc.table_name = #{tableName}
     </select>
 
+    <!-- 根据表编码更新字段的业务系统 -->
+    <update id="updateFieldsBusinessSystemByTable">
+        UPDATE metadata_field
+        SET business_code = #{businessCode}
+        WHERE table_code = #{tableCode}
+    </update>
+
+    <!-- 批量根据表编码更新字段的业务系统 -->
+    <update id="batchUpdateFieldsBusinessSystem">
+        UPDATE metadata_field
+        SET business_code = #{businessCode}
+        WHERE table_code IN
+        <foreach collection="tableCodes" item="tableCode" open="(" separator="," close=")">
+            #{tableCode}
+        </foreach>
+    </update>
 </mapper>
 

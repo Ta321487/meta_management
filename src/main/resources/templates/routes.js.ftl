@@ -7,7 +7,7 @@ export default [
     <#if node.routePath?has_content || node.jumpRelation?has_content>
     {
       <#-- 优先使用 routePath，否则使用 jumpRelation -->
-      path: '${node.routePath?has_content?then(node.routePath, node.jumpRelation)}',
+      path: '/${businessCode}${node.routePath?has_content?then(node.routePath, node.jumpRelation)}',
       name: '${node.nodeCode}',
       <#-- 根据 nodeType 选择组件名 -->
       <#-- 支持 nodeType 包含 LIST、FORM、DETAIL 等关键词 -->
@@ -35,16 +35,16 @@ export default [
   </#list>
 <#else>
   {
-    path: '/${componentName?lower_case}/list',
+    path: '/${businessCode}/${componentName?lower_case}/list',
     name: '${componentName}List',
     component: () => import('@/views/${componentDir}/List.vue'),
-    meta: { relatedTableCode: '${table.tableCode}', isMenuVisible: 1 }
+    meta: { relatedTableCode: '${table.tableCode}', isMenuVisible: 1, businessCode: '${businessCode}' }
   },
   {
-    path: '/${componentName?lower_case}/form/:id?',
+    path: '/${businessCode}/${componentName?lower_case}/form/:id?',
     name: '${componentName}Form',
     component: () => import('@/views/${componentDir}/Form.vue'),
-    meta: { relatedTableCode: '${table.tableCode}', isMenuVisible: 0 }
+    meta: { relatedTableCode: '${table.tableCode}', isMenuVisible: 0, businessCode: '${businessCode}' }
   }
 </#if>
 ]

@@ -11,15 +11,17 @@
         <result column="slave_field_code" property="slaveFieldCode"/>
         <result column="relation_type" property="relationType"/>
         <result column="relation_name" property="relationName"/>
+        <result column="description" property="description"/>
+        <result column="business_code" property="businessCode"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataTableRelation" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_table_relation (relation_code, main_table_code, slave_table_code,
-                                             main_field_code, slave_field_code, relation_type, relation_name)
+                                             main_field_code, slave_field_code, relation_type, relation_name, description, business_code)
         VALUES (#{relationCode}, #{mainTableCode}, #{slaveTableCode},
-                #{mainFieldCode}, #{slaveFieldCode}, #{relationType}, #{relationName})
+                #{mainFieldCode}, #{slaveFieldCode}, #{relationType}, #{relationName}, #{description}, #{businessCode})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataTableRelation">
@@ -29,7 +31,8 @@
             main_field_code = #{mainFieldCode},
             slave_field_code = #{slaveFieldCode},
             relation_type = #{relationType},
-            relation_name = #{relationName}
+            relation_name = #{relationName},
+            description = #{description}
         WHERE id = #{id}
     </update>
 
@@ -38,33 +41,63 @@
     </delete>
 
     <select id="selectByCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table_relation WHERE relation_code = #{relationCode}
+        SELECT * FROM metadata_table_relation 
+        WHERE relation_code = #{relationCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectByMainTableCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table_relation WHERE main_table_code = #{mainTableCode}
+        SELECT * FROM metadata_table_relation 
+        WHERE main_table_code = #{mainTableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectBySlaveTableCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table_relation WHERE slave_table_code = #{slaveTableCode}
+        SELECT * FROM metadata_table_relation 
+        WHERE slave_table_code = #{slaveTableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table_relation ORDER BY create_time DESC
+        SELECT * FROM metadata_table_relation 
+        <if test="businessCode != null and businessCode != ''">
+            WHERE business_code = #{businessCode}
+        </if>
+        ORDER BY create_time DESC
     </select>
 
     <select id="countByCode" resultType="int">
-        SELECT COUNT(*) FROM metadata_table_relation WHERE relation_code = #{relationCode}
+        SELECT COUNT(*) FROM metadata_table_relation 
+        WHERE relation_code = #{relationCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="count" resultType="Long">
-        SELECT COUNT(*) FROM metadata_table_relation
+        SELECT COUNT(*) FROM metadata_table_relation 
+        <if test="businessCode != null and businessCode != ''">
+            WHERE business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectPage" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table_relation
+        SELECT * FROM metadata_table_relation 
+        <if test="businessCode != null and businessCode != ''">
+            WHERE business_code = #{businessCode}
+        </if>
         ORDER BY create_time DESC
         LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation WHERE id = #{id}
     </select>
 
 </mapper>

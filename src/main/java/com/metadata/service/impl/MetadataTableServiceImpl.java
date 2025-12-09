@@ -62,6 +62,10 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (tableMapper.countByCode(table.getTableCode()) > 0) {
             throw new RuntimeException("表编码已存在");
         }
+        // 确保businessCode不为null，使用空字符串作为默认值
+        if (table.getBusinessCode() == null) {
+            table.setBusinessCode("");
+        }
         // 先创建元数据记录
         tableMapper.insert(table);
         
@@ -102,6 +106,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 }   
                 // 启用主键字段
                 primaryKeyField.setIsEnabled(1);
+                // 设置业务系统编码，与表保持一致
+                primaryKeyField.setBusinessCode(table.getBusinessCode());
                 
                 // 插入主键字段
             fieldMapper.insert(primaryKeyField);
@@ -240,17 +246,17 @@ public class MetadataTableServiceImpl implements MetadataTableService {
      * 查询所有表
      */
     @Override
-    public List<MetadataTable> list(String tableName) {
-        return tableMapper.selectAll(tableName);
+    public List<MetadataTable> list(String tableName, String businessCode) {
+        return tableMapper.selectAll(tableName, businessCode);
     }
 
     /**
      * 分页查询表
      */
     @Override
-    public PageResult<MetadataTable> page(String tableName, PageRequest pageRequest) {
-        Long total = tableMapper.count(tableName);
-        List<MetadataTable> records = tableMapper.selectPage(tableName, pageRequest);
+    public PageResult<MetadataTable> page(String tableName, String businessCode, PageRequest pageRequest) {
+        Long total = tableMapper.count(tableName, businessCode);
+        List<MetadataTable> records = tableMapper.selectPage(tableName, businessCode, pageRequest);
         return new PageResult<>(total, records);
     }
 
@@ -258,8 +264,56 @@ public class MetadataTableServiceImpl implements MetadataTableService {
      * 根据模块编码查询表
      */
     @Override
-    public List<MetadataTable> listByModuleCode(String moduleCode) {
-        return tableMapper.selectByModuleCode(moduleCode);
+    public List<MetadataTable> listByModuleCode(String moduleCode, String businessCode) {
+        return tableMapper.selectByModuleCode(moduleCode, businessCode);
+    }
+
+    /**
+     * 更新表的业务系统
+     */
+    @Override
+    @Transactional
+    public void updateTableBusinessSystem(String tableCode, String businessCode) {
+        // 获取表信息
+        MetadataTable table = tableMapper.selectByCode(tableCode);
+        if (table == null) {
+            throw new RuntimeException("表不存在");
+        }
+        
+        // 更新表的业务系统
+        table.setBusinessCode(businessCode);
+        tableMapper.update(table);
+        
+        // 更新表关联的所有字段的业务系统
+        fieldMapper.updateFieldsBusinessSystemByTable(tableCode, businessCode);
+        
+        logService.logSuccess("admin", "EDIT", "更新表业务系统：" + tableCode + " -> " + businessCode);
+    }
+
+    /**
+     * 批量更新表的业务系统
+     */
+    @Override
+    @Transactional
+    public void batchUpdateTableBusinessSystem(List<String> tableCodes, String businessCode) {
+        if (tableCodes == null || tableCodes.isEmpty()) {
+            throw new RuntimeException("表编码列表不能为空");
+        }
+        
+        for (String tableCode : tableCodes) {
+            updateTableBusinessSystem(tableCode, businessCode);
+        }
+    }
+
+    /**
+     * 批量获取表列表
+     */
+    @Override
+    public List<MetadataTable> getTablesByCodes(List<String> tableCodes) {
+        if (tableCodes == null || tableCodes.isEmpty()) {
+            return List.of();
+        }
+        return tableMapper.selectByCodes(tableCodes);
     }
 
     /**

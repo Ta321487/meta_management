@@ -20,6 +20,7 @@ public class MetadataModule {
     private String routePath;  // 路由路径
     private String componentPath;  // 组件路径
     private List<String> tableCodes;  // 关联的表编码列表
+    private String businessCode;  // 业务系统编码
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

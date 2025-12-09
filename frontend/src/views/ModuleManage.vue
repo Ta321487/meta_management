@@ -25,6 +25,16 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="业务系统">
+          <el-select v-model="searchForm.businessCode" placeholder="请选择" clearable style="width: 200px">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 200px">
             <el-option label="启用" :value="1" />
@@ -41,6 +51,11 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="moduleCode" label="模块编码" width="150" />
         <el-table-column prop="moduleName" label="模块名称" />
+        <el-table-column prop="businessCode" label="业务系统" width="150">
+          <template #default="{ row }">
+            <el-tag>{{ row.businessCode || '未关联' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="moduleType" label="模块类型" width="150" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="tableCodes" label="关联表" width="150">
@@ -67,17 +82,19 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button
-              :type="row.status === 1 ? 'warning' : 'success'"
-              size="small"
-              @click="handleToggleStatus(row)"
-            >
-              {{ row.status === 1 ? '禁用' : '启用' }}
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-space>
+              <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button
+                :type="row.status === 1 ? 'warning' : 'success'"
+                size="small"
+                @click="handleToggleStatus(row)"
+              >
+                {{ row.status === 1 ? '禁用' : '启用' }}
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </el-space>
           </template>
         </el-table-column>
       </el-table>
@@ -118,6 +135,16 @@
               :key="type.typeCode"
               :label="type.typeName"
               :value="type.typeCode"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="业务系统">
+          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
             />
           </el-select>
         </el-form-item>
@@ -181,7 +208,8 @@ import {
   updateModuleStatus,
   getModuleTypeList,
   getTableList,
-  getTablesByModule
+  getTablesByModule,
+  getBusinessSystemList
 } from '../api'
 import IconSelector from '../components/IconSelector.vue'
 
@@ -191,6 +219,7 @@ export default {
     const tableData = ref([])
     const moduleTypes = ref([])
     const allTables = ref([])
+    const businessSystems = ref([])
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增模块')
     const formRef = ref(null)
@@ -204,13 +233,15 @@ export default {
     const searchForm = reactive({
       moduleName: '',
       moduleType: '',
-      status: null
+      status: null,
+      businessCode: ''
     })
     const form = reactive({
       id: null,
       moduleCode: '',
       moduleName: '',
       moduleType: '',
+      businessCode: '',
       description: '',
       sort: 1,
       icon: '',
@@ -287,6 +318,18 @@ export default {
         ElMessage.error('加载表列表失败')
       }
     }
+    
+    // 加载业务系统列表
+    const loadBusinessSystems = async () => {
+      try {
+        const res = await getBusinessSystemList({})
+        if (res.code === 200) {
+          businessSystems.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载业务系统列表失败')
+      }
+    }
 
     const handleSearch = () => {
       pagination.current = 1
@@ -297,6 +340,7 @@ export default {
       searchForm.moduleName = ''
       searchForm.moduleType = ''
       searchForm.status = null
+      searchForm.businessCode = ''
       pagination.current = 1
       loadData()
     }
@@ -315,6 +359,7 @@ export default {
         moduleCode: '',
         moduleName: '',
         moduleType: '',
+        businessCode: '',
         description: '',
         sort: maxSort + 1,
         icon: '',
@@ -332,6 +377,7 @@ export default {
         moduleCode: row.moduleCode,
         moduleName: row.moduleName,
         moduleType: row.moduleType,
+        businessCode: row.businessCode || '',
         description: row.description,
         sort: row.sort || 1,
         icon: row.icon || '',
@@ -455,12 +501,14 @@ export default {
       loadData()
       loadModuleTypes()
       loadTables()
+      loadBusinessSystems()
     })
 
     return {
       tableData,
       moduleTypes,
       allTables,
+      businessSystems,
       dialogVisible,
       dialogTitle,
       formRef,

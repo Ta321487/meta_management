@@ -131,6 +131,7 @@ public class MetadataModuleController {
     public Result<?> list(
             @Parameter(description = "模块名称") @RequestParam(required = false) String moduleName,
             @Parameter(description = "模块类型") @RequestParam(required = false) String moduleType,
+            @Parameter(description = "业务系统") @RequestParam(required = false) String businessCode,
             @Parameter(description = "模块状态") @RequestParam(required = false) Integer status,
             @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
             @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
@@ -139,11 +140,11 @@ public class MetadataModuleController {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataModule> pageResult = moduleService.page(moduleName, moduleType, status, pageRequest);
+            PageResult<MetadataModule> pageResult = moduleService.page(moduleName, moduleType, businessCode, status, pageRequest);
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataModule> list = moduleService.list(moduleName, moduleType, status);
+        List<MetadataModule> list = moduleService.list(moduleName, moduleType, businessCode, status);
         return Result.success(list);
     }
 

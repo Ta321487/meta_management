@@ -8,6 +8,7 @@ import java.util.List;
 
 /**
  * ${table.tableName}Mapper接口
+ * 业务系统：${businessName}
  */
 @Mapper
 public interface ${className}Mapper {

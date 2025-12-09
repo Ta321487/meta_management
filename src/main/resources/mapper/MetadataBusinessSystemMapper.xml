@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<mapper namespace="com.metadata.mapper.MetadataBusinessSystemMapper">
+    
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataBusinessSystem">
+        <id column="id" property="id" />
+        <result column="business_code" property="businessCode" />
+        <result column="business_name" property="businessName" />
+        <result column="description" property="description" />
+        <result column="is_default" property="isDefault" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+    
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_system ORDER BY create_time DESC
+    </select>
+    
+    <select id="selectByCode" parameterType="string" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_system WHERE business_code = #{businessCode}
+    </select>
+    
+    <select id="selectDefault" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_system WHERE is_default = 1
+    </select>
+    
+    <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessSystem" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_business_system (
+            business_code, business_name, description, is_default
+        ) VALUES (
+            #{businessCode}, #{businessName}, #{description}, #{isDefault}
+        )
+    </insert>
+    
+    <update id="update" parameterType="com.metadata.entity.MetadataBusinessSystem">
+        UPDATE metadata_business_system SET
+            business_name = #{businessName},
+            description = #{description},
+            is_default = #{isDefault}
+        WHERE id = #{id}
+    </update>
+    
+    <delete id="delete" parameterType="long">
+        DELETE FROM metadata_business_system WHERE id = #{id}
+    </delete>
+</mapper>

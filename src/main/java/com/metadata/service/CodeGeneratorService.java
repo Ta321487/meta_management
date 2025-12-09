@@ -14,52 +14,122 @@ public interface CodeGeneratorService {
     /**
      * 生成数据库建表SQL
      */
-    String generateCreateTableSQL(String tableCode) throws Exception;
+    String generateCreateTableSQL(String tableCode, String businessCode) throws Exception;
+    
+    /**
+     * 生成数据库建表SQL（默认业务系统）
+     */
+    default String generateCreateTableSQL(String tableCode) throws Exception {
+        return generateCreateTableSQL(tableCode, "DEFAULT");
+    }
 
     /**
      * 生成Java实体类
      */
-    String generateEntity(String tableCode, String packageName) throws Exception;
+    String generateEntity(String tableCode, String packageName, String businessCode) throws Exception;
+    
+    /**
+     * 生成Java实体类（默认业务系统）
+     */
+    default String generateEntity(String tableCode, String packageName) throws Exception {
+        return generateEntity(tableCode, packageName, "DEFAULT");
+    }
 
     /**
      * 生成Controller
      */
-    String generateController(String tableCode, String packageName) throws Exception;
+    String generateController(String tableCode, String packageName, String businessCode) throws Exception;
+    
+    /**
+     * 生成Controller（默认业务系统）
+     */
+    default String generateController(String tableCode, String packageName) throws Exception {
+        return generateController(tableCode, packageName, "DEFAULT");
+    }
 
     /**
      * 生成Service
      */
-    String generateService(String tableCode, String packageName) throws Exception;
+    String generateService(String tableCode, String packageName, String businessCode) throws Exception;
+    
+    /**
+     * 生成Service（默认业务系统）
+     */
+    default String generateService(String tableCode, String packageName) throws Exception {
+        return generateService(tableCode, packageName, "DEFAULT");
+    }
 
     /**
      * 生成Mapper接口
      */
-    String generateMapper(String tableCode, String packageName) throws Exception;
+    String generateMapper(String tableCode, String packageName, String businessCode) throws Exception;
+    
+    /**
+     * 生成Mapper接口（默认业务系统）
+     */
+    default String generateMapper(String tableCode, String packageName) throws Exception {
+        return generateMapper(tableCode, packageName, "DEFAULT");
+    }
 
     /**
      * 生成Mapper XML
      */
-    String generateMapperXml(String tableCode, String packageName) throws Exception;
+    String generateMapperXml(String tableCode, String packageName, String businessCode) throws Exception;
+    
+    /**
+     * 生成Mapper XML（默认业务系统）
+     */
+    default String generateMapperXml(String tableCode, String packageName) throws Exception {
+        return generateMapperXml(tableCode, packageName, "DEFAULT");
+    }
 
     /**
      * 生成Vue列表页面
      */
-    String generateVueList(String tableCode) throws Exception;
+    String generateVueList(String tableCode, String businessCode) throws Exception;
+    
+    /**
+     * 生成Vue列表页面（默认业务系统）
+     */
+    default String generateVueList(String tableCode) throws Exception {
+        return generateVueList(tableCode, "DEFAULT");
+    }
 
     /**
      * 生成Vue表单页面
      */
-    String generateVueForm(String tableCode) throws Exception;
+    String generateVueForm(String tableCode, String businessCode) throws Exception;
+    
+    /**
+     * 生成Vue表单页面（默认业务系统）
+     */
+    default String generateVueForm(String tableCode) throws Exception {
+        return generateVueForm(tableCode, "DEFAULT");
+    }
 
     /**
      * 生成前端路由配置（routes.js）
      */
-    String generateRoutes(String tableCode) throws Exception;
+    String generateRoutes(String tableCode, String businessCode) throws Exception;
+    
+    /**
+     * 生成前端路由配置（routes.js）（默认业务系统）
+     */
+    default String generateRoutes(String tableCode) throws Exception {
+        return generateRoutes(tableCode, "DEFAULT");
+    }
 
     /**
      * 生成完整的代码包（包含所有文件）
      */
-    Map<String, String> generateAll(String tableCode, String packageName) throws Exception;
+    Map<String, String> generateAll(String tableCode, String packageName, String businessCode) throws Exception;
+    
+    /**
+     * 生成完整的代码包（包含所有文件）（默认业务系统）
+     */
+    default Map<String, String> generateAll(String tableCode, String packageName) throws Exception {
+        return generateAll(tableCode, packageName, "DEFAULT");
+    }
 
     /**
      * 工具方法：转换为表名（下划线）

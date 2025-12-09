@@ -39,15 +39,36 @@ public interface MetadataModuleService {
     /**
      * 查询所有模块
      */
-    List<MetadataModule> list(String moduleName, String moduleType, Integer status);
+    List<MetadataModule> list(String moduleName, String moduleType, String businessCode, Integer status);
 
     /**
      * 分页查询模块
      */
-    PageResult<MetadataModule> page(String moduleName, String moduleType, Integer status, PageRequest pageRequest);
+    PageResult<MetadataModule> page(String moduleName, String moduleType, String businessCode, Integer status, PageRequest pageRequest);
 
     /**
      * 启用/禁用模块
      */
     void updateStatus(Long id, Integer status);
+    
+    /**
+     * 更新模块的业务系统
+     * @param moduleCode 模块编码
+     * @param businessCode 业务系统编码
+     */
+    void updateModuleBusinessSystem(String moduleCode, String businessCode);
+    
+    /**
+     * 批量更新模块的业务系统
+     * @param moduleCodes 模块编码列表
+     * @param businessCode 业务系统编码
+     */
+    void batchUpdateModuleBusinessSystem(List<String> moduleCodes, String businessCode);
+    
+    /**
+     * 获取模块列表
+     * @param moduleCodes 模块编码列表
+     * @return 模块列表
+     */
+    List<MetadataModule> getModulesByCodes(List<String> moduleCodes);
 }

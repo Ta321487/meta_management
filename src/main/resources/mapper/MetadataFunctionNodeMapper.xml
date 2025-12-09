@@ -16,6 +16,7 @@
         <result column="icon" property="icon"/>
         <result column="sort" property="sort"/>
         <result column="is_enabled" property="isEnabled"/>
+        <result column="business_code" property="businessCode"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
@@ -23,10 +24,10 @@
     <insert id="insert" parameterType="com.metadata.entity.MetadataFunctionNode" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_function_node (node_code, node_name, module_code, node_type, 
                                            related_table_code, jump_relation, route_path, component_path, 
-                                           is_menu_visible, icon, sort, is_enabled)
+                                           is_menu_visible, icon, sort, is_enabled, business_code)
         VALUES (#{nodeCode}, #{nodeName}, #{moduleCode}, #{nodeType},
                 #{relatedTableCode}, #{jumpRelation}, #{routePath}, #{componentPath},
-                #{isMenuVisible}, #{icon}, #{sort}, #{isEnabled})
+                #{isMenuVisible}, #{icon}, #{sort}, #{isEnabled}, #{businessCode})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataFunctionNode">
@@ -40,7 +41,8 @@
             is_menu_visible = #{isMenuVisible},
             icon = #{icon},
             sort = #{sort},
-            is_enabled = #{isEnabled}
+            is_enabled = #{isEnabled},
+            business_code = #{businessCode}
         WHERE id = #{id}
     </update>
 
@@ -59,27 +61,43 @@
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_function_node 
         WHERE module_code = #{moduleCode} AND node_code = #{nodeCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectByModuleCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_function_node 
         WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY sort ASC, create_time ASC
     </select>
 
     <select id="selectByRelatedTableCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_function_node
         WHERE related_table_code = #{relatedTableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY sort ASC, create_time ASC
     </select>
 
     <select id="countByModuleCode" resultType="Long">
-        SELECT COUNT(*) FROM metadata_function_node WHERE module_code = #{moduleCode}
+        SELECT COUNT(*) FROM metadata_function_node 
+        WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectPageByModuleCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_function_node 
         WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY sort ASC, create_time ASC
         LIMIT #{pageRequest.offset}, #{pageRequest.size}
     </select>

@@ -9,13 +9,14 @@
         <result column="pk_strategy" property="pkStrategy"/>
         <result column="description" property="description"/>
         <result column="is_enabled" property="isEnabled"/>
+        <result column="business_code" property="businessCode"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataTable" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description, is_enabled)
-        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description}, #{isEnabled, jdbcType=INTEGER})
+        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description, is_enabled, business_code)
+        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description}, #{isEnabled, jdbcType=INTEGER}, #{businessCode, jdbcType=VARCHAR})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataTable">
@@ -23,7 +24,8 @@
         SET table_name = #{tableName},
             pk_strategy = #{pkStrategy},
             description = #{description},
-            is_enabled = #{isEnabled}
+            is_enabled = #{isEnabled},
+            business_code = #{businessCode}
         WHERE id = #{id}
     </update>
 
@@ -40,6 +42,9 @@
 
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_table WHERE table_code = #{tableCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -51,6 +56,9 @@
         <where>
             <if test="tableName != null and tableName != ''">
                 AND table_name LIKE CONCAT('%', #{tableName}, '%')
+            </if>
+            <if test="businessCode != null and businessCode != ''">
+                AND business_code = #{businessCode}
             </if>
         </where>
         ORDER BY create_time DESC
@@ -66,6 +74,9 @@
             <if test="tableName != null and tableName != ''">
                 AND table_name LIKE CONCAT('%', #{tableName}, '%')
             </if>
+            <if test="businessCode != null and businessCode != ''">
+                AND business_code = #{businessCode}
+            </if>
         </where>
     </select>
 
@@ -74,6 +85,9 @@
         <where>
             <if test="tableName != null and tableName != ''">
                 AND table_name LIKE CONCAT('%', #{tableName}, '%')
+            </if>
+            <if test="businessCode != null and businessCode != ''">
+                AND business_code = #{businessCode}
             </if>
         </where>
         ORDER BY create_time DESC
@@ -84,7 +98,22 @@
         SELECT t.* FROM metadata_table t
         INNER JOIN metadata_module_table mt ON t.table_code = mt.table_code
         WHERE mt.module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND t.business_code = #{businessCode}
+        </if>
         ORDER BY t.create_time DESC
+    </select>
+
+    <select id="selectByCodes" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table
+        WHERE table_code IN
+        <foreach collection="tableCodes" item="tableCode" open="(" separator="," close=")">
+            #{tableCode}
+        </foreach>
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
+        ORDER BY create_time DESC
     </select>
 
 </mapper>

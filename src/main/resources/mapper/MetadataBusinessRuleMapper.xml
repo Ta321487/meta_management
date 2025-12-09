@@ -9,20 +9,22 @@
         <result column="rule_type" property="ruleType"/>
         <result column="rule_content" property="ruleContent"/>
         <result column="description" property="description"/>
+        <result column="business_code" property="businessCode"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessRule" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_business_rule (rule_code, module_code, rule_type, rule_content, description)
-        VALUES (#{ruleCode}, #{moduleCode}, #{ruleType}, #{ruleContent}, #{description})
+        INSERT INTO metadata_business_rule (rule_code, module_code, rule_type, rule_content, description, business_code)
+        VALUES (#{ruleCode}, #{moduleCode}, #{ruleType}, #{ruleContent}, #{description}, #{businessCode})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataBusinessRule">
         UPDATE metadata_business_rule
         SET rule_type = #{ruleType},
             rule_content = #{ruleContent},
-            description = #{description}
+            description = #{description},
+            business_code = #{businessCode}
         WHERE id = #{id}
     </update>
 
@@ -42,16 +44,26 @@
     <select id="selectByModuleCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_business_rule 
         WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY create_time DESC
     </select>
 
     <select id="countByModuleCode" resultType="Long">
-        SELECT COUNT(*) FROM metadata_business_rule WHERE module_code = #{moduleCode}
+        SELECT COUNT(*) FROM metadata_business_rule 
+        WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectPageByModuleCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_business_rule 
         WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
         ORDER BY create_time DESC
         LIMIT #{pageRequest.offset}, #{pageRequest.size}
     </select>

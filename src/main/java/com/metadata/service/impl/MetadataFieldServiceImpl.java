@@ -6,6 +6,7 @@ import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataField;
 import com.metadata.mapper.MetadataFieldMapper;
+import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.CodeGeneratorService;
 import com.metadata.service.MetadataFieldService;
 import com.metadata.service.OperationLogService;
@@ -16,6 +17,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -39,6 +41,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Autowired
     private SqlExecuteService sqlExecuteService;
 
+    @Autowired
+    private MetadataTableRelationMapper relationMapper;
+
     /**
      * 新增字段
      */
@@ -54,6 +59,17 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         // 设置isEnabled默认值
         if (field.getIsEnabled() == null) {
             field.setIsEnabled(1);
+        }
+        // 确保businessCode不为null，如果没有提供则从表中获取
+        if (field.getBusinessCode() == null || field.getBusinessCode().isEmpty()) {
+            // 从表中获取业务系统编码
+            MetadataField existingField = fieldMapper.selectByTableCode(field.getTableCode()).stream().findFirst().orElse(null);
+            if (existingField != null) {
+                field.setBusinessCode(existingField.getBusinessCode());
+            } else {
+                // 如果没有现有字段，使用默认业务系统编码
+                field.setBusinessCode("DEFAULT");
+            }
         }
         
         // 保存原始校验规则的message字段
@@ -474,6 +490,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         String fieldName = null;
         String tableCode = null;
         
+        // 优先从参数中获取约束名
+        constraintName = (String) params.get("constraintName");
+        
         if (idObj != null) {
             // 如果有id，则通过id获取字段信息
             Long id = Long.valueOf(idObj.toString());
@@ -484,10 +503,13 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             tableCode = field.getTableCode();
             tableName = codeGeneratorService.convertToTableName(tableCode);
             fieldName = field.getFieldName();
-            constraintName = "ck_" + tableName + "_" + fieldName;
+            
+            // 如果没有约束名，则生成默认的检查约束名
+            if (constraintName == null) {
+                constraintName = "ck_" + tableName + "_" + fieldName;
+            }
         } else {
             // 如果没有id，则尝试从参数中获取其他信息
-            constraintName = (String) params.get("constraintName");
             tableName = (String) params.get("tableName");
             tableCode = (String) params.get("tableCode");
             fieldName = (String) params.get("fieldName");
@@ -497,7 +519,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 tableName = codeGeneratorService.convertToTableName(tableCode);
             }
             
-            // 如果没有约束名，则尝试生成约束名
+            // 如果没有约束名，则生成默认的检查约束名
             if (constraintName == null && tableName != null && fieldName != null) {
                 constraintName = "ck_" + tableName + "_" + fieldName;
             }
@@ -526,6 +548,8 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             String constraintType = "CHECK";
             if (constraintName.equalsIgnoreCase("PRIMARY")) {
                 constraintType = "PRIMARY KEY";
+            } else if (constraintName.toUpperCase().startsWith("FK_")) {
+                constraintType = "FOREIGN KEY";
             }
             
             // 禁止删除主键约束
@@ -537,20 +561,79 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             String dropSql = "ALTER TABLE `" + tableName + "` DROP " + constraintType + " `" + constraintName + "`";
             
             // 删除数据库中的约束
-            sqlExecuteService.executeSql(dropSql, true);
+            Map<String,Object> result = sqlExecuteService.executeSql(dropSql, true);
             
             // 如果有字段信息，则将validate_rule设置为空
             if (field != null) {
-                MetadataField updateField = new MetadataField();
-                updateField.setId(field.getId());
-                updateField.setValidateRule(null);
-                fieldMapper.update(updateField);
+                // 查询完整的字段信息，避免更新时丢失其他字段值
+                MetadataField fullField = fieldMapper.selectById(field.getId());
+                if (fullField != null) {
+                    MetadataField updateField = new MetadataField();
+                    updateField.setId(fullField.getId());
+                    updateField.setFieldCode(fullField.getFieldCode());
+                    updateField.setTableCode(fullField.getTableCode());
+                    updateField.setFieldName(fullField.getFieldName());
+                    updateField.setFieldType(fullField.getFieldType());
+                    updateField.setLabel(fullField.getLabel());
+                    updateField.setIsRequired(fullField.getIsRequired());
+                    updateField.setFormComponent(fullField.getFormComponent());
+                    updateField.setValidateRule(null);
+                    updateField.setSort(fullField.getSort());
+                    updateField.setIsEnabled(fullField.getIsEnabled());
+                    updateField.setBusinessCode(fullField.getBusinessCode());
+                    fieldMapper.update(updateField);
+                }
             }
             
             logService.logSuccess("admin", "DELETE_CONSTRAINT", "删除约束成功: " + constraintName);
+            
+            // 如果删除的是外键约束，同时删除对应的关联关系记录
+            if (constraintType.equals("FOREIGN KEY") && tableCode != null && fieldName != null) {
+                // 根据从表编码和字段名，查找并删除对应的关联关系记录
+                // 查找作为从表的关联关系
+                List<Map<String, Object>> relationsToDelete = new ArrayList<>();
+                
+                // 获取该表作为从表的所有关联关系
+                List<com.metadata.entity.MetadataTableRelation> slaveRelations = relationMapper.selectBySlaveTableCode(tableCode);
+                if (slaveRelations != null && !slaveRelations.isEmpty()) {
+                    for (com.metadata.entity.MetadataTableRelation relation : slaveRelations) {
+                        // 获取从表字段信息
+                        MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
+                        if (slaveField != null && slaveField.getFieldName().equals(fieldName)) {
+                            // 找到了匹配的关联关系，添加到待删除列表
+                            relationMapper.deleteById(relation.getId());
+                            logService.logSuccess("admin", "DELETE", "删除关联关系: " + relation.getRelationCode());
+                        }
+                    }
+                }
+            }
         } catch (Exception e) {
             logService.logError("admin", "DELETE_CONSTRAINT", "删除约束失败", e.getMessage());
             throw new RuntimeException("删除约束失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 更新字段的业务系统
+     */
+    @Override
+    @Transactional
+    public void updateFieldsBusinessSystemByTable(String tableCode, String businessCode) {
+        fieldMapper.updateFieldsBusinessSystemByTable(tableCode, businessCode);
+        logService.logSuccess("admin", "EDIT", "更新表字段业务系统：" + tableCode + " -> " + businessCode);
+    }
+
+    /**
+     * 批量更新字段的业务系统
+     */
+    @Override
+    @Transactional
+    public void batchUpdateFieldsBusinessSystem(List<String> tableCodes, String businessCode) {
+        if (tableCodes == null || tableCodes.isEmpty()) {
+            throw new RuntimeException("表编码列表不能为空");
+        }
+        
+        fieldMapper.batchUpdateFieldsBusinessSystem(tableCodes, businessCode);
+        logService.logSuccess("admin", "EDIT", "批量更新表字段业务系统：" + tableCodes + " -> " + businessCode);
     }
 }

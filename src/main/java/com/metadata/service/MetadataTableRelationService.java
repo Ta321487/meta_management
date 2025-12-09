@@ -41,11 +41,21 @@ public interface MetadataTableRelationService {
      * 查询所有关联关系
      */
     List<MetadataTableRelation> listAll();
+    
+    /**
+     * 按业务系统查询所有关联关系
+     */
+    List<MetadataTableRelation> listAll(String businessCode);
 
     /**
      * 分页查询关联关系
      */
     PageResult<MetadataTableRelation> page(PageRequest pageRequest);
+    
+    /**
+     * 按业务系统分页查询关联关系
+     */
+    PageResult<MetadataTableRelation> page(PageRequest pageRequest, String businessCode);
 
     /**
      * 创建外键约束

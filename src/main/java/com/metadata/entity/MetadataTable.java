@@ -14,6 +14,7 @@ public class MetadataTable {
     private String pkStrategy;
     private String description;
     private Integer isEnabled;
+    private String businessCode;  // 业务系统编码
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -24,6 +24,11 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="fieldCode" label="字段编码" width="150" />
         <el-table-column prop="fieldName" label="字段名称" />
+        <el-table-column prop="businessCode" label="业务系统" width="120">
+          <template #default="{ row }">
+            <el-tag>{{ row.businessCode || '未关联' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="fieldType" label="字段类型" width="150" />
         <el-table-column prop="label" label="显示名" width="120" />
         <el-table-column prop="isRequired" label="必填" width="80">
@@ -42,17 +47,19 @@
           </template>
         </el-table-column>
         <el-table-column prop="sort" label="排序" width="80" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button 
-              :type="row.isEnabled === 1 ? 'warning' : 'success'" 
-              size="small" 
-              @click="handleToggleEnable(row)"
-            >
-              {{ row.isEnabled === 1 ? '禁用' : '启用' }}
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-space>
+              <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button 
+                :type="row.isEnabled === 1 ? 'warning' : 'success'" 
+                size="small" 
+                @click="handleToggleEnable(row)"
+              >
+                {{ row.isEnabled === 1 ? '禁用' : '启用' }}
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </el-space>
           </template>
         </el-table-column>
       </el-table>
@@ -203,9 +210,11 @@
         <el-table-column prop="constraintType" label="约束类型" width="150" />
         <el-table-column prop="fieldName" label="作用列名" width="150" />
         <el-table-column prop="constraintLevel" label="约束级别" width="150" />
-        <el-table-column label="操作" width="150" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
-            <el-button type="danger" size="small" @click="handleDeleteConstraint(row)">删除</el-button>
+            <el-space>
+              <el-button type="danger" size="small" @click="handleDeleteConstraint(row)">删除</el-button>
+            </el-space>
           </template>
         </el-table-column>
       </el-table>

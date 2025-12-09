@@ -19,6 +19,7 @@ public class MetadataField {
     private String validateRule;
     private Integer sort;
     private Integer isEnabled;
+    private String businessCode;  // 业务系统编码
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

@@ -16,6 +16,8 @@ public class MetadataTableRelation {
     private String slaveFieldCode;
     private String relationType;
     private String relationName;
+    private String description;  // 关联关系描述
+    private String businessCode;  // 业务系统编码
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

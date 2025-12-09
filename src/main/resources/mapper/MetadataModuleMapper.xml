@@ -13,13 +13,14 @@
         <result column="icon" property="icon"/>
         <result column="route_path" property="routePath"/>
         <result column="component_path" property="componentPath"/>
+        <result column="business_code" property="businessCode"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataModule" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_module (module_code, module_name, module_type, description, status, sort, icon, route_path, component_path)
-        VALUES (#{moduleCode}, #{moduleName}, #{moduleType}, #{description}, #{status}, #{sort}, #{icon}, #{routePath}, #{componentPath})
+        INSERT INTO metadata_module (module_code, module_name, module_type, description, status, sort, icon, route_path, component_path, business_code)
+        VALUES (#{moduleCode}, #{moduleName}, #{moduleType}, #{description}, #{status}, #{sort}, #{icon}, #{routePath}, #{componentPath}, #{businessCode})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataModule">
@@ -31,7 +32,8 @@
             sort = #{sort},
             icon = #{icon},
             route_path = #{routePath},
-            component_path = #{componentPath}
+            component_path = #{componentPath},
+            business_code = #{businessCode}
         WHERE id = #{id}
     </update>
 
@@ -48,6 +50,9 @@
 
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_module WHERE module_code = #{moduleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectById" resultMap="BaseResultMap">
@@ -65,6 +70,9 @@
             </if>
             <if test="status != null">
                 AND status = #{status}
+            </if>
+            <if test="businessCode != null and businessCode != ''">
+                AND business_code = #{businessCode}
             </if>
         </where>
         ORDER BY create_time DESC
@@ -86,6 +94,9 @@
             <if test="status != null">
                 AND status = #{status}
             </if>
+            <if test="businessCode != null and businessCode != ''">
+                AND business_code = #{businessCode}
+            </if>
         </where>
     </select>
 
@@ -101,9 +112,27 @@
             <if test="status != null">
                 AND status = #{status}
             </if>
+            <if test="businessCode != null and businessCode != ''">
+                AND business_code = #{businessCode}
+            </if>
         </where>
         ORDER BY create_time DESC
         LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
+    <select id="selectByCodes" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module
+        WHERE module_code IN
+        <foreach collection="moduleCodes" item="moduleCode" open="(" separator="," close=")">
+            #{moduleCode}
+        </foreach>
+        ORDER BY create_time DESC
+    </select>
+
+    <select id="selectByBusinessCode" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module
+        WHERE business_code = #{businessCode}
+        ORDER BY create_time DESC
     </select>
 
 </mapper>

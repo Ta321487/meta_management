@@ -15,6 +15,16 @@
         <el-form-item label="表名称">
           <el-input v-model="searchForm.tableName" placeholder="请输入表名称" clearable />
         </el-form-item>
+        <el-form-item label="业务系统">
+          <el-select v-model="searchForm.businessCode" placeholder="请选择" clearable style="width: 200px">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">查询</el-button>
           <el-button @click="handleReset">重置</el-button>
@@ -25,6 +35,11 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="tableCode" label="表编码" width="150" />
         <el-table-column prop="tableName" label="表名称" />
+        <el-table-column prop="businessCode" label="业务系统" width="150">
+          <template #default="{ row }">
+            <el-tag>{{ row.businessCode || '未关联' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="pkStrategy" label="主键策略" width="120" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="isEnabled" label="状态" width="100">
@@ -34,17 +49,19 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button 
-              :type="row.isEnabled === 1 ? 'warning' : 'success'" 
-              size="small" 
-              @click="handleToggleEnable(row)"
-            >
-              {{ row.isEnabled === 1 ? '禁用' : '启用' }}
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-space>
+              <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button 
+                :type="row.isEnabled === 1 ? 'warning' : 'success'" 
+                size="small" 
+                @click="handleToggleEnable(row)"
+              >
+                {{ row.isEnabled === 1 ? '禁用' : '启用' }}
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            </el-space>
           </template>
         </el-table-column>
       </el-table>
@@ -84,6 +101,16 @@
             <el-option label="UUID" value="UUID" />
           </el-select>
         </el-form-item>
+        <el-form-item label="业务系统">
+          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" />
         </el-form-item>
@@ -99,12 +126,13 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable } from '../api'
+import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, getBusinessSystemList } from '../api'
 
 export default {
   name: 'TableManage',
   setup() {
     const tableData = ref([])
+    const businessSystems = ref([])
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增表')
     const formRef = ref(null)
@@ -116,7 +144,8 @@ export default {
       total: 0
     })
     const searchForm = reactive({
-      tableName: ''
+      tableName: '',
+      businessCode: ''
     })
     const form = reactive({
       id: null,
@@ -124,6 +153,7 @@ export default {
       tableName: '',
       pkStrategy: 'AUTO',
       description: '',
+      businessCode: '',
       isEnabled: 1
     })
     const rules = {
@@ -174,8 +204,21 @@ export default {
       loadData()
     }
 
+    // 加载业务系统列表
+    const loadBusinessSystems = async () => {
+      try {
+        const res = await getBusinessSystemList({})
+        if (res.code === 200) {
+          businessSystems.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载业务系统列表失败')
+      }
+    }
+
     const handleReset = () => {
       searchForm.tableName = ''
+      searchForm.businessCode = ''
       pagination.current = 1
       loadData()
     }
@@ -187,7 +230,8 @@ export default {
         tableCode: '',
         tableName: '',
         pkStrategy: 'AUTO',
-        description: ''
+        description: '',
+        businessCode: ''
       })
       dialogVisible.value = true
     }
@@ -199,7 +243,8 @@ export default {
         tableCode: row.tableCode,
         tableName: row.tableName,
         pkStrategy: row.pkStrategy,
-        description: row.description
+        description: row.description,
+        businessCode: row.businessCode || ''
       })
       dialogVisible.value = true
     }
@@ -325,10 +370,12 @@ export default {
 
     onMounted(() => {
       loadData()
+      loadBusinessSystems()
     })
 
     return {
       tableData,
+      businessSystems,
       dialogVisible,
       dialogTitle,
       formRef,

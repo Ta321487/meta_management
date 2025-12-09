@@ -413,6 +413,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
             } else {
                 // 同步所有表
                 List<MetadataTable> tables = tableMapper.selectAll(null);
+                
                 for (MetadataTable table : tables) {
                     try {
                         // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写

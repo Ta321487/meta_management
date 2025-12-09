@@ -88,3 +88,14 @@ export const getOperationLogList = (params) => request.get('/operationLog/list',
 export const executeSql = (data) => request.post('/sql/execute', data)
 export const executeMultipleSql = (data) => request.post('/sql/executeMultiple', data)
 
+// 业务系统相关
+export const getBusinessSystemList = () => request.get('/businessSystem/list')
+export const getBusinessSystemByCode = (businessCode) => request.get(`/businessSystem/${businessCode}`)
+export const getDefaultBusinessSystem = () => request.get('/businessSystem/default')
+export const addBusinessSystem = (data) => request.post('/businessSystem/add', data)
+export const updateBusinessSystem = (data) => request.post('/businessSystem/update', data)
+export const deleteBusinessSystem = (data) => request.post('/businessSystem/delete', data)
+export const associateModulesToBusinessSystem = (data) => request.post('/businessSystem/associateModules', data)
+export const disassociateModulesFromBusinessSystem = (data) => request.post('/businessSystem/disassociateModules', data)
+export const getAssociatedModules = (businessCode) => request.get(`/businessSystem/associatedModules/${businessCode}`)
+

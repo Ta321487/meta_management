@@ -1,25 +1,27 @@
 <template>
   <div class="page-module-type">
-    <div class="card">
-      <div class="card-header">
-        <span>模块类型管理</span>
-        <el-button type="primary" @click="handleAdd">新增类型</el-button>
-      </div>
-      <div class="card-body">
-        <el-table :data="tableData" border style="width: 100%">
-          <el-table-column prop="typeCode" label="类型编码" width="180" />
-          <el-table-column prop="typeName" label="类型名称" />
-          <el-table-column prop="defaultNodes" label="默认节点" :formatter="formatDefaultNodes" />
-          <el-table-column prop="description" label="描述" />
-          <el-table-column label="操作" width="220" fixed="right">
-            <template #default="{ row }">
-              <el-button size="mini" @click="handleEdit(row)">编辑</el-button>
-              <el-button size="mini" type="danger" @click="handleDelete(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </div>
+    <el-card>
+      <template #header>
+        <div class="card-header">
+          <span>模块类型管理</span>
+          <el-button type="primary" @click="handleAdd">新增类型</el-button>
+        </div>
+      </template>
+      <el-table :data="tableData" border style="width: 100%">
+        <el-table-column prop="typeCode" label="类型编码" width="180" />
+        <el-table-column prop="typeName" label="类型名称" />
+        <el-table-column prop="defaultNodes" label="默认节点" :formatter="formatDefaultNodes" />
+        <el-table-column prop="description" label="描述" />
+        <el-table-column label="操作" width="180" fixed="right">
+        <template #default="{ row }">
+          <el-space>
+            <el-button size="mini" @click="handleEdit(row)">编辑</el-button>
+            <el-button size="mini" type="danger" @click="handleDelete(row)">删除</el-button>
+          </el-space>
+        </template>
+      </el-table-column>
+      </el-table>
+    </el-card>
 
   <el-dialog :title="dialogTitle" v-model="dialogVisible" close-on-click-modal="false" close-on-press-escape="false">
       <el-form :model="form" ref="formRef" label-width="120px">
@@ -55,7 +57,7 @@
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { getModuleTypeList, addModuleType, updateModuleType, deleteModuleType } from '../api'
 
 export default {
@@ -110,14 +112,22 @@ export default {
       dialogVisible.value = true
     }
 
-    const handleDelete = async (row) => {
-      try {
-        await deleteModuleType({ id: row.id })
-        ElMessage.success('删除成功')
-        loadData()
-      } catch (e) {
-        ElMessage.error('删除失败')
-      }
+    const handleDelete = (row) => {
+      ElMessageBox.confirm('确定要删除该模块类型吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await deleteModuleType({ id: row.id })
+          ElMessage.success('删除成功')
+          loadData()
+        } catch (e) {
+          ElMessage.error('删除失败')
+        }
+      }).catch(() => {
+        // 用户取消删除操作，不执行任何操作
+      })
     }
 
     const handleSubmit = async () => {
@@ -150,6 +160,5 @@ export default {
 </script>
 
 <style scoped>
-.card { background: #fff; padding: 12px; border-radius: 6px; }
-.card-header { display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px }
+.card-header { display:flex; justify-content:space-between; align-items:center; }
 </style>

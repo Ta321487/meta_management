@@ -15,6 +15,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 /**
  * ${table.tableName}实体类
  * 表编码：${table.tableCode}
+ * 业务系统：${businessName}
  */
 @Data
 public class ${className} {

@@ -14,6 +14,7 @@ import java.util.UUID;
 
 /**
  * ${table.tableName}服务类
+ * 业务系统：${businessName}
  */
 @Service
 public class ${className}Service {

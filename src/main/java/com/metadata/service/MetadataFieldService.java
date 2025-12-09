@@ -51,4 +51,18 @@ public interface MetadataFieldService {
      * 删除约束
      */
     void deleteConstraint(Map<String, Object> params);
+    
+    /**
+     * 更新字段的业务系统
+     * @param tableCode 表编码
+     * @param businessCode 业务系统编码
+     */
+    void updateFieldsBusinessSystemByTable(String tableCode, String businessCode);
+    
+    /**
+     * 批量更新字段的业务系统
+     * @param tableCodes 表编码列表
+     * @param businessCode 业务系统编码
+     */
+    void batchUpdateFieldsBusinessSystem(List<String> tableCodes, String businessCode);
 }

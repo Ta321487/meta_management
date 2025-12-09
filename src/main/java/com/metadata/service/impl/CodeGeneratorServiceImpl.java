@@ -5,8 +5,10 @@ import com.alibaba.fastjson2.JSONObject;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataFunctionNode;
+import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.service.CodeGeneratorService;
+import com.metadata.service.MetadataBusinessSystemService;
 import com.metadata.service.MetadataFieldService;
 import com.metadata.service.MetadataTableService;
 import freemarker.cache.ClassTemplateLoader;
@@ -33,6 +35,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 
     @Autowired
     private MetadataFunctionNodeMapper nodeMapper;
+    
+    @Autowired
+    private MetadataBusinessSystemService businessSystemService;
 
     private Configuration freemarkerConfig;
 
@@ -50,7 +55,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成数据库建表SQL
      */
     @Override
-    public String generateCreateTableSQL(String tableCode) throws Exception {
+    public String generateCreateTableSQL(String tableCode, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -80,11 +85,28 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("fields", fieldList);
         data.put("tableName", tableName);
         data.put("checkConstraints", checkConstraints);
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("create_table.sql.ftl");
         StringWriter writer = new StringWriter();
         template.process(data, writer);
         return writer.toString();
+    }
+    
+    /**
+     * 获取业务系统名称
+     */
+    private String getBusinessName(String businessCode) {
+        if (businessCode == null || businessCode.trim().isEmpty()) {
+            return "默认系统";
+        }
+        try {
+            MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+            return businessSystem != null ? businessSystem.getBusinessName() : businessCode;
+        } catch (Exception e) {
+            return businessCode;
+        }
     }
 
     /**
@@ -253,7 +275,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Java实体类
      */
     @Override
-    public String generateEntity(String tableCode, String packageName) throws Exception {
+    public String generateEntity(String tableCode, String packageName, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -274,6 +296,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("tableName", convertToTableName(table.getTableCode()));
         data.put("hasDate", hasDate(fields));
         data.put("hasDecimal", hasDecimal(fields));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("entity.java.ftl");
         StringWriter writer = new StringWriter();
@@ -285,7 +309,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Controller
      */
     @Override
-    public String generateController(String tableCode, String packageName) throws Exception {
+    public String generateController(String tableCode, String packageName, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -300,6 +324,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("packageName", packageName);
         data.put("className", convertToClassName(table.getTableCode()));
         data.put("entityName", convertToEntityName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("controller.java.ftl");
         StringWriter writer = new StringWriter();
@@ -311,7 +337,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Service
      */
     @Override
-    public String generateService(String tableCode, String packageName) throws Exception {
+    public String generateService(String tableCode, String packageName, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -322,6 +348,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("packageName", packageName);
         data.put("className", convertToClassName(table.getTableCode()));
         data.put("entityName", convertToEntityName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("service.java.ftl");
         StringWriter writer = new StringWriter();
@@ -333,7 +361,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Mapper接口
      */
     @Override
-    public String generateMapper(String tableCode, String packageName) throws Exception {
+    public String generateMapper(String tableCode, String packageName, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -349,6 +377,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("className", convertToClassName(table.getTableCode()));
         data.put("entityName", convertToEntityName(table.getTableCode()));
         data.put("tableName", convertToTableName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("mapper.java.ftl");
         StringWriter writer = new StringWriter();
@@ -360,7 +390,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Mapper XML
      */
     @Override
-    public String generateMapperXml(String tableCode, String packageName) throws Exception {
+    public String generateMapperXml(String tableCode, String packageName, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -376,6 +406,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("className", convertToClassName(table.getTableCode()));
         data.put("entityName", convertToEntityName(table.getTableCode()));
         data.put("tableName", convertToTableName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("mapper.xml.ftl");
         StringWriter writer = new StringWriter();
@@ -387,7 +419,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Vue列表页面
      */
     @Override
-    public String generateVueList(String tableCode) throws Exception {
+    public String generateVueList(String tableCode, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -405,6 +437,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("table", table);
         data.put("fields", fieldList);
         data.put("componentName", convertToComponentName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("vue_list.vue.ftl");
         StringWriter writer = new StringWriter();
@@ -416,7 +450,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Vue表单页面
      */
     @Override
-    public String generateVueForm(String tableCode) throws Exception {
+    public String generateVueForm(String tableCode, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -429,6 +463,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("table", table);
         data.put("fields", fieldList);
         data.put("componentName", convertToComponentName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("vue_form.vue.ftl");
         StringWriter writer = new StringWriter();
@@ -440,7 +476,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成前端路由配置（routes.js）
      */
     @Override
-    public String generateRoutes(String tableCode) throws Exception {
+    public String generateRoutes(String tableCode, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -462,6 +498,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("componentName", componentName);
         data.put("componentDir", componentDir);
         data.put("nodes", nodes);
+        data.put("businessCode", businessCode);
+        data.put("businessName", getBusinessName(businessCode));
 
         Template template = freemarkerConfig.getTemplate("routes.js.ftl");
         StringWriter writer = new StringWriter();
@@ -473,25 +511,25 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成完整的代码包（包含所有文件）
      */
     @Override
-    public Map<String, String> generateAll(String tableCode, String packageName) throws Exception {
+    public Map<String, String> generateAll(String tableCode, String packageName, String businessCode) throws Exception {
         Map<String, String> codeMap = new HashMap<>();
 
         // 生成SQL
-        codeMap.put("create_table.sql", generateCreateTableSQL(tableCode));
+        codeMap.put("create_table.sql", generateCreateTableSQL(tableCode, businessCode));
 
         // 生成Java代码
-        codeMap.put("Entity.java", generateEntity(tableCode, packageName));
-        codeMap.put("Controller.java", generateController(tableCode, packageName));
-        codeMap.put("Service.java", generateService(tableCode, packageName));
-        codeMap.put("Mapper.java", generateMapper(tableCode, packageName));
-        codeMap.put("Mapper.xml", generateMapperXml(tableCode, packageName));
+        codeMap.put("Entity.java", generateEntity(tableCode, packageName, businessCode));
+        codeMap.put("Controller.java", generateController(tableCode, packageName, businessCode));
+        codeMap.put("Service.java", generateService(tableCode, packageName, businessCode));
+        codeMap.put("Mapper.java", generateMapper(tableCode, packageName, businessCode));
+        codeMap.put("Mapper.xml", generateMapperXml(tableCode, packageName, businessCode));
 
         // 生成Vue代码
-        codeMap.put("List.vue", generateVueList(tableCode));
-        codeMap.put("Form.vue", generateVueForm(tableCode));
+        codeMap.put("List.vue", generateVueList(tableCode, businessCode));
+        codeMap.put("Form.vue", generateVueForm(tableCode, businessCode));
         // 生成路由配置（供客户集成到前端）
         try {
-            codeMap.put("routes.js", generateRoutes(tableCode));
+            codeMap.put("routes.js", generateRoutes(tableCode, businessCode));
         } catch (Exception e) {
             // 不阻塞主流程，记录但仍返回其他文件
             codeMap.put("routes.js", "// 生成路由失败: " + e.getMessage());

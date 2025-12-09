@@ -149,15 +149,15 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
      */
     @Override
     public MetadataModule getByCode(String moduleCode) {
-        return moduleMapper.selectByCode(moduleCode);
+        return moduleMapper.selectByCode(moduleCode, "");
     }
 
     /**
      * 查询所有模块
      */
     @Override
-    public List<MetadataModule> list(String moduleName, String moduleType, Integer status) {
-        List<MetadataModule> modules = moduleMapper.selectAll(moduleName, moduleType, status);
+    public List<MetadataModule> list(String moduleName, String moduleType, String businessCode, Integer status) {
+        List<MetadataModule> modules = moduleMapper.selectAll(moduleName, moduleType, status, businessCode);
         // 为每个模块添加关联的表编码列表
         return setTableCodesForModules(modules);
     }
@@ -166,9 +166,9 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
      * 分页查询模块
      */
     @Override
-    public PageResult<MetadataModule> page(String moduleName, String moduleType, Integer status, PageRequest pageRequest) {
-        Long total = moduleMapper.count(moduleName, moduleType, status);
-        List<MetadataModule> records = moduleMapper.selectPage(moduleName, moduleType, status, pageRequest);
+    public PageResult<MetadataModule> page(String moduleName, String moduleType, String businessCode, Integer status, PageRequest pageRequest) {
+        Long total = moduleMapper.count(moduleName, moduleType, status, businessCode);
+        List<MetadataModule> records = moduleMapper.selectPage(moduleName, moduleType, status, businessCode, pageRequest);
         // 为每个模块添加关联的表编码列表
         records = setTableCodesForModules(records);
         return new PageResult<>(total, records);
@@ -198,6 +198,58 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         module.setStatus(status);
         moduleMapper.update(module);
         logService.logSuccess("admin", "EDIT", "更新模块状态：" + module.getModuleCode() + " -> " + status);
+    }
+
+    /**
+     * 更新模块的业务系统
+     */
+    @Override
+    @Transactional
+    public void updateModuleBusinessSystem(String moduleCode, String businessCode) {
+        // 获取模块，使用空字符串作为业务系统，查询所有业务系统的模块
+        MetadataModule module = moduleMapper.selectByCode(moduleCode, "");
+        if (module == null) {
+            throw new RuntimeException("模块不存在");
+        }
+        
+        // 更新模块的业务系统
+        module.setBusinessCode(businessCode);
+        moduleMapper.update(module);
+        
+        // 获取模块关联的表
+        List<String> tableCodes = moduleTableMapper.selectTableCodesByModuleCode(moduleCode);
+        if (tableCodes != null && !tableCodes.isEmpty()) {
+            // 批量更新表的业务系统
+            tableService.batchUpdateTableBusinessSystem(tableCodes, businessCode);
+        }
+        
+        logService.logSuccess("admin", "EDIT", "更新模块业务系统：" + moduleCode + " -> " + businessCode);
+    }
+
+    /**
+     * 批量更新模块的业务系统
+     */
+    @Override
+    @Transactional
+    public void batchUpdateModuleBusinessSystem(List<String> moduleCodes, String businessCode) {
+        if (moduleCodes == null || moduleCodes.isEmpty()) {
+            throw new RuntimeException("模块编码列表不能为空");
+        }
+        
+        for (String moduleCode : moduleCodes) {
+            updateModuleBusinessSystem(moduleCode, businessCode);
+        }
+    }
+
+    /**
+     * 获取模块列表
+     */
+    @Override
+    public List<MetadataModule> getModulesByCodes(List<String> moduleCodes) {
+        if (moduleCodes == null || moduleCodes.isEmpty()) {
+            return List.of();
+        }
+        return moduleMapper.selectByCodes(moduleCodes);
     }
 
     /**

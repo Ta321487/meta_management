@@ -3,6 +3,8 @@ package com.metadata.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.entity.MetadataField;
+import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.mapper.MetadataTableMapper;
@@ -57,10 +59,12 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             throw new RuntimeException("编码格式不正确");
         }
         // 校验表是否存在
-        if (tableMapper.selectByCode(relation.getMainTableCode()) == null) {
+        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
+        if (mainTable == null) {
             throw new RuntimeException("主表不存在");
         }
-        if (tableMapper.selectByCode(relation.getSlaveTableCode()) == null) {
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+        if (slaveTable == null) {
             throw new RuntimeException("从表不存在");
         }
         // 校验字段是否存在
@@ -70,7 +74,20 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         if (fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode()) == null) {
             throw new RuntimeException("从表外键字段不存在");
         }
-        if (relationMapper.countByCode(relation.getRelationCode()) > 0) {
+        // 校验主表和从表是否属于同一个业务系统
+        String mainBusinessCode = mainTable.getBusinessCode();
+        String slaveBusinessCode = slaveTable.getBusinessCode();
+        if (mainBusinessCode == null || mainBusinessCode.isEmpty() || 
+            slaveBusinessCode == null || slaveBusinessCode.isEmpty()) {
+            throw new RuntimeException("主表或从表未配置业务系统");
+        }
+        if (!mainBusinessCode.equals(slaveBusinessCode)) {
+            throw new RuntimeException("主表和从表不属于同一个业务系统");
+        }
+        // 自动从表中获取业务系统编码
+        relation.setBusinessCode(mainBusinessCode);
+        // 检查关联编码是否已存在（使用正确的businessCode）
+        if (relationMapper.countByCode(relation.getRelationCode(), relation.getBusinessCode()) > 0) {
             throw new RuntimeException("关联编码已存在");
         }
         relationMapper.insert(relation);
@@ -83,7 +100,15 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     @Override
     @Transactional
     public void update(MetadataTableRelation relation) {
-        MetadataTableRelation existing = relationMapper.selectByCode(relation.getRelationCode());
+        // 先从主表获取业务系统编码
+        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
+        if (mainTable == null) {
+            throw new RuntimeException("主表不存在");
+        }
+        String businessCode = mainTable.getBusinessCode();
+        
+        // 使用正确的businessCode查询关联关系
+        MetadataTableRelation existing = relationMapper.selectByCode(relation.getRelationCode(), businessCode);
         if (existing == null) {
             throw new RuntimeException("关联关系不存在");
         }
@@ -94,12 +119,33 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                                   !existing.getMainFieldCode().equals(relation.getMainFieldCode()) ||
                                   !existing.getSlaveFieldCode().equals(relation.getSlaveFieldCode());
         
-        // 如果关联关系发生变化，需要同步更新物理表的外键约束
+        // 如果关联关系发生变化，需要验证新的主表和从表的业务系统一致性
         if (relationChanged) {
+            // 重新获取主表信息，因为主表可能已经改变
+            mainTable = tableMapper.selectByCode(relation.getMainTableCode());
+            if (mainTable == null) {
+                throw new RuntimeException("主表不存在");
+            }
+            MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+            if (slaveTable == null) {
+                throw new RuntimeException("从表不存在");
+            }
+            
+            // 校验主表和从表是否属于同一个业务系统
+            String mainBusinessCode = mainTable.getBusinessCode();
+            String slaveBusinessCode = slaveTable.getBusinessCode();
+            if (mainBusinessCode == null || mainBusinessCode.isEmpty() || 
+                slaveBusinessCode == null || slaveBusinessCode.isEmpty()) {
+                throw new RuntimeException("主表或从表未配置业务系统");
+            }
+            if (!mainBusinessCode.equals(slaveBusinessCode)) {
+                throw new RuntimeException("主表和从表不属于同一个业务系统");
+            }
+            
             try {
                 // 1. 查找并删除旧的外键约束
                 String oldSlaveTableName = convertToTableName(existing.getSlaveTableCode());
-                com.metadata.entity.MetadataField oldSlaveField = fieldMapper.selectByCode(
+                MetadataField oldSlaveField = fieldMapper.selectByCode(
                     existing.getSlaveTableCode(), existing.getSlaveFieldCode());
                 
                 if (oldSlaveField != null) {
@@ -118,11 +164,9 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                 }
                 
                 // 2. 创建新的外键约束
-                com.metadata.entity.MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
-                com.metadata.entity.MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
-                com.metadata.entity.MetadataField mainField = fieldMapper.selectByCode(
+                MetadataField mainField = fieldMapper.selectByCode(
                     relation.getMainTableCode(), relation.getMainFieldCode());
-                com.metadata.entity.MetadataField slaveField = fieldMapper.selectByCode(
+                MetadataField slaveField = fieldMapper.selectByCode(
                     relation.getSlaveTableCode(), relation.getSlaveFieldCode());
                 
                 if (mainTable != null && slaveTable != null && mainField != null && slaveField != null) {
@@ -146,6 +190,11 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             } catch (Exception e) {
                 logService.logError("admin", "UPDATE_FOREIGN_KEY", "更新外键约束失败", e.getMessage());
             }
+        }
+        
+        // 自动从表中获取业务系统编码，不允许手动修改
+        if (mainTable != null) {
+            relation.setBusinessCode(mainTable.getBusinessCode());
         }
         
         relation.setId(existing.getId());
@@ -186,6 +235,38 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     @Override
     @Transactional
     public void delete(Long id) {
+        // 1. 先获取关联关系信息
+        MetadataTableRelation relation = relationMapper.selectById(id);
+        if (relation == null) {
+            throw new RuntimeException("关联关系不存在");
+        }
+        
+        // 2. 获取表和字段信息
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+        MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
+        
+        if (slaveTable != null && slaveField != null) {
+            // 3. 转换为实际表名
+            String slaveTableName = convertToTableName(relation.getSlaveTableCode());
+            
+            // 4. 查找外键名称
+            String fkName = findForeignKeyName(slaveTableName, slaveField.getFieldName());
+            
+            // 5. 如果外键存在，删除物理外键
+            if (fkName != null && !fkName.isEmpty()) {
+                // 删除外键约束
+                String dropFkSql = "ALTER TABLE `" + slaveTableName + "` DROP FOREIGN KEY `" + fkName + "`";
+                Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql, true);
+                if (Boolean.TRUE.equals(dropResult.get("success"))) {
+                    logService.logSuccess("admin", "DROP_FOREIGN_KEY", "删除外键约束: " + fkName);
+                } else {
+                    logService.logError("admin", "DROP_FOREIGN_KEY", "删除外键约束失败: " + fkName, 
+                        dropResult.get("message").toString());
+                }
+            }
+        }
+        
+        // 6. 删除关联关系记录
         relationMapper.deleteById(id);
         logService.logSuccess("admin", "DELETE", "删除表关联关系ID：" + id);
     }
@@ -213,6 +294,14 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     public List<MetadataTableRelation> listAll() {
         return relationMapper.selectAll();
     }
+    
+    /**
+     * 按业务系统查询所有关联关系
+     */
+    @Override
+    public List<MetadataTableRelation> listAll(String businessCode) {
+        return relationMapper.selectAll(businessCode);
+    }
 
     /**
      * 分页查询关联关系
@@ -221,6 +310,16 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     public PageResult<MetadataTableRelation> page(PageRequest pageRequest) {
         Long total = relationMapper.count();
         List<MetadataTableRelation> records = relationMapper.selectPage(pageRequest);
+        return new PageResult<>(total, records);
+    }
+    
+    /**
+     * 按业务系统分页查询关联关系
+     */
+    @Override
+    public PageResult<MetadataTableRelation> page(PageRequest pageRequest, String businessCode) {
+        Long total = relationMapper.count(businessCode);
+        List<MetadataTableRelation> records = relationMapper.selectPage(pageRequest, businessCode);
         return new PageResult<>(total, records);
     }
 
@@ -249,7 +348,6 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             result.put("message", "主表不存在");
             return result;
         }
-        
         com.metadata.entity.MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
         if (slaveTable == null) {
             result.put("success", false);
@@ -264,7 +362,6 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             result.put("message", "主表关联字段不存在");
             return result;
         }
-        
         com.metadata.entity.MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
         if (slaveField == null) {
             result.put("success", false);
@@ -279,6 +376,42 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         // 生成外键名称
         String fkName = "fk_" + slaveTableName + "_" + slaveField.getFieldName();
         
+        // 检查外键是否已经存在
+        String existingFkName = findForeignKeyName(slaveTableName, slaveField.getFieldName());
+        
+        if (existingFkName != null && !existingFkName.isEmpty()) {
+            // 外键已经存在，直接返回成功
+            result.put("success", true);
+            result.put("message", "外键约束已存在: " + existingFkName);
+            
+            // 自动从表中获取业务系统编码
+            relation.setBusinessCode(mainTable.getBusinessCode());
+            
+            // 如果关联关系不存在，自动创建
+            if (relation.getRelationCode() == null || relation.getRelationCode().isEmpty()) {
+                String relationCode = "REL_" + relation.getMainTableCode() + "_" + relation.getSlaveTableCode() + "_" + 
+                                     relation.getMainFieldCode() + "_" + relation.getSlaveFieldCode();
+                relation.setRelationCode(relationCode);
+            }
+            
+            // 使用正确的businessCode检查关联编码是否存在
+            if (relationMapper.countByCode(relation.getRelationCode(), relation.getBusinessCode()) == 0) {
+                if (relation.getRelationName() == null || relation.getRelationName().isEmpty()) {
+                    String relationName = mainTable.getTableName() + " -> " + slaveTable.getTableName();
+                    relation.setRelationName(relationName);
+                }
+                if (relation.getRelationType() == null || relation.getRelationType().isEmpty()) {
+                    relation.setRelationType("ONE_TO_MANY");
+                }
+                relationMapper.insert(relation);
+                logService.logSuccess("admin", "CREATE_FOREIGN_KEY", "外键约束已存在，创建关联关系: " + relation.getRelationCode());
+            } else {
+                logService.logSuccess("admin", "CREATE_FOREIGN_KEY", "外键约束已存在: " + existingFkName);
+            }
+            
+            return result;
+        }
+        
         // 生成创建外键的SQL
         String createFkSql = String.format(
             "ALTER TABLE `%s` ADD CONSTRAINT `%s` FOREIGN KEY (`%s`) REFERENCES `%s` (`%s`) ",
@@ -288,7 +421,11 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         // 执行SQL
         try {
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql, true);
+            
             if (Boolean.TRUE.equals(sqlResult.get("success"))) {
+                // 自动从表中获取业务系统编码
+                relation.setBusinessCode(mainTable.getBusinessCode());
+                
                 // 如果关联关系不存在，自动创建
                 if (relation.getRelationCode() == null || relation.getRelationCode().isEmpty()) {
                     String relationCode = "REL_" + relation.getMainTableCode() + "_" + relation.getSlaveTableCode() + "_" + 
@@ -296,9 +433,11 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                     relation.setRelationCode(relationCode);
                 }
                 
-                if (relationMapper.countByCode(relation.getRelationCode()) == 0) {
+                // 使用正确的businessCode检查关联编码是否存在
+                if (relationMapper.countByCode(relation.getRelationCode(), relation.getBusinessCode()) == 0) {
                     if (relation.getRelationName() == null || relation.getRelationName().isEmpty()) {
-                        relation.setRelationName(mainTable.getTableName() + " -> " + slaveTable.getTableName());
+                        String relationName = mainTable.getTableName() + " -> " + slaveTable.getTableName();
+                        relation.setRelationName(relationName);
                     }
                     if (relation.getRelationType() == null || relation.getRelationType().isEmpty()) {
                         relation.setRelationType("ONE_TO_MANY");
@@ -332,10 +471,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     @Override
     @Transactional
     public Map<String, Object> syncForeignKeys(String tableCode) {
-        Map<String, Object> result = new HashMap<>();
-        result.put("success", false);
-        result.put("message", "SqlExecuteService 中未定义 syncForeignKeys 方法，同步功能暂不可用");
-        return result;
+        return sqlExecuteService.syncForeignKeys(tableCode);
     }
     
     /**

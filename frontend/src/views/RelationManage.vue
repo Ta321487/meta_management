@@ -11,9 +11,33 @@
         </div>
       </template>
 
+      <!-- 筛选条件 -->
+      <div style="margin-bottom: 15px; display: flex; align-items: center;">
+        <el-select 
+          v-model="selectedBusinessCode" 
+          placeholder="请选择业务系统" 
+          style="width: 200px; margin-right: 10px;"
+        >
+          <el-option label="全部" value="" />
+          <el-option 
+            v-for="system in businessSystems" 
+            :key="system.businessCode" 
+            :label="system.businessName" 
+            :value="system.businessCode" 
+          />
+        </el-select>
+        <el-button type="primary" @click="handleFilter">查询</el-button>
+        <el-button @click="handleReset">重置</el-button>
+      </div>
+
       <el-table :data="relationData" border style="width: 100%">
         <el-table-column prop="relationCode" label="关联编码" width="150" />
         <el-table-column prop="relationName" label="关联名称" />
+        <el-table-column prop="businessCode" label="业务系统" width="120">
+          <template #default="{ row }">
+            <el-tag>{{ row.businessCode || '未关联' }}</el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="mainTableCode" label="主表" width="150" />
         <el-table-column prop="slaveTableCode" label="从表" width="150" />
         <el-table-column prop="mainFieldCode" label="主表字段" width="150" />
@@ -106,6 +130,9 @@
             <el-option label="一对多" value="ONE_TO_MANY" />
           </el-select>
         </el-form-item>
+        <el-form-item label="关联描述" prop="description">
+          <el-input v-model="form.description" type="textarea" rows="3" placeholder="请输入关联关系的描述" />
+        </el-form-item>
         <el-form-item v-if="!form.id" label="创建外键约束">
           <el-checkbox v-model="form.createForeignKey">同时创建数据库外键约束</el-checkbox>
         </el-form-item>
@@ -121,18 +148,20 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, getFieldList, addRelation, updateRelation, deleteRelation, getAllRelations, createForeignKey, syncForeignKeys } from '../api'
+import { getTableList, getFieldList, addRelation, updateRelation, deleteRelation, getAllRelations, createForeignKey, syncForeignKeys, getBusinessSystemList } from '../api'
 
 export default {
   name: 'RelationManage',
   setup() {
     const tables = ref([])
+    const businessSystems = ref([])
     const relationData = ref([])
     const mainTableFields = ref([])
     const slaveTableFields = ref([])
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增关联')
     const formRef = ref(null)
+    const selectedBusinessCode = ref('') // 选中的业务系统编码
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -142,6 +171,7 @@ export default {
       id: null,
       relationCode: '',
       relationName: '',
+      description: '',
       mainTableCode: '',
       slaveTableCode: '',
       mainFieldCode: '',
@@ -171,11 +201,24 @@ export default {
       }
     }
 
+    // 加载业务系统列表
+    const loadBusinessSystems = async () => {
+      try {
+        const res = await getBusinessSystemList({})
+        if (res.code === 200) {
+          businessSystems.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载业务系统列表失败')
+      }
+    }
+
     const loadRelations = async () => {
       try {
         const params = {
           current: pagination.current,
-          size: pagination.size
+          size: pagination.size,
+          businessCode: selectedBusinessCode.value || undefined
         }
         const res = await getAllRelations(params)
         if (res.code === 200) {
@@ -205,6 +248,19 @@ export default {
     const handleCurrentChange = (val) => {
       pagination.current = val
       loadRelations()
+    }
+    
+    // 筛选关联关系
+    const handleFilter = () => {
+      pagination.current = 1 // 重置页码
+      loadRelations()
+    }
+    
+    // 重置筛选条件
+    const handleReset = () => {
+      selectedBusinessCode.value = '' // 重置选中的业务系统
+      pagination.current = 1 // 重置页码
+      loadRelations() // 重新加载数据
     }
 
     const handleMainTableChange = async (tableCode) => {
@@ -243,6 +299,7 @@ export default {
         id: null,
         relationCode: '',
         relationName: '',
+        description: '',
         mainTableCode: '',
         slaveTableCode: '',
         mainFieldCode: '',
@@ -259,6 +316,7 @@ export default {
         id: row.id,
         relationCode: row.relationCode,
         relationName: row.relationName,
+        description: row.description || '',
         mainTableCode: row.mainTableCode,
         slaveTableCode: row.slaveTableCode,
         mainFieldCode: row.mainFieldCode,
@@ -351,16 +409,19 @@ export default {
     onMounted(() => {
       loadTables()
       loadRelations()
+      loadBusinessSystems()
     })
 
     return {
       tables,
+      businessSystems,
       relationData,
       mainTableFields,
       slaveTableFields,
       dialogVisible,
       dialogTitle,
       formRef,
+      selectedBusinessCode,
       pagination,
       form,
       rules,
@@ -373,7 +434,9 @@ export default {
       handleSubmit,
       handleDelete,
       handleDialogClose,
-      handleSyncForeignKeys
+      handleSyncForeignKeys,
+      handleFilter,
+      handleReset
     }
   }
 }

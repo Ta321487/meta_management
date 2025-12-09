@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
+import BusinessSystemManage from '../views/BusinessSystemManage.vue'
 import ModuleManage from '../views/ModuleManage.vue'
 import ModuleTypeManage from '../views/ModuleTypeManage.vue'
 import TableManage from '../views/TableManage.vue'
@@ -23,6 +24,11 @@ const routes = [
     component: Layout,
     redirect: '/module',
     children: [
+      {
+        path: '/business-system',
+        name: 'BusinessSystemManage',
+        component: BusinessSystemManage
+      },
       {
         path: '/module',
         name: 'ModuleManage',

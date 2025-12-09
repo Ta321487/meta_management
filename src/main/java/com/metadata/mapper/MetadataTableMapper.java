@@ -13,13 +13,65 @@ public interface MetadataTableMapper {
     int update(MetadataTable table);
     int deleteById(Long id);
     int batchDelete(@Param("ids") List<Long> ids);
-    MetadataTable selectByCode(String tableCode);
+    MetadataTable selectByCode(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据表编码查询表（默认业务系统）
+     */
+    default MetadataTable selectByCode(String tableCode) {
+        return selectByCode(tableCode, "");
+    }
     MetadataTable selectById(Long id);
-    List<MetadataTable> selectAll(@Param("tableName") String tableName);
+    List<MetadataTable> selectAll(@Param("tableName") String tableName, @Param("businessCode") String businessCode);
+    
+    /**
+     * 查询所有表（默认业务系统）
+     */
+    default List<MetadataTable> selectAll(@Param("tableName") String tableName) {
+        return selectAll(tableName, "");
+    }
+    
     int countByCode(String tableCode);
-    List<MetadataTable> selectByModuleCode(String moduleCode);
-    Long count(@Param("tableName") String tableName);
+    List<MetadataTable> selectByModuleCode(@Param("moduleCode") String moduleCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据模块编码查询表（默认业务系统）
+     */
+    default List<MetadataTable> selectByModuleCode(String moduleCode) {
+        return selectByModuleCode(moduleCode, "");
+    }
+    
+    Long count(@Param("tableName") String tableName, @Param("businessCode") String businessCode);
+    
+    /**
+     * 统计表数量（默认业务系统）
+     */
+    default Long count(@Param("tableName") String tableName) {
+        return count(tableName, "");
+    }
+    
     List<MetadataTable> selectPage(@Param("tableName") String tableName, 
+                                    @Param("businessCode") String businessCode,
                                     @Param("pageRequest") PageRequest pageRequest);
+    
+    /**
+     * 分页查询表（默认业务系统）
+     */
+    default List<MetadataTable> selectPage(@Param("tableName") String tableName, 
+                                    @Param("pageRequest") PageRequest pageRequest) {
+        return selectPage(tableName, "", pageRequest);
+    }
+    
+    /**
+     * 根据表编码列表查询表
+     */
+    List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据表编码列表查询表（默认业务系统）
+     */
+    default List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes) {
+        return selectByCodes(tableCodes, "");
+    }
 }
 

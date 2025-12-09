@@ -16,9 +16,10 @@ import java.util.UUID;
 
 /**
  * ${table.tableName}控制器
+ * 业务系统：${businessName}
  */
 @RestController
-@RequestMapping("/api/${entityName}")
+@RequestMapping("/api/${businessCode}/${entityName}")
 public class ${className}Controller {
 
     @Autowired
