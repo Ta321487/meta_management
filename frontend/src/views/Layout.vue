@@ -202,7 +202,7 @@ export default {
             ElMessage.success('修改密码成功')
             passwordDialogVisible.value = false
           } catch (error) {
-            ElMessage.error('修改密码失败')
+            ElMessage.error(error.message || '修改密码失败')
           }
         }
       })
