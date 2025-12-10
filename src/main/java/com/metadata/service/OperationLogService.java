@@ -29,10 +29,10 @@ public interface OperationLogService {
     /**
      * 查询操作日志列表
      */
-    List<MetadataOperationLog> list(String operateType, String startTime, String endTime);
+    List<MetadataOperationLog> list(String module, String operateType, String startTime, String endTime);
 
     /**
      * 分页查询操作日志列表
      */
-    PageResult<MetadataOperationLog> page(String operateType, String startTime, String endTime, PageRequest pageRequest);
+    PageResult<MetadataOperationLog> page(String module, String operateType, String startTime, String endTime, PageRequest pageRequest);
 }

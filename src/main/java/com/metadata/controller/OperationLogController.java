@@ -26,7 +26,8 @@ public class OperationLogController {
      * 查询操作日志列表
      */
     @GetMapping("/list")
-    public Result<?> list(@RequestParam(required = false) String operateType,
+    public Result<?> list(@RequestParam(required = false) String module,
+                          @RequestParam(required = false) String operateType,
                           @RequestParam(required = false) String startTime,
                           @RequestParam(required = false) String endTime,
                           @RequestParam(required = false) Integer current,
@@ -37,11 +38,11 @@ public class OperationLogController {
                 PageRequest pageRequest = new PageRequest();
                 pageRequest.setCurrent(current);
                 pageRequest.setSize(size);
-                PageResult<MetadataOperationLog> pageResult = logService.page(operateType, startTime, endTime, pageRequest);
+                PageResult<MetadataOperationLog> pageResult = logService.page(module, operateType, startTime, endTime, pageRequest);
                 return Result.success(pageResult);
             }
             // 否则使用非分页查询（兼容旧接口）
-            List<MetadataOperationLog> list = logService.list(operateType, startTime, endTime);
+            List<MetadataOperationLog> list = logService.list(module, operateType, startTime, endTime);
             return Result.success(list);
         } catch (Exception e) {
             return Result.error(e.getMessage());

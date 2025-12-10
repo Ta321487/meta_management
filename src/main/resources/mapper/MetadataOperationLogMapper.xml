@@ -20,8 +20,53 @@
     <select id="selectAll" resultMap="BaseResultMap">
         SELECT * FROM metadata_operation_log
         <where>
-            <if test="operateUser != null and operateUser != ''">
-                AND operate_user = #{operateUser}
+            <if test="module != null and module != ''">
+                <choose>
+                    <!-- 业务系统管理 -->
+                    <when test="module == 'business-system'">
+                        (operate_content LIKE '%业务系统%' OR operate_type IN ('ADD', 'EDIT', 'DELETE') AND operate_content NOT LIKE '%模块%' AND operate_content NOT LIKE '%表%' AND operate_content NOT LIKE '%字段%' AND operate_content NOT LIKE '%节点%' AND operate_content NOT LIKE '%关联%' AND operate_content NOT LIKE '%规则%')
+                    </when>
+                    <!-- 模块类型管理 -->
+                    <when test="module == 'module-type'">
+                        (operate_content LIKE '%模块类型%' OR operate_type IN ('ADD', 'EDIT', 'DELETE') AND operate_content LIKE '%模块%' AND operate_content NOT LIKE '%功能节点%' AND operate_content NOT LIKE '%节点%')
+                    </when>
+                    <!-- 模块管理 -->
+                    <when test="module == 'module'">
+                        (operate_content LIKE '%模块%' AND operate_content NOT LIKE '%模块类型%' AND operate_content NOT LIKE '%功能节点%' AND operate_content NOT LIKE '%节点%')
+                    </when>
+                    <!-- 表管理 -->
+                    <when test="module == 'table'">
+                        (operate_content LIKE '%表%' AND operate_content NOT LIKE '%字段%' AND operate_content NOT LIKE '%外键%')
+                    </when>
+                    <!-- 字段管理 -->
+                    <when test="module == 'field'">
+                        (operate_content LIKE '%字段%' OR operate_type IN ('ADD', 'EDIT', 'DELETE', 'BATCH_DELETE') AND operate_content LIKE '%字段%')
+                    </when>
+                    <!-- 功能节点 -->
+                    <when test="module == 'node'">
+                        (operate_content LIKE '%功能节点%' OR operate_content LIKE '%节点%')
+                    </when>
+                    <!-- 表关联 -->
+                    <when test="module == 'relation'">
+                        (operate_content LIKE '%关联%' OR operate_content LIKE '%外键%' OR operate_type IN ('SYNC'))
+                    </when>
+                    <!-- 业务规则 -->
+                    <when test="module == 'rule'">
+                        (operate_content LIKE '%规则%')
+                    </when>
+                    <!-- 代码生成 -->
+                    <when test="module == 'codegen'">
+                        (operate_content LIKE '%生成%' OR operate_type IN ('GENERATE_SQL'))
+                    </when>
+                    <!-- SQL执行 -->
+                    <when test="module == 'sql'">
+                        (operate_content LIKE '%执行SQL%' OR operate_type IN ('EXECUTE_SQL'))
+                    </when>
+                    <!-- 操作日志 -->
+                    <when test="module == 'operation-log'">
+                        (operate_type IN ('LOGIN', 'CHANGE_PASSWORD') OR operate_content LIKE '%登录%' OR operate_content LIKE '%密码%')
+                    </when>
+                </choose>
             </if>
             <if test="operateType != null and operateType != ''">
                 AND operate_type = #{operateType}
@@ -39,8 +84,53 @@
     <select id="count" resultType="Long">
         SELECT COUNT(*) FROM metadata_operation_log
         <where>
-            <if test="operateUser != null and operateUser != ''">
-                AND operate_user = #{operateUser}
+            <if test="module != null and module != ''">
+                <choose>
+                    <!-- 业务系统管理 -->
+                    <when test="module == 'business-system'">
+                        (operate_content LIKE '%业务系统%' OR operate_type IN ('ADD', 'EDIT', 'DELETE') AND operate_content NOT LIKE '%模块%' AND operate_content NOT LIKE '%表%' AND operate_content NOT LIKE '%字段%' AND operate_content NOT LIKE '%节点%' AND operate_content NOT LIKE '%关联%' AND operate_content NOT LIKE '%规则%')
+                    </when>
+                    <!-- 模块类型管理 -->
+                    <when test="module == 'module-type'">
+                        (operate_content LIKE '%模块类型%' OR operate_type IN ('ADD', 'EDIT', 'DELETE') AND operate_content LIKE '%模块%' AND operate_content NOT LIKE '%功能节点%' AND operate_content NOT LIKE '%节点%')
+                    </when>
+                    <!-- 模块管理 -->
+                    <when test="module == 'module'">
+                        (operate_content LIKE '%模块%' AND operate_content NOT LIKE '%模块类型%' AND operate_content NOT LIKE '%功能节点%' AND operate_content NOT LIKE '%节点%')
+                    </when>
+                    <!-- 表管理 -->
+                    <when test="module == 'table'">
+                        (operate_content LIKE '%表%' AND operate_content NOT LIKE '%字段%' AND operate_content NOT LIKE '%外键%')
+                    </when>
+                    <!-- 字段管理 -->
+                    <when test="module == 'field'">
+                        (operate_content LIKE '%字段%' OR operate_type IN ('ADD', 'EDIT', 'DELETE', 'BATCH_DELETE') AND operate_content LIKE '%字段%')
+                    </when>
+                    <!-- 功能节点 -->
+                    <when test="module == 'node'">
+                        (operate_content LIKE '%功能节点%' OR operate_content LIKE '%节点%')
+                    </when>
+                    <!-- 表关联 -->
+                    <when test="module == 'relation'">
+                        (operate_content LIKE '%关联%' OR operate_content LIKE '%外键%' OR operate_type IN ('SYNC'))
+                    </when>
+                    <!-- 业务规则 -->
+                    <when test="module == 'rule'">
+                        (operate_content LIKE '%规则%')
+                    </when>
+                    <!-- 代码生成 -->
+                    <when test="module == 'codegen'">
+                        (operate_content LIKE '%生成%' OR operate_type IN ('GENERATE_SQL'))
+                    </when>
+                    <!-- SQL执行 -->
+                    <when test="module == 'sql'">
+                        (operate_content LIKE '%执行SQL%' OR operate_type IN ('EXECUTE_SQL'))
+                    </when>
+                    <!-- 操作日志 -->
+                    <when test="module == 'operation-log'">
+                        (operate_type IN ('LOGIN', 'CHANGE_PASSWORD') OR operate_content LIKE '%登录%' OR operate_content LIKE '%密码%')
+                    </when>
+                </choose>
             </if>
             <if test="operateType != null and operateType != ''">
                 AND operate_type = #{operateType}
@@ -57,8 +147,53 @@
     <select id="selectPage" resultMap="BaseResultMap">
         SELECT * FROM metadata_operation_log
         <where>
-            <if test="operateUser != null and operateUser != ''">
-                AND operate_user = #{operateUser}
+            <if test="module != null and module != ''">
+                <choose>
+                    <!-- 业务系统管理 -->
+                    <when test="module == 'business-system'">
+                        (operate_content LIKE '%业务系统%' OR operate_type IN ('ADD', 'EDIT', 'DELETE') AND operate_content NOT LIKE '%模块%' AND operate_content NOT LIKE '%表%' AND operate_content NOT LIKE '%字段%' AND operate_content NOT LIKE '%节点%' AND operate_content NOT LIKE '%关联%' AND operate_content NOT LIKE '%规则%')
+                    </when>
+                    <!-- 模块类型管理 -->
+                    <when test="module == 'module-type'">
+                        (operate_content LIKE '%模块类型%' OR operate_type IN ('ADD', 'EDIT', 'DELETE') AND operate_content LIKE '%模块%' AND operate_content NOT LIKE '%功能节点%' AND operate_content NOT LIKE '%节点%')
+                    </when>
+                    <!-- 模块管理 -->
+                    <when test="module == 'module'">
+                        (operate_content LIKE '%模块%' AND operate_content NOT LIKE '%模块类型%' AND operate_content NOT LIKE '%功能节点%' AND operate_content NOT LIKE '%节点%')
+                    </when>
+                    <!-- 表管理 -->
+                    <when test="module == 'table'">
+                        (operate_content LIKE '%表%' AND operate_content NOT LIKE '%字段%' AND operate_content NOT LIKE '%外键%')
+                    </when>
+                    <!-- 字段管理 -->
+                    <when test="module == 'field'">
+                        (operate_content LIKE '%字段%' OR operate_type IN ('ADD', 'EDIT', 'DELETE', 'BATCH_DELETE') AND operate_content LIKE '%字段%')
+                    </when>
+                    <!-- 功能节点 -->
+                    <when test="module == 'node'">
+                        (operate_content LIKE '%功能节点%' OR operate_content LIKE '%节点%')
+                    </when>
+                    <!-- 表关联 -->
+                    <when test="module == 'relation'">
+                        (operate_content LIKE '%关联%' OR operate_content LIKE '%外键%' OR operate_type IN ('SYNC'))
+                    </when>
+                    <!-- 业务规则 -->
+                    <when test="module == 'rule'">
+                        (operate_content LIKE '%规则%')
+                    </when>
+                    <!-- 代码生成 -->
+                    <when test="module == 'codegen'">
+                        (operate_content LIKE '%生成%' OR operate_type IN ('GENERATE_SQL'))
+                    </when>
+                    <!-- SQL执行 -->
+                    <when test="module == 'sql'">
+                        (operate_content LIKE '%执行SQL%' OR operate_type IN ('EXECUTE_SQL'))
+                    </when>
+                    <!-- 操作日志 -->
+                    <when test="module == 'operation-log'">
+                        (operate_type IN ('LOGIN', 'CHANGE_PASSWORD') OR operate_content LIKE '%登录%' OR operate_content LIKE '%密码%')
+                    </when>
+                </choose>
             </if>
             <if test="operateType != null and operateType != ''">
                 AND operate_type = #{operateType}

@@ -342,13 +342,13 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         }
         
         // 校验表是否存在
-        com.metadata.entity.MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
+        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
         if (mainTable == null) {
             result.put("success", false);
             result.put("message", "主表不存在");
             return result;
         }
-        com.metadata.entity.MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
         if (slaveTable == null) {
             result.put("success", false);
             result.put("message", "从表不存在");
@@ -356,13 +356,13 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         }
         
         // 校验字段是否存在
-        com.metadata.entity.MetadataField mainField = fieldMapper.selectByCode(relation.getMainTableCode(), relation.getMainFieldCode());
+        MetadataField mainField = fieldMapper.selectByCode(relation.getMainTableCode(), relation.getMainFieldCode());
         if (mainField == null) {
             result.put("success", false);
             result.put("message", "主表关联字段不存在");
             return result;
         }
-        com.metadata.entity.MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
+        MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
         if (slaveField == null) {
             result.put("success", false);
             result.put("message", "从表外键字段不存在");

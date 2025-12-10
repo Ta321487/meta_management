@@ -53,17 +53,17 @@ public class OperationLogServiceImpl implements OperationLogService {
      * 查询操作日志列表
      */
     @Override
-    public List<MetadataOperationLog> list(String operateType, String startTime, String endTime) {
-        return logMapper.selectAll(null, operateType, startTime, endTime);
+    public List<MetadataOperationLog> list(String module, String operateType, String startTime, String endTime) {
+        return logMapper.selectAll(module, operateType, startTime, endTime);
     }
 
     /**
      * 分页查询操作日志列表
      */
     @Override
-    public PageResult<MetadataOperationLog> page(String operateType, String startTime, String endTime, PageRequest pageRequest) {
-        Long total = logMapper.count(null, operateType, startTime, endTime);
-        List<MetadataOperationLog> records = logMapper.selectPage(null, operateType, startTime, endTime, pageRequest);
+    public PageResult<MetadataOperationLog> page(String module, String operateType, String startTime, String endTime, PageRequest pageRequest) {
+        Long total = logMapper.count(module, operateType, startTime, endTime);
+        List<MetadataOperationLog> records = logMapper.selectPage(module, operateType, startTime, endTime, pageRequest);
         return new PageResult<>(total, records);
     }
 }

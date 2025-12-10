@@ -10,15 +10,15 @@ import java.util.List;
  */
 public interface MetadataOperationLogMapper {
     int insert(MetadataOperationLog log);
-    List<MetadataOperationLog> selectAll(@Param("operateUser") String operateUser,
+    List<MetadataOperationLog> selectAll(@Param("module") String module,
                                          @Param("operateType") String operateType,
                                          @Param("startTime") String startTime,
                                          @Param("endTime") String endTime);
-    Long count(@Param("operateUser") String operateUser,
+    Long count(@Param("module") String module,
                @Param("operateType") String operateType,
                @Param("startTime") String startTime,
                @Param("endTime") String endTime);
-    List<MetadataOperationLog> selectPage(@Param("operateUser") String operateUser,
+    List<MetadataOperationLog> selectPage(@Param("module") String module,
                                          @Param("operateType") String operateType,
                                          @Param("startTime") String startTime,
                                          @Param("endTime") String endTime,
