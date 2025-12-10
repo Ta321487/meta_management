@@ -1,5 +1,7 @@
 package com.metadata.controller;
 
+import com.metadata.common.ChangePasswordRequest;
+import com.metadata.common.LoginRequest;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataAdmin;
 import com.metadata.service.AuthService;
@@ -31,10 +33,10 @@ public class AuthController {
     @PostMapping("/login")
     @Operation(summary = "用户登录", description = "用户登录认证，返回用户信息")
     public Result<Map<String, Object>> login(
-            @Parameter(description = "登录参数，包含username和password") @RequestBody Map<String, String> params,
+            @Parameter(description = "登录参数，包含username和password",required = true) @RequestBody LoginRequest loginRequest,
             HttpServletRequest request) {
-        String username = params.get("username");
-        String password = params.get("password");
+        String username = loginRequest.getUsername();
+        String password = loginRequest.getPassword();
         MetadataAdmin admin = authService.login(username, password);
         if (admin == null) {
             return Result.error("用户名或密码错误");
@@ -62,15 +64,15 @@ public class AuthController {
     @PostMapping("/changePassword")
     @Operation(summary = "修改密码", description = "用户修改密码，需要验证原密码")
     public Result<?> changePassword(
-            @Parameter(description = "密码参数，包含oldPassword和newPassword") @RequestBody Map<String, String> params,
+            @Parameter(description = "密码参数，包含oldPassword和newPassword") @RequestBody ChangePasswordRequest changePasswordRequest,
             HttpServletRequest request) {
         HttpSession session = request.getSession();
         MetadataAdmin admin = (MetadataAdmin) session.getAttribute("admin");
         if (admin == null) {
             return Result.error(401, "未登录");
         }
-        String oldPassword = params.get("oldPassword");
-        String newPassword = params.get("newPassword");
+        String oldPassword = changePasswordRequest.getOldPassword();
+        String newPassword = changePasswordRequest.getNewPassword();
         boolean success = authService.changePassword(admin.getUsername(), oldPassword, newPassword);
         if (success) {
             return Result.success();

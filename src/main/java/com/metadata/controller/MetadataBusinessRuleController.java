@@ -5,12 +5,13 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.service.MetadataBusinessRuleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 业务规则控制器
@@ -24,7 +25,8 @@ public class MetadataBusinessRuleController {
     private MetadataBusinessRuleService ruleService;
 
     @PostMapping("/add")
-    public Result<?> add(@RequestBody MetadataBusinessRule rule) {
+    @Operation(description = "添加业务规则")
+    public Result<?> add(@Parameter(description = "业务规则信息") @RequestBody MetadataBusinessRule rule) {
         try {
             ruleService.add(rule);
             return Result.success();
@@ -34,7 +36,8 @@ public class MetadataBusinessRuleController {
     }
 
     @PostMapping("/update")
-    public Result<?> update(@RequestBody MetadataBusinessRule rule) {
+    @Operation(description = "更新业务规则")
+    public Result<?> update(@Parameter(description = "业务规则信息") @RequestBody MetadataBusinessRule rule) {
         try {
             ruleService.update(rule);
             return Result.success();
@@ -43,10 +46,10 @@ public class MetadataBusinessRuleController {
         }
     }
 
-    @PostMapping("/delete")
-    public Result<?> delete(@RequestBody Map<String, Object> params) {
+    @DeleteMapping("/delete/{id}")
+    @Operation(description = "根据id删除业务规则")
+    public Result<?> delete(@Parameter(description = "业务规则信息") @PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             ruleService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -55,9 +58,12 @@ public class MetadataBusinessRuleController {
     }
 
     @GetMapping("/list/{moduleCode}")
-    public Result<?> listByModuleCode(@PathVariable String moduleCode,
-                                     @RequestParam(required = false) Integer current,
-                                     @RequestParam(required = false) Integer size) {
+    @Operation(description = "通过模块唯一代码分页查询")
+    public Result<?> listByModuleCode(@Parameter(description = "模块唯一代码") @PathVariable String moduleCode,
+                                      @Parameter(description = "当前页",required = true)
+                                      @RequestParam(required = false) Integer current,
+                                      @Parameter(description = "每页显示数量")
+                                      @RequestParam(required = false) Integer size) {
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();

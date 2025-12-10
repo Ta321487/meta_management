@@ -1,5 +1,6 @@
 package com.metadata.controller;
 
+import com.metadata.common.BatchDeleteRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
@@ -12,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 表控制器
@@ -56,11 +56,10 @@ public class MetadataTableController {
     /**
      * 删除表
      */
-    @PostMapping("/delete")
+    @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除表", description = "根据ID删除元数据表")
-    public Result<?> delete(@Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> delete(@Parameter(description = "表ID") @PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             tableService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -73,12 +72,9 @@ public class MetadataTableController {
      */
     @PostMapping("/batchDelete")
     @Operation(summary = "批量删除表", description = "根据ID列表批量删除元数据表")
-    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Integer> intIds = (List<Integer>) params.get("ids");
-            List<Long> ids = intIds.stream().map(Long::valueOf).collect(java.util.stream.Collectors.toList());
-            tableService.batchDelete(ids);
+            tableService.batchDelete(request.getIds());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

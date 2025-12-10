@@ -1,6 +1,7 @@
 package com.metadata.controller;
 
 import com.metadata.common.Result;
+import com.metadata.common.SqlExecuteRequest;
 import com.metadata.service.SqlExecuteService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +24,9 @@ public class SqlExecuteController {
      * 执行SQL语句
      */
     @PostMapping("/execute")
-    public Result<?> executeSql(@RequestBody Map<String, String> params) {
+    public Result<?> executeSql(@RequestBody SqlExecuteRequest request) {
         try {
-            String sql = params.get("sql");
+            String sql = request.getSql();
             if (sql == null || sql.trim().isEmpty()) {
                 return Result.error("SQL语句不能为空");
             }
@@ -41,9 +42,9 @@ public class SqlExecuteController {
      * 执行多条SQL语句
      */
     @PostMapping("/executeMultiple")
-    public Result<?> executeMultipleSql(@RequestBody Map<String, String> params) {
+    public Result<?> executeMultipleSql(@RequestBody SqlExecuteRequest request) {
         try {
-            String sqls = params.get("sql");
+            String sqls = request.getSql();
             if (sqls == null || sqls.trim().isEmpty()) {
                 return Result.error("SQL语句不能为空");
             }

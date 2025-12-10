@@ -1,8 +1,11 @@
 package com.metadata.controller;
 
+import com.metadata.common.BatchDeleteRequest;
+import com.metadata.common.ModuleRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
+import com.metadata.common.UpdateStatusRequest;
 import com.metadata.entity.MetadataModule;
 import com.metadata.service.MetadataModuleService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,7 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 模块控制器
@@ -30,23 +32,9 @@ public class MetadataModuleController {
      */
     @PostMapping("/add")
     @Operation(summary = "新增模块", description = "添加新的元数据模块")
-    public Result<?> add(@Parameter(description = "模块信息，包含moduleCode、moduleName、moduleType等字段") @RequestBody Map<String, Object> params) {
+    public Result<?> add(@Parameter(description = "模块请求信息") @RequestBody ModuleRequest request) {
         try {
-            MetadataModule module = new MetadataModule();
-            module.setModuleCode((String) params.get("moduleCode"));
-            module.setModuleName((String) params.get("moduleName"));
-            module.setModuleType((String) params.get("moduleType"));
-            module.setDescription((String) params.get("description"));
-            // 处理新增字段
-            if (params.containsKey("sort")) {
-                module.setSort(params.get("sort") != null ? Integer.valueOf(params.get("sort").toString()) : 1);
-            }
-            module.setIcon((String) params.get("icon"));
-            module.setRoutePath((String) params.get("routePath"));
-            module.setComponentPath((String) params.get("componentPath"));
-            @SuppressWarnings("unchecked")
-            List<String> tableCodes = (List<String>) params.get("tableCodes");
-            moduleService.add(module, tableCodes);
+            moduleService.add(request.getModule(), request.getTableCodes());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -58,23 +46,9 @@ public class MetadataModuleController {
      */
     @PostMapping("/update")
     @Operation(summary = "更新模块", description = "更新元数据模块信息")
-    public Result<?> update(@Parameter(description = "模块信息，包含id、moduleName、moduleType等字段") @RequestBody Map<String, Object> params) {
+    public Result<?> update(@Parameter(description = "模块请求信息") @RequestBody ModuleRequest request) {
         try {
-            MetadataModule module = new MetadataModule();
-            module.setId(Long.valueOf(params.get("id").toString()));
-            module.setModuleName((String) params.get("moduleName"));
-            module.setModuleType((String) params.get("moduleType"));
-            module.setDescription((String) params.get("description"));
-            // 处理新增字段
-            if (params.containsKey("sort")) {
-                module.setSort(params.get("sort") != null ? Integer.valueOf(params.get("sort").toString()) : 1);
-            }
-            module.setIcon((String) params.get("icon"));
-            module.setRoutePath((String) params.get("routePath"));
-            module.setComponentPath((String) params.get("componentPath"));
-            @SuppressWarnings("unchecked")
-            List<String> tableCodes = (List<String>) params.get("tableCodes");
-            moduleService.update(module, tableCodes);
+            moduleService.update(request.getModule(), request.getTableCodes());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -84,11 +58,10 @@ public class MetadataModuleController {
     /**
      * 删除模块
      */
-    @PostMapping("/delete")
+    @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除模块", description = "根据ID删除元数据模块")
-    public Result<?> delete(@Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> delete(@Parameter(description = "模块ID") @PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             moduleService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -101,12 +74,9 @@ public class MetadataModuleController {
      */
     @PostMapping("/batchDelete")
     @Operation(summary = "批量删除模块", description = "根据ID列表批量删除元数据模块")
-    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Integer> intIds = (List<Integer>) params.get("ids");
-            List<Long> ids = intIds.stream().map(Long::valueOf).collect(java.util.stream.Collectors.toList());
-            moduleService.batchDelete(ids);
+            moduleService.batchDelete(request.getIds());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -153,11 +123,9 @@ public class MetadataModuleController {
      */
     @PostMapping("/updateStatus")
     @Operation(summary = "更新模块状态", description = "更新模块的启用/禁用状态")
-    public Result<?> updateStatus(@Parameter(description = "包含id和status的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> updateStatus(@Parameter(description = "包含id和status的参数") @RequestBody UpdateStatusRequest request) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
-            Integer status = Integer.valueOf(params.get("status").toString());
-            moduleService.updateStatus(id, status);
+            moduleService.updateStatus(request.getId(), request.getStatus());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

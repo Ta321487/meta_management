@@ -1,5 +1,6 @@
 package com.metadata.controller;
 
+import com.metadata.common.AssociateModulesRequest;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.service.MetadataBusinessSystemService;
@@ -10,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 业务系统控制器
@@ -28,13 +28,8 @@ public class MetadataBusinessSystemController {
      */
     @PostMapping("/add")
     @Operation(summary = "新增业务系统", description = "添加新的业务系统")
-    public Result<?> add(@Parameter(description = "业务系统信息，包含businessCode、businessName等字段") @RequestBody Map<String, Object> params) {
+    public Result<?> add(@Parameter(description = "业务系统信息") @RequestBody MetadataBusinessSystem businessSystem) {
         try {
-            MetadataBusinessSystem businessSystem = new MetadataBusinessSystem();
-            businessSystem.setBusinessCode((String) params.get("businessCode"));
-            businessSystem.setBusinessName((String) params.get("businessName"));
-            businessSystem.setDescription((String) params.get("description"));
-            businessSystem.setIsDefault(params.get("isDefault") != null ? Integer.valueOf(params.get("isDefault").toString()) : 0);
             businessSystemService.add(businessSystem);
             return Result.success();
         } catch (Exception e) {
@@ -47,13 +42,8 @@ public class MetadataBusinessSystemController {
      */
     @PostMapping("/update")
     @Operation(summary = "更新业务系统", description = "更新业务系统信息")
-    public Result<?> update(@Parameter(description = "业务系统信息，包含id、businessName等字段") @RequestBody Map<String, Object> params) {
+    public Result<?> update(@Parameter(description = "业务系统信息") @RequestBody MetadataBusinessSystem businessSystem) {
         try {
-            MetadataBusinessSystem businessSystem = new MetadataBusinessSystem();
-            businessSystem.setId(Long.valueOf(params.get("id").toString()));
-            businessSystem.setBusinessName((String) params.get("businessName"));
-            businessSystem.setDescription((String) params.get("description"));
-            businessSystem.setIsDefault(params.get("isDefault") != null ? Integer.valueOf(params.get("isDefault").toString()) : 0);
             businessSystemService.update(businessSystem);
             return Result.success();
         } catch (Exception e) {
@@ -64,11 +54,10 @@ public class MetadataBusinessSystemController {
     /**
      * 删除业务系统
      */
-    @PostMapping("/delete")
+    @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除业务系统", description = "根据ID删除业务系统")
-    public Result<?> delete(@Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> delete(@Parameter(description = "业务系统ID") @PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             businessSystemService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -111,11 +100,9 @@ public class MetadataBusinessSystemController {
      */
     @PostMapping("/associateModules")
     @Operation(summary = "关联模块到业务系统", description = "将多个模块关联到指定业务系统")
-    public Result<?> associateModules(@Parameter(description = "包含businessCode和moduleCodes字段的请求体") @RequestBody Map<String, Object> params) {
+    public Result<?> associateModules(@Parameter(description = "关联模块请求参数") @RequestBody AssociateModulesRequest request) {
         try {
-            String businessCode = (String) params.get("businessCode");
-            List<String> moduleCodes = (List<String>) params.get("moduleCodes");
-            businessSystemService.associateModules(businessCode, moduleCodes);
+            businessSystemService.associateModules(request.getBusinessCode(), request.getModuleCodes());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -127,11 +114,9 @@ public class MetadataBusinessSystemController {
      */
     @PostMapping("/disassociateModules")
     @Operation(summary = "解除模块关联", description = "解除多个模块与指定业务系统的关联")
-    public Result<?> disassociateModules(@Parameter(description = "包含businessCode和moduleCodes字段的请求体") @RequestBody Map<String, Object> params) {
+    public Result<?> disassociateModules(@Parameter(description = "解除模块关联请求参数") @RequestBody AssociateModulesRequest request) {
         try {
-            String businessCode = (String) params.get("businessCode");
-            List<String> moduleCodes = (List<String>) params.get("moduleCodes");
-            businessSystemService.disassociateModules(businessCode, moduleCodes);
+            businessSystemService.disassociateModules(request.getBusinessCode(), request.getModuleCodes());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

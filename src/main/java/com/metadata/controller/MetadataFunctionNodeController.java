@@ -3,6 +3,7 @@ package com.metadata.controller;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
+import com.metadata.common.UpdateSortRequest;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.service.MetadataFunctionNodeService;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,7 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * 功能节点控制器
@@ -43,10 +43,9 @@ public class MetadataFunctionNodeController {
         }
     }
 
-    @PostMapping("/delete")
-    public Result<?> delete(@RequestBody Map<String, Object> params) {
+    @DeleteMapping("/delete/{id}")
+    public Result<?> delete(@PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             nodeService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -72,11 +71,9 @@ public class MetadataFunctionNodeController {
     }
 
     @PostMapping("/updateSort")
-    public Result<?> updateSort(@RequestBody Map<String, Object> params) {
+    public Result<?> updateSort(@RequestBody UpdateSortRequest request) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
-            Integer sort = Integer.valueOf(params.get("sort").toString());
-            nodeService.updateSort(id, sort);
+            nodeService.updateSort(request.getId(), request.getSort());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

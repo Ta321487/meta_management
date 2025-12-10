@@ -1,5 +1,7 @@
 package com.metadata.controller;
 
+import com.metadata.common.BatchDeleteRequest;
+import com.metadata.common.DeleteConstraintRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
@@ -11,6 +13,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -60,11 +63,10 @@ public class MetadataFieldController {
     /**
      * 删除字段
      */
-    @PostMapping("/delete")
+    @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除字段", description = "根据ID删除元数据字段")
-    public Result<?> delete(@Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> delete(@Parameter(description = "字段ID") @PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             fieldService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -77,12 +79,9 @@ public class MetadataFieldController {
      */
     @PostMapping("/batchDelete")
     @Operation(summary = "批量删除字段", description = "根据ID列表批量删除元数据字段")
-    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody Map<String, Object> params) {
+    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request) {
         try {
-            @SuppressWarnings("unchecked")
-            List<Integer> intIds = (List<Integer>) params.get("ids");
-            List<Long> ids = intIds.stream().map(Long::valueOf).collect(java.util.stream.Collectors.toList());
-            fieldService.batchDelete(ids);
+            fieldService.batchDelete(request.getIds());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -132,8 +131,15 @@ public class MetadataFieldController {
     @PostMapping("/constraint/delete")
     @Operation(summary = "删除约束", description = "删除表的约束")
     public Result<?> deleteConstraint(
-            @Parameter(description = "包含id的参数") @RequestBody Map<String, Object> params) {
+            @Parameter(description = "删除约束请求参数") @RequestBody DeleteConstraintRequest request) {
         try {
+            // 转换为Map以便兼容现有服务实现
+            Map<String, Object> params = new HashMap<>();
+            params.put("id", request.getId());
+            params.put("constraintName", request.getConstraintName());
+            params.put("tableName", request.getTableName());
+            params.put("tableCode", request.getTableCode());
+            params.put("fieldName", request.getFieldName());
             fieldService.deleteConstraint(params);
             return Result.success();
         } catch (Exception e) {

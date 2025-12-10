@@ -43,10 +43,9 @@ public class MetadataTableRelationController {
         }
     }
 
-    @PostMapping("/delete")
-    public Result<?> delete(@RequestBody Map<String, Object> params) {
+    @DeleteMapping("/delete/{id}")
+    public Result<?> delete(@PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             relationService.delete(id);
             return Result.success();
         } catch (Exception e) {
@@ -108,9 +107,8 @@ public class MetadataTableRelationController {
     }
 
     @PostMapping("/syncForeignKeys")
-    public Result<?> syncForeignKeys(@RequestBody(required = false) Map<String, String> params) {
+    public Result<?> syncForeignKeys(@RequestParam(required = false) String tableCode) {
         try {
-            String tableCode = params != null ? params.get("tableCode") : null;
             Map<String, Object> result = relationService.syncForeignKeys(tableCode);
             if (Boolean.TRUE.equals(result.get("success"))) {
                 return Result.success(result.get("message"));

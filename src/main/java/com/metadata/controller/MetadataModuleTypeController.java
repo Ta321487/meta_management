@@ -55,10 +55,9 @@ public class MetadataModuleTypeController {
     /**
      * 删除模块类型
      */
-    @PostMapping("/delete")
-    public Result<?> delete(@RequestBody java.util.Map<String, Object> params) {
+    @DeleteMapping("/delete/{id}")
+    public Result<?> delete(@PathVariable Long id) {
         try {
-            Long id = Long.valueOf(params.get("id").toString());
             typeService.delete(id);
             return Result.success();
         } catch (Exception e) {

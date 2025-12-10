@@ -2,6 +2,8 @@ package com.metadata.controller;
 
 import com.metadata.common.Result;
 import com.metadata.service.CodeGeneratorService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -26,16 +28,18 @@ public class CodeTestController {
      * 测试代码生成
      */
     @GetMapping("/codetest/test/{tableCode}")
-    public Result<Map<String, Object>> testCode(@PathVariable String tableCode, 
-                                               @RequestParam(defaultValue = "com.example") String packageName) {
+    @Operation(description = "测试代码生成")
+    public Result<Map<String, Object>> testCode(
+            @Parameter(description = "表编码") @PathVariable String tableCode,
+            @RequestParam(defaultValue = "com.example") String packageName) {
         try {
             // 生成所有代码
             Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName);
-            
+
             // 构造测试结果
             Map<String, Object> result = new HashMap<>();
             List<Map<String, Object>> testResults = new ArrayList<>();
-            
+
             // 定义测试项配置
             Map<String, Map<String, String>> testConfigMap = new HashMap<>();
             testConfigMap.put("create_table.sql", Map.of("name", "建表SQL", "type", "数据库脚本"));
@@ -47,27 +51,27 @@ public class CodeTestController {
             testConfigMap.put("List.vue", Map.of("name", "列表页", "type", "Vue组件"));
             testConfigMap.put("Form.vue", Map.of("name", "表单页", "type", "Vue组件"));
             testConfigMap.put("routes.js", Map.of("name", "路由配置", "type", "前端配置"));
-            
+
             // 验证生成的每种代码类型
             for (Map.Entry<String, String> entry : codeMap.entrySet()) {
                 String codeType = entry.getKey();
                 String code = entry.getValue();
-                
+
                 Map<String, Object> testResult = new HashMap<>();
                 Map<String, String> testConfig = testConfigMap.getOrDefault(codeType, Map.of("name", codeType, "type", "未知类型"));
-                
+
                 // 基本信息
                 testResult.put("name", testConfig.get("name"));
                 testResult.put("type", testConfig.get("type"));
-                
+
                 // 验证代码是否生成成功
                 boolean isSuccess = code != null && !code.trim().isEmpty();
                 String status = isSuccess ? "success" : "danger";
                 String message = isSuccess ? "生成成功" : "生成失败：代码为空";
-                
+
                 List<String> errors = new ArrayList<>();
                 List<String> warnings = new ArrayList<>();
-                
+
                 if (!isSuccess) {
                     errors.add("代码内容为空");
                 } else {
@@ -81,22 +85,22 @@ public class CodeTestController {
                         }
                     }
                 }
-                
+
                 testResult.put("status", status);
                 testResult.put("message", message);
                 testResult.put("errors", errors);
                 testResult.put("warnings", warnings);
                 testResult.put("apiTests", new ArrayList<>());
-                
+
                 testResults.add(testResult);
             }
-            
+
             // 计算测试统计
             int total = testResults.size();
             int successCount = (int) testResults.stream().filter(r -> "success".equals(r.get("status"))).count();
             int failCount = (int) testResults.stream().filter(r -> "danger".equals(r.get("status"))).count();
             boolean allSuccess = successCount == total;
-            
+
             result.put("testResults", testResults);
             result.put("success", allSuccess);
             result.put("message", allSuccess ? "所有代码生成测试通过！" : "部分代码生成测试失败，请检查");
@@ -104,13 +108,13 @@ public class CodeTestController {
             result.put("successCount", successCount);
             result.put("failCount", failCount);
             result.put("generatedCode", codeMap);
-            
+
             return Result.success(result);
         } catch (Exception e) {
             return Result.error(e.getMessage());
         }
     }
-    
+
     /**
      * 验证模板之间的逻辑关系
      */
@@ -125,7 +129,7 @@ public class CodeTestController {
                 }
             }
         }
-        
+
         // 验证Service与Mapper之间的调用关系
         if ("Service.java".equals(codeType)) {
             String mapperCode = codeMap.get("Mapper.java");
@@ -136,20 +140,20 @@ public class CodeTestController {
                 }
             }
         }
-        
+
         // 验证Vue组件之间的路由关系
         if ("routes.js".equals(codeType)) {
             // 检查路由配置中是否包含了列表页和表单页的关键字
             String listVueCode = codeMap.get("List.vue");
             String formVueCode = codeMap.get("Form.vue");
-            
+
             if (listVueCode != null && !listVueCode.trim().isEmpty()) {
                 // 检查路由配置中是否包含列表相关关键字
                 if (!code.contains("List") && !code.contains("list")) {
                     throw new Exception("路由配置中未包含列表页组件");
                 }
             }
-            
+
             if (formVueCode != null && !formVueCode.trim().isEmpty()) {
                 // 检查路由配置中是否包含表单相关关键字
                 if (!code.contains("Form") && !code.contains("form")) {
