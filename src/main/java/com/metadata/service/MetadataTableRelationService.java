@@ -65,9 +65,41 @@ public interface MetadataTableRelationService {
     Map<String, Object> createForeignKey(MetadataTableRelation relation);
 
     /**
-     * 同步数据库外键到元数据关联关系系统
+     * 同步元数据关联关系到数据库外键约束
      * @param tableCode 表编码，如果为null或空字符串则同步所有表
      * @return 同步结果
      */
     Map<String, Object> syncForeignKeys(String tableCode);
+    
+    /**
+     * 根据主表、从表、主字段、从字段的组合来查找关联关系记录
+     * @param mainTableCode 主表编码
+     * @param slaveTableCode 从表编码
+     * @param mainFieldCode 主表关联字段编码
+     * @param slaveFieldCode 从表外键字段编码
+     * @param businessCode 业务系统编码
+     * @return 关联关系对象列表
+     */
+    List<MetadataTableRelation> listByTablesAndFields(
+            String mainTableCode,
+            String slaveTableCode,
+            String mainFieldCode,
+            String slaveFieldCode,
+            String businessCode
+    );
+    
+    /**
+     * 根据主表、从表、主字段、从字段的组合来查找关联关系记录（默认业务系统）
+     * @param mainTableCode 主表编码
+     * @param slaveTableCode 从表编码
+     * @param mainFieldCode 主表关联字段编码
+     * @param slaveFieldCode 从表外键字段编码
+     * @return 关联关系对象列表
+     */
+    List<MetadataTableRelation> listByTablesAndFields(
+            String mainTableCode,
+            String slaveTableCode,
+            String mainFieldCode,
+            String slaveFieldCode
+    );
 }

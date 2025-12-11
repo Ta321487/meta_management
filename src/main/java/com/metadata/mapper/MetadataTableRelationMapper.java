@@ -47,5 +47,39 @@ public interface MetadataTableRelationMapper {
      * @return 关联关系对象
      */
     MetadataTableRelation selectById(@Param("id") Long id);
+    
+    /**
+     * 根据主表、从表、主字段、从字段的组合来查找关联关系记录
+     * @param mainTableCode 主表编码
+     * @param slaveTableCode 从表编码
+     * @param mainFieldCode 主表关联字段编码
+     * @param slaveFieldCode 从表外键字段编码
+     * @param businessCode 业务系统编码
+     * @return 关联关系对象列表
+     */
+    List<MetadataTableRelation> selectByTablesAndFields(
+            @Param("mainTableCode") String mainTableCode,
+            @Param("slaveTableCode") String slaveTableCode,
+            @Param("mainFieldCode") String mainFieldCode,
+            @Param("slaveFieldCode") String slaveFieldCode,
+            @Param("businessCode") String businessCode
+    );
+    
+    /**
+     * 根据主表、从表、主字段、从字段的组合来查找关联关系记录（默认业务系统）
+     * @param mainTableCode 主表编码
+     * @param slaveTableCode 从表编码
+     * @param mainFieldCode 主表关联字段编码
+     * @param slaveFieldCode 从表外键字段编码
+     * @return 关联关系对象列表
+     */
+    default List<MetadataTableRelation> selectByTablesAndFields(
+            @Param("mainTableCode") String mainTableCode,
+            @Param("slaveTableCode") String slaveTableCode,
+            @Param("mainFieldCode") String mainFieldCode,
+            @Param("slaveFieldCode") String slaveFieldCode
+    ) {
+        return selectByTablesAndFields(mainTableCode, slaveTableCode, mainFieldCode, slaveFieldCode, "DEFAULT");
+    }
 }
 

@@ -51,7 +51,7 @@ export const getRelationsBySlave = (slaveTableCode) => request.get(`/relation/li
 export const getAllRelations = (params) => request.get('/relation/list', { params })
 export const addRelation = (data) => request.post('/relation/add', data)
 export const updateRelation = (data) => request.post('/relation/update', data)
-export const deleteRelation = (data) => request.post('/relation/delete', data)
+export const deleteRelation = (id) => request.delete(`/relation/delete/${id}`)
 export const createForeignKey = (data) => request.post('/relation/createForeignKey', data)
 export const syncForeignKeys = (tableCode) => request.post('/relation/syncForeignKeys', tableCode ? { tableCode } : {})
 

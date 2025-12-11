@@ -5,6 +5,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataField;
+import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.CodeGeneratorService;
@@ -45,6 +46,56 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     private MetadataTableRelationMapper relationMapper;
 
     /**
+     * 从校验规则中提取message字段
+     */
+    private String extractMessageFromValidateRule(String validateRule) {
+        if (validateRule == null || validateRule.trim().isEmpty()) {
+            return null;
+        }
+        try {
+            JSONObject json = JSON.parseObject(validateRule);
+            return json.getString("message");
+        } catch (Exception e) {
+            // 解析失败，忽略
+            return null;
+        }
+    }
+
+    /**
+     * 将message字段合并到最新的校验规则中
+     */
+    private void mergeMessageIntoValidateRule(MetadataField field, MetadataField latestField, String message) {
+        if (message == null || message.isEmpty()) {
+            return;
+        }
+        try {
+            String mergedValidateRule;
+            if (latestField.getValidateRule() != null && !latestField.getValidateRule().trim().isEmpty()) {
+                // 最新的校验规则不为空，合并message字段
+                JSONObject latestJson = JSON.parseObject(latestField.getValidateRule());
+                latestJson.put("message", message);
+                mergedValidateRule = latestJson.toJSONString();
+            } else {
+                // 最新的校验规则为空，直接设置为包含message字段的规则
+                JSONObject messageJson = new JSONObject();
+                messageJson.put("message", message);
+                mergedValidateRule = messageJson.toJSONString();
+            }
+
+            // 更新合并后的校验规则到数据库
+            MetadataField updatedField = new MetadataField();
+            updatedField.setId(latestField.getId());
+            updatedField.setValidateRule(mergedValidateRule);
+            fieldMapper.update(updatedField);
+
+            // 更新当前field对象的校验规则
+            field.setValidateRule(mergedValidateRule);
+        } catch (Exception e) {
+            // 合并失败，忽略
+        }
+    }
+
+    /**
      * 新增字段
      */
     @Override
@@ -71,23 +122,13 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 field.setBusinessCode("DEFAULT");
             }
         }
-        
+
         // 保存原始校验规则的message字段
-        String originalMessage = null;
-        if (field.getValidateRule() != null && !field.getValidateRule().trim().isEmpty()) {
-            try {
-                JSONObject originalJson = JSON.parseObject(field.getValidateRule());
-                if (originalJson.containsKey("message")) {
-                    originalMessage = originalJson.getString("message");
-                }
-            } catch (Exception e) {
-                // 解析失败，忽略
-            }
-        }
-        
+        String originalMessage = extractMessageFromValidateRule(field.getValidateRule());
+
         fieldMapper.insert(field);
         logService.logSuccess("admin", "ADD", "新增字段：" + JSON.toJSONString(field));
-        
+
         // 生成并执行ALTER TABLE ADD COLUMN语句
         try {
             String alterSql = codeGeneratorService.generateAlterTableAddColumnSQL(field.getTableCode(), field);
@@ -100,47 +141,12 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             logService.logError("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN失败", e.getMessage());
             throw new RuntimeException("执行ALTER TABLE ADD COLUMN失败: " + e.getMessage());
         }
-        
+
         // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息）
         MetadataField latestField = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode());
-        
-        // 如果原始校验规则有message字段，且最新的校验规则不为空，合并message字段
-        if (originalMessage != null && !originalMessage.isEmpty() && latestField.getValidateRule() != null && !latestField.getValidateRule().trim().isEmpty()) {
-            try {
-                JSONObject latestJson = JSON.parseObject(latestField.getValidateRule());
-                latestJson.put("message", originalMessage);
-                String mergedValidateRule = latestJson.toJSONString();
-                
-                // 更新合并后的校验规则到数据库
-                MetadataField updatedField = new MetadataField();
-                updatedField.setId(latestField.getId());
-                updatedField.setValidateRule(mergedValidateRule);
-                fieldMapper.update(updatedField);
-                
-                // 更新当前field对象的校验规则，确保后续操作使用合并后的规则
-                field.setValidateRule(mergedValidateRule);
-            } catch (Exception e) {
-                // 合并失败，忽略
-            }
-        } else if (originalMessage != null && !originalMessage.isEmpty()) {
-            // 如果最新的校验规则为空，直接设置为包含message字段的规则
-            try {
-                JSONObject messageJson = new JSONObject();
-                messageJson.put("message", originalMessage);
-                String messageValidateRule = messageJson.toJSONString();
-                
-                // 更新包含message字段的校验规则到数据库
-                MetadataField updatedField = new MetadataField();
-                updatedField.setId(latestField.getId());
-                updatedField.setValidateRule(messageValidateRule);
-                fieldMapper.update(updatedField);
-                
-                // 更新当前field对象的校验规则
-                field.setValidateRule(messageValidateRule);
-            } catch (Exception e) {
-                // 合并失败，忽略
-            }
-        }
+
+        // 合并message字段到最新的校验规则中
+        mergeMessageIntoValidateRule(field, latestField, originalMessage);
     }
 
     /**
@@ -156,32 +162,22 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         field.setId(existing.getId());
         field.setFieldCode(existing.getFieldCode()); // 编码不可修改
         field.setTableCode(existing.getTableCode()); // 表编码不可修改
-        
+
         // 保存原有校验规则的message字段
-        String oldMessage = null;
-        if (existing.getValidateRule() != null && !existing.getValidateRule().trim().isEmpty()) {
-            try {
-                JSONObject oldJson = JSON.parseObject(existing.getValidateRule());
-                if (oldJson.containsKey("message")) {
-                    oldMessage = oldJson.getString("message");
-                }
-            } catch (Exception e) {
-                // 解析失败，忽略
-            }
-        }
-        
+        String oldMessage = extractMessageFromValidateRule(existing.getValidateRule());
+
         // 检查字段名称是否变化以及validate_rule是否变化
         boolean fieldNameChanged = !Objects.equals(existing.getFieldName(), field.getFieldName());
         boolean validateRuleChanged = !Objects.equals(existing.getValidateRule(), field.getValidateRule());
-        
+
         // 如果字段名称变化或validate_rule变化，需要先处理CHECK约束
         if (fieldNameChanged || validateRuleChanged) {
             try {
                 String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
-                
+
                 // 生成旧约束名
                 String oldConstraintName = "ck_" + tableName + "_" + existing.getFieldName();
-                
+
                 // 先删除旧的CHECK约束（如果存在）
                 String dropOldSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + oldConstraintName + "`";
                 // 执行删除旧约束的SQL语句（忽略失败，因为约束可能不存在）
@@ -191,12 +187,12 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "删除旧CHECK约束失败", e.getMessage());
             }
         }
-        
+
         // 生成并执行ALTER TABLE语句
         try {
             String alterSql;
             String operationType;
-            
+
             // 检查字段名称是否发生了变化
             if (fieldNameChanged) {
                 // 字段名称发生了变化，执行CHANGE COLUMN语句
@@ -207,7 +203,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 alterSql = codeGeneratorService.generateAlterTableModifyColumnSQL(field.getTableCode(), field);
                 operationType = "ALTER_TABLE_MODIFY_COLUMN";
             }
-            
+
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                 throw new RuntimeException("执行" + operationType + "失败: " + sqlResult.get("message"));
@@ -217,23 +213,23 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             logService.logError("admin", "ALTER_TABLE_OPERATION", "执行ALTER TABLE操作失败", e.getMessage());
             throw new RuntimeException("执行ALTER TABLE操作失败: " + e.getMessage());
         }
-        
+
         // 如果字段名称变化或validate_rule变化，添加新的CHECK约束
         if (fieldNameChanged || validateRuleChanged) {
             try {
                 String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
-                
+
                 // 生成新的约束名
                 String newConstraintName = "ck_" + tableName + "_" + field.getFieldName();
-                
+
                 // 生成删除新CHECK约束的SQL语句（以防万一，确保没有重复约束）
                 String dropNewSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + newConstraintName + "`";
                 // 执行删除新约束的SQL语句（忽略失败，因为约束可能不存在）
                 sqlExecuteService.executeSql(dropNewSql, true);
-                
+
                 // 生成新的CHECK约束
                 String checkConstraint = codeGeneratorService.generateCheckConstraint(field);
-                
+
                 // 如果有新的CHECK约束，执行添加新CHECK约束的SQL语句
                 if (checkConstraint != null && !checkConstraint.isEmpty()) {
                     String addSql = "ALTER TABLE `" + tableName + "` ADD CONSTRAINT `" + newConstraintName + "` " + checkConstraint;
@@ -249,51 +245,16 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", e.getMessage());
             }
         }
-        
+
         // 更新数据库记录（将ALTER TABLE和CHECK约束操作放在前面，确保syncTableFields先执行）
         fieldMapper.update(field);
         logService.logSuccess("admin", "EDIT", "更新字段：" + JSON.toJSONString(field));
-        
+
         // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息）
         MetadataField latestField = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode());
-        
-        // 如果原有校验规则有message字段，且最新的校验规则不为空，合并message字段
-        if (oldMessage != null && !oldMessage.isEmpty() && latestField.getValidateRule() != null && !latestField.getValidateRule().trim().isEmpty()) {
-            try {
-                JSONObject latestJson = JSON.parseObject(latestField.getValidateRule());
-                latestJson.put("message", oldMessage);
-                String mergedValidateRule = latestJson.toJSONString();
-                
-                // 更新合并后的校验规则到数据库
-                MetadataField updatedField = new MetadataField();
-                updatedField.setId(existing.getId());
-                updatedField.setValidateRule(mergedValidateRule);
-                fieldMapper.update(updatedField);
-                
-                // 更新当前field对象的校验规则，确保后续操作使用合并后的规则
-                field.setValidateRule(mergedValidateRule);
-            } catch (Exception e) {
-                // 合并失败，忽略
-            }
-        } else if (oldMessage != null && !oldMessage.isEmpty()) {
-            // 如果最新的校验规则为空，直接设置为包含message字段的规则
-            try {
-                JSONObject messageJson = new JSONObject();
-                messageJson.put("message", oldMessage);
-                String messageValidateRule = messageJson.toJSONString();
-                
-                // 更新包含message字段的校验规则到数据库
-                MetadataField updatedField = new MetadataField();
-                updatedField.setId(existing.getId());
-                updatedField.setValidateRule(messageValidateRule);
-                fieldMapper.update(updatedField);
-                
-                // 更新当前field对象的校验规则
-                field.setValidateRule(messageValidateRule);
-            } catch (Exception e) {
-                // 合并失败，忽略
-            }
-        }
+
+        // 合并message字段到最新的校验规则中
+        mergeMessageIntoValidateRule(field, latestField, oldMessage);
     }
 
     /**
@@ -306,10 +267,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         if (field == null) {
             throw new RuntimeException("字段不存在");
         }
-        
+
         // 增强主键字段判断：检查formComponent或字段名为id/uuid
         boolean isPrimaryKey = "primary_key".equals(field.getFormComponent()) || "id".equals(field.getFieldName()) || "uuid".equals(field.getFieldName());
-        
+
         // 新增：检查字段是否是数据库中的主键约束字段
         if (!isPrimaryKey) {
             // 获取表的所有约束信息
@@ -318,7 +279,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 // 获取约束类型和字段名
                 String constraintType = (String) constraint.get("constraintType");
                 String columnName = (String) constraint.get("fieldName");
-                
+
                 // 检查是否是主键约束且字段名匹配
                 if ("主键约束".equals(constraintType) && field.getFieldName().equals(columnName)) {
                     isPrimaryKey = true;
@@ -326,17 +287,17 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 }
             }
         }
-        
+
         if (isPrimaryKey) {
             throw new RuntimeException("主键字段不允许删除");
         }
-        
+
         // 检查表中字段数量，不能删除最后一个字段
         Long fieldCount = fieldMapper.countByTableCode(field.getTableCode());
         if (fieldCount <= 1) {
             throw new RuntimeException("不能删除表中最后一个字段");
         }
-        
+
         // 生成并执行ALTER TABLE DROP COLUMN语句
         try {
             String alterSql = codeGeneratorService.generateAlterTableDropColumnSQL(field.getTableCode(), field.getFieldName());
@@ -349,7 +310,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             logService.logError("admin", "ALTER_TABLE_DROP_COLUMN", "执行ALTER TABLE DROP COLUMN失败", e.getMessage());
             throw new RuntimeException("执行ALTER TABLE DROP COLUMN失败: " + e.getMessage());
         }
-        
+
         fieldMapper.deleteById(id);
         logService.logSuccess("admin", "DELETE", "删除字段：" + JSON.toJSONString(field));
     }
@@ -393,22 +354,22 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Override
     public List<Map<String, Object>> getConstraints(String tableCode) {
         List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
-        
+
         // 获取表名
         String tableName = codeGeneratorService.convertToTableName(tableCode);
-        
+
         // 获取所有类型约束
         List<Map<String, Object>> allConstraints = fieldMapper.selectAllConstraints(tableName);
-        
+
         // 将字段按字段名分组，便于查询
         Map<String, MetadataField> fieldMap = new java.util.HashMap<>();
         for (MetadataField field : fields) {
             fieldMap.put(field.getFieldName(), field);
         }
-        
+
         // 构建约束结果列表
         List<Map<String, Object>> result = new java.util.ArrayList<>();
-        
+
         // 处理所有类型约束
         for (Map<String, Object> constraint : allConstraints) {
             // 获取值时使用大写键，与SQL返回的列名一致
@@ -417,28 +378,28 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             String constraintName = (String) constraint.get("CONSTRAINT_NAME");
             String constraintLevel = (String) constraint.get("constraint_level");
             String constraintContent = (String) constraint.get("constraint_content");
-            
+
             // 确保约束类型不为null
             if (constraintType == null) {
                 constraintType = "UNKNOWN";
             }
-            
+
             // 确保约束级别不为null
             if (constraintLevel == null) {
                 constraintLevel = "COLUMN";
             }
-            
+
             // 确保约束内容不为null
             if (constraintContent == null) {
                 constraintContent = constraintName;
             }
-            
+
             // 将约束级别转换为中文显示
             String constraintLevelCn = "COLUMN".equals(constraintLevel) ? "列级" : "表级";
-            
+
             // 构建约束对象
             Map<String, Object> constraintItem = new java.util.HashMap<>();
-            
+
             // 设置约束类型中文名称
             String constraintTypeCn = switch (constraintType) {
                 case "PRIMARY KEY" -> "主键约束";
@@ -448,31 +409,31 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 case "DEFAULT" -> "默认约束";
                 default -> constraintType;
             };
-            
+
             // 查找对应的字段
             MetadataField field = columnName != null ? fieldMap.get(columnName) : null;
-            
+
             // 设置约束基本信息
             constraintItem.put("constraintName", constraintName);
             constraintItem.put("constraintType", constraintTypeCn);
             constraintItem.put("fieldName", columnName != null ? columnName : "");
             constraintItem.put("constraintLevel", constraintLevelCn);
-            
+
             // 设置约束内容
             constraintItem.put("constraintContent", constraintContent);
-            
+
             // 设置表编码
             constraintItem.put("tableCode", tableCode);
-            
+
             // 添加字段相关信息
             if (field != null) {
                 constraintItem.put("id", field.getId());
                 constraintItem.put("fieldCode", field.getFieldCode());
             }
-            
+
             result.add(constraintItem);
         }
-        
+
         return result;
     }
 
@@ -489,10 +450,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         String constraintName = null;
         String fieldName = null;
         String tableCode = null;
-        
+
         // 优先从参数中获取约束名
         constraintName = (String) params.get("constraintName");
-        
+
         if (idObj != null) {
             // 如果有id，则通过id获取字段信息
             Long id = Long.valueOf(idObj.toString());
@@ -503,7 +464,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             tableCode = field.getTableCode();
             tableName = codeGeneratorService.convertToTableName(tableCode);
             fieldName = field.getFieldName();
-            
+
             // 如果没有约束名，则生成默认的检查约束名
             if (constraintName == null) {
                 constraintName = "ck_" + tableName + "_" + fieldName;
@@ -513,17 +474,17 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             tableName = (String) params.get("tableName");
             tableCode = (String) params.get("tableCode");
             fieldName = (String) params.get("fieldName");
-            
+
             // 如果参数中没有表名，则通过表编码转换
             if (tableName == null && tableCode != null) {
                 tableName = codeGeneratorService.convertToTableName(tableCode);
             }
-            
+
             // 如果没有约束名，则生成默认的检查约束名
             if (constraintName == null && tableName != null && fieldName != null) {
                 constraintName = "ck_" + tableName + "_" + fieldName;
             }
-            
+
             // 如果有tableCode和fieldName，则通过tableCode和fieldName获取字段信息
             if (tableCode != null && fieldName != null) {
                 List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
@@ -537,12 +498,12 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 }
             }
         }
-        
+
         // 验证必要参数
         if (tableName == null || constraintName == null) {
             throw new RuntimeException("缺少必要的约束信息");
         }
-        
+
         try {
             // 确定约束类型
             String constraintType = "CHECK";
@@ -551,18 +512,18 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             } else if (constraintName.toUpperCase().startsWith("FK_")) {
                 constraintType = "FOREIGN KEY";
             }
-            
+
             // 禁止删除主键约束
             if (constraintType.equals("PRIMARY KEY")) {
                 throw new RuntimeException("主键约束不能被直接删除，若要修改主键请重新设计表结构");
             }
-            
+
             // 构建删除约束的SQL语句
             String dropSql = "ALTER TABLE `" + tableName + "` DROP " + constraintType + " `" + constraintName + "`";
-            
+
             // 删除数据库中的约束
-            Map<String,Object> result = sqlExecuteService.executeSql(dropSql, true);
-            
+            Map<String, Object> result = sqlExecuteService.executeSql(dropSql, true);
+
             // 如果有字段信息，则将validate_rule设置为空
             if (field != null) {
                 // 查询完整的字段信息，避免更新时丢失其他字段值
@@ -584,27 +545,17 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                     fieldMapper.update(updateField);
                 }
             }
-            
+
             logService.logSuccess("admin", "DELETE_CONSTRAINT", "删除约束成功: " + constraintName);
-            
+
             // 如果删除的是外键约束，同时删除对应的关联关系记录
-            if (constraintType.equals("FOREIGN KEY") && tableCode != null && fieldName != null) {
-                // 根据从表编码和字段名，查找并删除对应的关联关系记录
-                // 查找作为从表的关联关系
-                List<Map<String, Object>> relationsToDelete = new ArrayList<>();
-                
-                // 获取该表作为从表的所有关联关系
-                List<com.metadata.entity.MetadataTableRelation> slaveRelations = relationMapper.selectBySlaveTableCode(tableCode);
-                if (slaveRelations != null && !slaveRelations.isEmpty()) {
-                    for (com.metadata.entity.MetadataTableRelation relation : slaveRelations) {
-                        // 获取从表字段信息
-                        MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
-                        if (slaveField != null && slaveField.getFieldName().equals(fieldName)) {
-                            // 找到了匹配的关联关系，添加到待删除列表
-                            relationMapper.deleteById(relation.getId());
-                            logService.logSuccess("admin", "DELETE", "删除关联关系: " + relation.getRelationCode());
-                        }
-                    }
+            if (constraintType.equals("FOREIGN KEY")) {
+                // 根据外键约束名（即关联编码）查找并删除对应的关联关系记录
+                // 外键约束名 = 关联编码
+                MetadataTableRelation relation = relationMapper.selectByCode(constraintName);
+                if (relation != null) {
+                    relationMapper.deleteById(relation.getId());
+                    logService.logSuccess("admin", "DELETE", "删除关联关系: " + relation.getRelationCode());
                 }
             }
         } catch (Exception e) {
@@ -632,7 +583,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         if (tableCodes == null || tableCodes.isEmpty()) {
             throw new RuntimeException("表编码列表不能为空");
         }
-        
+
         fieldMapper.batchUpdateFieldsBusinessSystem(tableCodes, businessCode);
         logService.logSuccess("admin", "EDIT", "批量更新表字段业务系统：" + tableCodes + " -> " + businessCode);
     }

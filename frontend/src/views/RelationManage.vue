@@ -366,7 +366,7 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await deleteRelation({ id: row.id })
+          await deleteRelation(row.id)
           ElMessage.success('删除成功')
           loadRelations()
         } catch (error) {

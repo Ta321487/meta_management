@@ -574,6 +574,16 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                     continue;
                 }
                 
+                // 检查是否已经存在由用户手动创建的关联关系记录（根据主表、从表、主字段、从字段的组合）
+                System.out.println("检查是否已存在关联关系记录: 主表 = " + mainTableCode + ", 从表 = " + slaveTableCode + ", 主字段 = " + mainField.getFieldCode() + ", 从字段 = " + slaveField.getFieldCode());
+                List<MetadataTableRelation> existingRelations = relationMapper.selectByTablesAndFields(
+                        mainTableCode, slaveTableCode, mainField.getFieldCode(), slaveField.getFieldCode(), businessCode);
+                if (existingRelations != null && !existingRelations.isEmpty()) {
+                    // 已存在由用户手动创建的关联关系记录，跳过自动生成
+                    System.out.println("已存在关联关系记录，跳过自动生成: " + existingRelations);
+                    continue;
+                }
+                
                 // 创建关联关系
                 MetadataTableRelation relation = new MetadataTableRelation();
                 relation.setRelationCode(relationCode);
