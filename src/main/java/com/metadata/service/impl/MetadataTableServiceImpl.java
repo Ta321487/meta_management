@@ -148,8 +148,17 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             throw new RuntimeException("主键生成策略不允许修改，请删除表后重新创建");
         }
         
+        // 检查业务系统是否变更
+        boolean businessSystemChanged = table.getBusinessCode() != null && !table.getBusinessCode().equals(existing.getBusinessCode());
+        
         // 更新元数据记录
         tableMapper.update(table);
+        
+        // 如果业务系统发生变化，更新表的所有字段的业务系统
+        if (businessSystemChanged) {
+            // 调用updateTableBusinessSystem方法更新表和字段的业务系统
+            updateTableBusinessSystem(table.getTableCode(), table.getBusinessCode());
+        }
         
         // 如果表名或描述发生变化，更新数据库表的注释（通过ALTER TABLE COMMENT）
         // 注意：这里只更新注释，不执行其他ALTER TABLE操作（如DROP COLUMN等危险操作）

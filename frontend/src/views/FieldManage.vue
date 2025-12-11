@@ -5,7 +5,7 @@
         <div class="card-header">
           <span>字段管理</span>
           <div>
-            <el-select v-model="selectedTableCode" placeholder="请选择表" style="width: 200px; margin-right: 10px" @change="loadFields">
+            <el-select v-model="selectedTableCode" placeholder="请选择表" style="width: 200px; margin-right: 10px" @change="handleTableChange">
               <el-option
                 v-for="table in tables"
                 :key="table.tableCode"
@@ -176,6 +176,16 @@
             <el-option label="文本域" value="textarea" />
           </el-select>
         </el-form-item>
+        <el-form-item label="业务系统" prop="businessCode">
+          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="校验规则" prop="validateRule">
           <json-editor
             v-model="form.validateRule"
@@ -228,7 +238,7 @@
 <script>
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField, getConstraintList, deleteConstraint } from '../api'
+import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField, getConstraintList, deleteConstraint, getBusinessSystemList } from '../api'
 import JsonEditor from '../components/JsonEditor'
 
 export default {
@@ -239,7 +249,9 @@ export default {
   setup() {
     const tables = ref([])
     const fieldData = ref([])
+    const businessSystems = ref([])
     const selectedTableCode = ref('')
+    const currentTableBusinessCode = ref('')
     const loading = ref(false)
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增字段')
@@ -267,7 +279,8 @@ export default {
       formComponent: 'input',
       validateRule: '',
       sort: 0,
-      isEnabled: 1
+      isEnabled: 1,
+      businessCode: ''
     })
     
     // 监听字段名称变化，当字段名为'id'或'uuid'时自动设置排序号为0和表单组件为primary_key
@@ -429,6 +442,18 @@ export default {
       formComponent: [{ required: true, message: '请选择表单组件', trigger: 'change' }]
     }
 
+    // 加载业务系统列表
+    const loadBusinessSystems = async () => {
+      try {
+        const res = await getBusinessSystemList({})
+        if (res.code === 200) {
+          businessSystems.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载业务系统列表失败')
+      }
+    }
+
     const loadTables = async () => {
       try {
         const res = await getTableList({})
@@ -438,6 +463,20 @@ export default {
         }
       } catch (error) {
         ElMessage.error('加载表列表失败')
+      }
+    }
+
+    // 获取当前表的业务系统
+    const getCurrentTableBusinessCode = () => {
+      if (!selectedTableCode.value) {
+        currentTableBusinessCode.value = ''
+        return
+      }
+      const table = tables.value.find(t => t.tableCode === selectedTableCode.value)
+      if (table) {
+        currentTableBusinessCode.value = table.businessCode || ''
+      } else {
+        currentTableBusinessCode.value = ''
       }
     }
 
@@ -483,6 +522,12 @@ export default {
       }
     }
 
+    // 处理表选择变化
+    const handleTableChange = () => {
+      getCurrentTableBusinessCode()
+      loadFields()
+    }
+
     const handleSizeChange = (val) => {
       pagination.size = val
       pagination.current = 1
@@ -521,7 +566,8 @@ export default {
         isRequired: 0,
         formComponent: 'input',
         validateRule: '',
-        sort: newSort // 默认为计算的排序号
+        sort: newSort, // 默认为计算的排序号
+        businessCode: currentTableBusinessCode.value // 默认为当前表的业务系统
       })
       
       // 重置类型参数
@@ -548,7 +594,8 @@ export default {
         isRequired: row.isRequired,
         formComponent: row.formComponent,
         validateRule: row.validateRule || '',
-        sort: row.sort
+        sort: row.sort,
+        businessCode: row.businessCode || '' // 设置当前字段的业务系统
       })
       
       // 解析字段类型，自动填充baseFieldType和typeParams
@@ -591,6 +638,24 @@ export default {
           
           if (!hasOtherPrimaryKey) {
             ElMessage.error('当前表必须有且只有一个主键字段，无法将唯一的主键字段修改为非主键字段')
+            return
+          }
+        }
+        
+        // 检查业务系统是否被修改
+        if (originalField && originalField.businessCode !== form.businessCode) {
+          // 添加业务系统修改提示
+          try {
+            await ElMessageBox.confirm(
+              '修改字段的业务系统可能会影响关联数据，确定要继续吗？',
+              '提示',
+              {
+                confirmButtonText: '确定',
+                cancelButtonText: '取消',
+                type: 'warning'
+              }
+            )
+          } catch (error) {
             return
           }
         }
@@ -863,12 +928,15 @@ export default {
 
     onMounted(() => {
       loadTables()
+      loadBusinessSystems()
     })
 
     return {
       tables,
       fieldData,
+      businessSystems,
       selectedTableCode,
+      currentTableBusinessCode,
       loading,
       dialogVisible,
       dialogTitle,
@@ -896,6 +964,7 @@ export default {
       handleDialogClose,
       handleSelectionChange,
       handleBatchDelete,
+      handleTableChange,
       // 约束相关方法
       handleViewConstraints,
       loadConstraints,
