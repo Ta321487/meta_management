@@ -319,7 +319,7 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await deleteTable({ id: row.id })
+          await deleteTable(row.id)
           ElMessage.success('删除成功')
           loadData()
         } catch (error) {

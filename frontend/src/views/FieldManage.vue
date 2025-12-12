@@ -757,7 +757,7 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await deleteField({ id: row.id })
+          await deleteField(row.id)
           ElMessage.success('删除成功')
           loadFields()
         } catch (error) {

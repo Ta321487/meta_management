@@ -78,13 +78,14 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
     /**
      * 同步数据库表字段到元数据系统
      */
-    @Transactional
     @Override
     public void syncTableFields(String tableName, Connection connection) throws Exception {
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_START, "开始同步表字段: " + tableName);
-        DatabaseMetaData metaData = connection.getMetaData();
-        String catalog = connection.getCatalog();
-        String schema = connection.getSchema();
+        // 使用新的连接，确保能看到最新的表结构
+        try (Connection newConnection = dataSource.getConnection()) {
+            DatabaseMetaData metaData = newConnection.getMetaData();
+            String catalog = newConnection.getCatalog();
+            String schema = newConnection.getSchema();
         
         // 查找对应的表编码（通过表名匹配，表名可能是表编码或实际表名）
         MetadataTable table = tableMapper.selectByCode(tableName.toUpperCase());
@@ -195,7 +196,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         
         // 使用 SHOW COLUMNS 获取表结构（直接查询数据库，确保获取最新字段信息）
         Map<String, MetadataField> physicalFields = new HashMap<>();
-        try (Statement stmt = connection.createStatement()) {
+        try (Statement stmt = newConnection.createStatement()) {
             String columnsSql = "SHOW FULL COLUMNS FROM `" + tableName + "`";
             ResultSet columns = stmt.executeQuery(columnsSql);
             int sort = 0;
@@ -236,7 +237,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 field.setFieldName(columnName);
                 field.setFieldType(fieldType);
                 field.setLabel(comments != null && !comments.isEmpty() ? comments : columnName);
-                field.setBusinessCode("DEFAULT"); // 设置默认业务系统编码
+                field.setBusinessCode(table.getBusinessCode()); // 使用表的业务系统编码
                 
                 // 判断是否是自增主键
                 boolean isAutoIncrementPk = (autoIncrementPkColumn != null && 
@@ -427,6 +428,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         }
         
         // 2. 删除物理表中不存在的字段
+        // 注意：仅删除已启用的字段，避免删除刚刚插入的未启用字段
         for (MetadataField existingField : existingFields) {
             String fieldCode = existingField.getFieldCode();
             if (!physicalFields.containsKey(fieldCode)) {
@@ -436,6 +438,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
             }
         }
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_END, "表字段同步完成: " + tableName);
+        }
     }
     
     /**

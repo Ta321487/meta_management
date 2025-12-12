@@ -58,7 +58,6 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
      * @param skipSafetyCheck 是否跳过安全检查
      * @return 执行结果
      */
-    @Transactional
     private Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck) {
         Map<String, Object> result = new HashMap<>();
         
@@ -241,7 +240,6 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
      * @return 执行结果
      */
     @Override
-    @Transactional
     public Map<String, Object> executeSql(String sql) {
         return executeSqlInternal(sql, false);
     }
@@ -253,7 +251,6 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
      * @return 执行结果
      */
     @Override
-    @Transactional
     public Map<String, Object> executeSql(String sql, boolean skipSafetyCheck) {
         return executeSqlInternal(sql, skipSafetyCheck);
     }

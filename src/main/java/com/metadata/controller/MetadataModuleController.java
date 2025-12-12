@@ -34,7 +34,7 @@ public class MetadataModuleController {
     @Operation(summary = "新增模块", description = "添加新的元数据模块")
     public Result<?> add(@Parameter(description = "模块请求信息") @RequestBody ModuleRequest request) {
         try {
-            moduleService.add(request.getModule(), request.getTableCodes());
+            moduleService.add(request.toMetadataModule(), request.getTableCodes());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -48,7 +48,7 @@ public class MetadataModuleController {
     @Operation(summary = "更新模块", description = "更新元数据模块信息")
     public Result<?> update(@Parameter(description = "模块请求信息") @RequestBody ModuleRequest request) {
         try {
-            moduleService.update(request.getModule(), request.getTableCodes());
+            moduleService.update(request.toMetadataModule(), request.getTableCodes());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

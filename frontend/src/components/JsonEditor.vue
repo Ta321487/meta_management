@@ -216,7 +216,7 @@ export default {
         key: 'phone',
         title: '手机号格式验证',
         description: '验证手机号格式是否正确',
-        code: '{"pattern": "^1[3-9]\\d{9}$", "message": "请输入正确的手机号", "trigger": "blur"}'
+        code: '{"pattern": "^1[3-9]\\\\d{9}$", "message": "请输入正确的手机号", "trigger": "blur"}'
       },
       {
         key: 'url',
@@ -234,13 +234,13 @@ export default {
         key: 'regexp',
         title: '正则表达式验证',
         description: '使用正则表达式验证输入格式',
-        code: '{"pattern": "^\\w{4,20}$", "message": "只能包含字母数字下划线，长度4-20位", "trigger": "blur"}'
+        code: '{"pattern": "^\\\\w{4,20}$", "message": "只能包含字母数字下划线，长度4-20位", "trigger": "blur"}'
       },
       {
         key: 'password_strength',
         title: '密码强度验证',
         description: '验证密码强度，要求包含大小写字母和数字',
-        code: '{"pattern": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)[a-zA-Z\\d@$!%*?&]{8,}$", "message": "密码至少8位，包含大小写字母和数字", "trigger": "blur"}'
+        code: '{"pattern": "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\\\d)[a-zA-Z\\\\d@$!%*?&]{8,}$", "message": "密码至少8位，包含大小写字母和数字", "trigger": "blur"}'
       }
     ])
     

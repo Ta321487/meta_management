@@ -426,7 +426,7 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await deleteModule({ id: row.id })
+          await deleteModule(row.id)
           ElMessage.success('删除成功')
           loadData()
         } catch (error) {

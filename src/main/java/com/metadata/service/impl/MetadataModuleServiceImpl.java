@@ -53,6 +53,10 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     @Override
     @Transactional
     public void add(MetadataModule module, List<String> tableCodes) {
+        // 校验模块对象是否为null
+        if (module == null) {
+            throw new RuntimeException("模块对象不能为空");
+        }
         // 校验编码
         if (!CodeValidator.isValidCode(module.getModuleCode())) {
             throw new RuntimeException("模块编码格式不正确");
@@ -211,18 +215,18 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         if (module == null) {
             throw new RuntimeException("模块不存在");
         }
-        
+
         // 更新模块的业务系统
         module.setBusinessCode(businessCode);
         moduleMapper.update(module);
-        
+
         // 获取模块关联的表
         List<String> tableCodes = moduleTableMapper.selectTableCodesByModuleCode(moduleCode);
         if (tableCodes != null && !tableCodes.isEmpty()) {
             // 批量更新表的业务系统
             tableService.batchUpdateTableBusinessSystem(tableCodes, businessCode);
         }
-        
+
         logService.logSuccess("admin", "EDIT", "更新模块业务系统：" + moduleCode + " -> " + businessCode);
     }
 
@@ -235,7 +239,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         if (moduleCodes == null || moduleCodes.isEmpty()) {
             throw new RuntimeException("模块编码列表不能为空");
         }
-        
+
         for (String moduleCode : moduleCodes) {
             updateModuleBusinessSystem(moduleCode, businessCode);
         }
@@ -257,9 +261,14 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
      */
     private void createDefaultFunctionNodes(MetadataModule module, List<String> tableCodes) {
         try {
+            // 校验模块对象是否为null
+            if (module == null) {
+                logService.logError("admin", "ADD", "创建功能节点失败：模块对象不能为空", "模块对象为null");
+                return;
+            }
             // 记录开始创建节点的日志
             logService.logSuccess("admin", "ADD", "开始创建功能节点，模块：" + module.getModuleCode() + "，关联表数量：" + (tableCodes == null ? 0 : tableCodes.size()));
-            
+
             if (tableCodes == null || tableCodes.isEmpty()) {
                 logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "关联表列表为空");
                 return;
@@ -271,13 +280,13 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                 logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "模块类型为空");
                 return;
             }
-            
+
             MetadataModuleType moduleType = moduleTypeService.getByCode(moduleTypeCode);
             if (moduleType == null) {
                 logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "模块类型不存在：" + moduleTypeCode);
                 return;
             }
-            
+
             List<String> defaultNodes = moduleType.getDefaultNodes();
             if (defaultNodes == null || defaultNodes.isEmpty()) {
                 logService.logError("admin", "ADD", "创建功能节点失败：" + module.getModuleCode(), "模块类型未配置默认节点：" + moduleTypeCode);
@@ -287,7 +296,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
             // 解析默认节点类型
             String[] nodeTypes = defaultNodes.toArray(new String[0]);
             logService.logSuccess("admin", "ADD", "解析节点类型，模块：" + module.getModuleCode() + "，节点类型数量：" + nodeTypes.length);
-            
+
             // 节点类型到中文名称的映射
             Map<String, String> nodeTypeNameMap = new HashMap<>();
             nodeTypeNameMap.put("LIST_PAGE", "列表页");
@@ -331,7 +340,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                     try {
                         // 生成节点编码：{MODULE_CODE}_{TABLE_CODE}_{NODE_TYPE}
                         String nodeCode = module.getModuleCode() + "_" + tableCode + "_" + nodeType;
-                        
+
                         // 检查节点是否已存在
                         MetadataFunctionNode existing = functionNodeMapper.selectByCode(module.getModuleCode(), nodeCode);
                         if (existing != null) {
@@ -349,11 +358,12 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                         node.setModuleCode(module.getModuleCode());
                         node.setNodeType(nodeType);
                         node.setRelatedTableCode(tableCode);
+                        node.setBusinessCode(module.getBusinessCode());
                         // 生成默认跳转关系，方便路由生成器和前端集成
                         // 使用模块的routePath作为基础路径，如果模块没有设置，则使用默认规则
                         String modulePath = module.getRoutePath();
                         String pathBase;
-                        
+
                         if (modulePath != null && !modulePath.trim().isEmpty()) {
                             // 如果模块设置了路由路径，使用模块路径作为基础
                             pathBase = modulePath.startsWith("/") ? modulePath.substring(1) : modulePath;
@@ -361,8 +371,8 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                             // 否则使用默认约定路径：小写表名
                             pathBase = tableCode == null ? "" : tableCode.toLowerCase().replace("_table", "");
                         }
-                        
-                        if (nodeType != null && nodeType.toUpperCase().contains("LIST")) {
+
+                        if (nodeType.toUpperCase().contains("LIST")) {
                             node.setJumpRelation("/" + pathBase + "/list");
                         } else if (nodeType != null && nodeType.toUpperCase().contains("FORM")) {
                             node.setJumpRelation("/" + pathBase + "/form/:id?");
@@ -388,7 +398,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                     }
                 }
             }
-            
+
             // 记录创建结果
             logService.logSuccess("admin", "ADD", "功能节点创建完成，模块：" + module.getModuleCode() + "，成功创建：" + totalCreated + "个节点");
         } catch (Exception e) {

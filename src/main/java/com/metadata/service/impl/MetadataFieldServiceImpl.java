@@ -116,7 +116,13 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             // 从表中获取业务系统编码
             MetadataField existingField = fieldMapper.selectByTableCode(field.getTableCode()).stream().findFirst().orElse(null);
             if (existingField != null) {
-                field.setBusinessCode(existingField.getBusinessCode());
+                String existingBusinessCode = existingField.getBusinessCode();
+                // 确保从现有字段获取的businessCode不为null或空字符串
+                if (existingBusinessCode == null || existingBusinessCode.isEmpty()) {
+                    field.setBusinessCode("DEFAULT");
+                } else {
+                    field.setBusinessCode(existingBusinessCode);
+                }
             } else {
                 // 如果没有现有字段，使用默认业务系统编码
                 field.setBusinessCode("DEFAULT");

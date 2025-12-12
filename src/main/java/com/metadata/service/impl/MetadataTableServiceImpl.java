@@ -62,9 +62,9 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (tableMapper.countByCode(table.getTableCode()) > 0) {
             throw new RuntimeException("表编码已存在");
         }
-        // 确保businessCode不为null，使用空字符串作为默认值
-        if (table.getBusinessCode() == null) {
-            table.setBusinessCode("");
+        // 确保businessCode不为null，使用DEFAULT作为默认值
+        if (table.getBusinessCode() == null || table.getBusinessCode().isEmpty()) {
+            table.setBusinessCode("DEFAULT");
         }
         // 先创建元数据记录
         tableMapper.insert(table);
