@@ -5,7 +5,9 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.common.UpdateSortRequest;
 import com.metadata.entity.MetadataFunctionNode;
+import com.metadata.entity.MetadataModule;
 import com.metadata.service.MetadataFunctionNodeService;
+import com.metadata.service.MetadataModuleService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -22,6 +24,9 @@ public class MetadataFunctionNodeController {
 
     @Autowired
     private MetadataFunctionNodeService nodeService;
+    
+    @Autowired
+    private MetadataModuleService moduleService;
 
     @PostMapping("/add")
     public Result<?> add(@RequestBody MetadataFunctionNode node) {
@@ -57,16 +62,27 @@ public class MetadataFunctionNodeController {
     public Result<?> listByModuleCode(@PathVariable String moduleCode,
                                       @RequestParam(required = false) Integer current,
                                       @RequestParam(required = false) Integer size) {
+        // 获取模块信息，用于获取业务系统编码
+        MetadataModule module = moduleService.getByCode(moduleCode);
+        String businessCode = "DEFAULT"; // 默认业务系统
+        
+        // 如果模块存在，使用模块的业务系统编码
+        if (module != null && module.getBusinessCode() != null) {
+            businessCode = module.getBusinessCode();
+        }
+        
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataFunctionNode> pageResult = nodeService.pageByModuleCode(moduleCode, pageRequest);
+            // 使用带业务系统参数的分页查询方法
+            PageResult<MetadataFunctionNode> pageResult = nodeService.pageByModuleCodeAndBusinessCode(moduleCode, businessCode, pageRequest);
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataFunctionNode> list = nodeService.listByModuleCode(moduleCode);
+        // 使用带业务系统参数的查询方法
+        List<MetadataFunctionNode> list = nodeService.listByModuleCodeAndBusinessCode(moduleCode, businessCode);
         return Result.success(list);
     }
 

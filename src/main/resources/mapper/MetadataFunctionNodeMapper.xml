@@ -59,46 +59,51 @@
     </delete>
 
     <select id="selectByCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_function_node 
-        WHERE module_code = #{moduleCode} AND node_code = #{nodeCode}
+        SELECT fn.* FROM metadata_function_node fn
+        JOIN metadata_module m ON fn.module_code = m.module_code AND m.status = 1
+        WHERE fn.module_code = #{moduleCode} AND fn.node_code = #{nodeCode}
         <if test="businessCode != null and businessCode != ''">
-            AND business_code = #{businessCode}
+            AND fn.business_code = #{businessCode}
         </if>
     </select>
 
     <select id="selectByModuleCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_function_node 
-        WHERE module_code = #{moduleCode}
+        SELECT fn.* FROM metadata_function_node fn
+        JOIN metadata_module m ON fn.module_code = m.module_code AND m.status = 1
+        WHERE fn.module_code = #{moduleCode}
         <if test="businessCode != null and businessCode != ''">
-            AND business_code = #{businessCode}
+            AND fn.business_code = #{businessCode}
         </if>
-        ORDER BY sort ASC, create_time ASC
+        ORDER BY fn.sort ASC, fn.create_time ASC
     </select>
 
     <select id="selectByRelatedTableCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_function_node
-        WHERE related_table_code = #{relatedTableCode}
+        SELECT fn.* FROM metadata_function_node fn
+        JOIN metadata_module m ON fn.module_code = m.module_code AND m.status = 1
+        WHERE fn.related_table_code = #{relatedTableCode}
         <if test="businessCode != null and businessCode != ''">
-            AND business_code = #{businessCode}
+            AND fn.business_code = #{businessCode}
         </if>
-        ORDER BY sort ASC, create_time ASC
+        ORDER BY fn.sort ASC, fn.create_time ASC
     </select>
 
     <select id="countByModuleCode" resultType="Long">
-        SELECT COUNT(*) FROM metadata_function_node 
-        WHERE module_code = #{moduleCode}
+        SELECT COUNT(*) FROM metadata_function_node fn
+        JOIN metadata_module m ON fn.module_code = m.module_code AND m.status = 1
+        WHERE fn.module_code = #{moduleCode}
         <if test="businessCode != null and businessCode != ''">
-            AND business_code = #{businessCode}
+            AND fn.business_code = #{businessCode}
         </if>
     </select>
 
     <select id="selectPageByModuleCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_function_node 
-        WHERE module_code = #{moduleCode}
+        SELECT fn.* FROM metadata_function_node fn
+        JOIN metadata_module m ON fn.module_code = m.module_code AND m.status = 1
+        WHERE fn.module_code = #{moduleCode}
         <if test="businessCode != null and businessCode != ''">
-            AND business_code = #{businessCode}
+            AND fn.business_code = #{businessCode}
         </if>
-        ORDER BY sort ASC, create_time ASC
+        ORDER BY fn.sort ASC, fn.create_time ASC
         LIMIT #{pageRequest.offset}, #{pageRequest.size}
     </select>
 

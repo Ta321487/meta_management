@@ -50,7 +50,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     @Override
     @Transactional
     public void update(MetadataFunctionNode node) {
-        MetadataFunctionNode existing = nodeMapper.selectByCode(node.getModuleCode(), node.getNodeCode());
+        MetadataFunctionNode existing = nodeMapper.selectByCode(node.getModuleCode(), node.getNodeCode(), node.getBusinessCode());
         if (existing == null) {
             throw new RuntimeException("节点不存在");
         }
@@ -76,6 +76,14 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     public List<MetadataFunctionNode> listByModuleCode(String moduleCode) {
         return nodeMapper.selectByModuleCode(moduleCode);
     }
+    
+    /**
+     * 查询模块的所有节点（支持业务系统）
+     */
+    @Override
+    public List<MetadataFunctionNode> listByModuleCodeAndBusinessCode(String moduleCode, String businessCode) {
+        return nodeMapper.selectByModuleCode(moduleCode, businessCode);
+    }
 
     /**
      * 分页查询模块的节点
@@ -84,6 +92,16 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     public PageResult<MetadataFunctionNode> pageByModuleCode(String moduleCode, PageRequest pageRequest) {
         Long total = nodeMapper.countByModuleCode(moduleCode);
         List<MetadataFunctionNode> records = nodeMapper.selectPageByModuleCode(moduleCode, pageRequest);
+        return new PageResult<>(total, records);
+    }
+    
+    /**
+     * 分页查询模块的节点（支持业务系统）
+     */
+    @Override
+    public PageResult<MetadataFunctionNode> pageByModuleCodeAndBusinessCode(String moduleCode, String businessCode, PageRequest pageRequest) {
+        Long total = nodeMapper.countByModuleCode(moduleCode, businessCode);
+        List<MetadataFunctionNode> records = nodeMapper.selectPageByModuleCode(moduleCode, businessCode, pageRequest);
         return new PageResult<>(total, records);
     }
 

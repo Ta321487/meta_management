@@ -4,7 +4,15 @@
       <template #header>
         <div class="card-header">
           <span>功能节点管理</span>
-          <div>
+          <div class="header-selectors">
+            <el-select v-model="selectedBusinessCode" placeholder="请选择业务系统" style="width: 200px; margin-right: 10px" @change="loadNodes">
+              <el-option
+                v-for="businessSystem in businessSystems"
+                :key="businessSystem.businessCode"
+                :label="businessSystem.businessName"
+                :value="businessSystem.businessCode"
+              />
+            </el-select>
             <el-select v-model="selectedModuleCode" placeholder="请选择模块" style="width: 200px; margin-right: 10px" @change="loadNodes">
               <el-option
                 v-for="module in modules"
@@ -182,6 +190,7 @@ export default {
     const businessSystems = ref([])
     const nodeData = ref([])
     const selectedModuleCode = ref('')
+    const selectedBusinessCode = ref('')
     const loading = ref(false)
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增节点')
@@ -205,7 +214,8 @@ export default {
       isMenuVisible: 1,
       icon: '',
       sort: 0,
-      isEnabled: 1
+      isEnabled: 1,
+      businessCode: ''
     })
     const rules = {
       nodeCode: [{ required: true, message: '请输入节点编码', trigger: 'blur' }],
@@ -215,7 +225,10 @@ export default {
 
     const loadModules = async () => {
       try {
-        const res = await getModuleList({})
+        const params = {
+          businessCode: selectedBusinessCode.value || ''
+        }
+        const res = await getModuleList(params)
         if (res.code === 200) {
           modules.value = res.data
         }
@@ -301,7 +314,8 @@ export default {
         isMenuVisible: 1,
         icon: '',
         sort: 0,
-        isEnabled: 1
+        isEnabled: 1,
+        businessCode: selectedBusinessCode.value
       })
       showIconSelector.value = false
       dialogVisible.value = true
@@ -322,7 +336,8 @@ export default {
         isMenuVisible: row.isMenuVisible || 1,
         icon: row.icon || '',
         sort: row.sort,
-        isEnabled: row.isEnabled
+        isEnabled: row.isEnabled,
+        businessCode: row.businessCode || ''
       })
       showIconSelector.value = false
       dialogVisible.value = true
@@ -413,6 +428,7 @@ export default {
       businessSystems,
       nodeData,
       selectedModuleCode,
+      selectedBusinessCode,
       loading,
       dialogVisible,
       dialogTitle,
@@ -445,6 +461,12 @@ export default {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-selectors {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .icon-select-wrapper {

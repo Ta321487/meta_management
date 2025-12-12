@@ -5,8 +5,10 @@ import com.alibaba.fastjson2.JSONObject;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataField;
+import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
+import com.metadata.mapper.MetadataTableMapper;
 import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.CodeGeneratorService;
 import com.metadata.service.MetadataFieldService;
@@ -44,6 +46,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
     @Autowired
     private MetadataTableRelationMapper relationMapper;
+    
+    @Autowired
+    private MetadataTableMapper tableMapper;
 
     /**
      * 从校验规则中提取message字段
@@ -511,12 +516,35 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         }
 
         try {
-            // 确定约束类型
-            String constraintType = "CHECK";
-            if (constraintName.equalsIgnoreCase("PRIMARY")) {
-                constraintType = "PRIMARY KEY";
-            } else if (constraintName.toUpperCase().startsWith("FK_")) {
-                constraintType = "FOREIGN KEY";
+            // 确定约束类型：先查询数据库获取实际约束类型
+            String constraintType = null;
+            // 直接拼接SQL，确保表名和约束名的安全性
+            String querySql = "SELECT constraint_type FROM information_schema.table_constraints " +
+                    "WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' AND constraint_name = '" + constraintName + "'";
+            
+            // 执行查询获取约束类型
+            Map<String, Object> typeResult = sqlExecuteService.executeSql(querySql, false);
+            if (typeResult != null && Boolean.TRUE.equals(typeResult.get("success"))) {
+                List<Map<String, Object>> rows = (List<Map<String, Object>>) typeResult.get("data");
+                if (rows != null && !rows.isEmpty()) {
+                    constraintType = (String) rows.get(0).get("CONSTRAINT_TYPE");
+                }
+            }
+            
+            // 如果查询失败或未获取到约束类型，则使用原有的约束名前缀判断逻辑
+            if (constraintType == null) {
+                if (constraintName.equalsIgnoreCase("PRIMARY")) {
+                    constraintType = "PRIMARY KEY";
+                } else if (constraintName.toUpperCase().startsWith("FK_")) {
+                    constraintType = "FOREIGN KEY";
+                } else if (constraintName.toUpperCase().startsWith("CK_")) {
+                    constraintType = "CHECK";
+                } else if (constraintName.toUpperCase().startsWith("UK_")) {
+                    constraintType = "UNIQUE";
+                } else {
+                    // 默认为CHECK约束
+                    constraintType = "CHECK";
+                }
             }
 
             // 禁止删除主键约束
@@ -556,12 +584,42 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
             // 如果删除的是外键约束，同时删除对应的关联关系记录
             if (constraintType.equals("FOREIGN KEY")) {
+                // 获取表的业务系统编码
+                String businessCode = "DEFAULT";
+                if (tableCode != null) {
+                    // 如果有tableCode，直接查询表的业务系统编码
+                    MetadataTable table = tableMapper.selectByCode(tableCode);
+                    if (table != null) {
+                        businessCode = table.getBusinessCode();
+                    }
+                } else if (tableName != null) {
+                    // 否则，通过表名查询表的业务系统编码
+                    List<MetadataTable> tables = tableMapper.selectAll(null);
+                    for (MetadataTable t : tables) {
+                        if (tableName.equalsIgnoreCase(codeGeneratorService.convertToTableName(t.getTableCode())) || 
+                            tableName.equalsIgnoreCase(t.getTableCode())) {
+                            businessCode = t.getBusinessCode();
+                            break;
+                        }
+                    }
+                }
+                
                 // 根据外键约束名（即关联编码）查找并删除对应的关联关系记录
-                // 外键约束名 = 关联编码
-                MetadataTableRelation relation = relationMapper.selectByCode(constraintName);
+                // 使用正确的业务系统编码
+                MetadataTableRelation relation = relationMapper.selectByCode(constraintName, businessCode);
                 if (relation != null) {
                     relationMapper.deleteById(relation.getId());
                     logService.logSuccess("admin", "DELETE", "删除关联关系: " + relation.getRelationCode());
+                } else {
+                    // 如果找不到，尝试使用所有业务系统编码查找
+                    List<MetadataTableRelation> allRelations = relationMapper.selectAll();
+                    for (MetadataTableRelation rel : allRelations) {
+                        if (constraintName.equals(rel.getRelationCode())) {
+                            relationMapper.deleteById(rel.getId());
+                            logService.logSuccess("admin", "DELETE", "删除关联关系: " + rel.getRelationCode());
+                            break;
+                        }
+                    }
                 }
             }
         } catch (Exception e) {

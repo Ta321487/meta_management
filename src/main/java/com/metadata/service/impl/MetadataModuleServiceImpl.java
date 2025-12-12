@@ -107,12 +107,14 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
             for (String tableCode : tableCodes) {
                 if (CodeValidator.isValidCode(tableCode)) {
                     moduleTableMapper.insert(new com.metadata.entity.MetadataModuleTable() {{
-                        setModuleCode(existing.getModuleCode());
+                        setModuleCode(module.getModuleCode());
                         setTableCode(tableCode);
                     }});
                 }
             }
         }
+        // 调用创建默认功能节点方法，生成缺失的功能节点
+        createDefaultFunctionNodes(module, tableCodes);
         logService.logSuccess("admin", "EDIT", "更新模块：" + JSON.toJSONString(module));
     }
 

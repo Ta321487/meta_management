@@ -100,5 +100,16 @@
         SELECT * FROM metadata_table_relation WHERE id = #{id}
     </select>
 
+    <select id="selectByTablesAndFields" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table_relation 
+        WHERE main_table_code = #{mainTableCode}
+        AND slave_table_code = #{slaveTableCode}
+        AND main_field_code = #{mainFieldCode}
+        AND slave_field_code = #{slaveFieldCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
+    </select>
+
 </mapper>
 
