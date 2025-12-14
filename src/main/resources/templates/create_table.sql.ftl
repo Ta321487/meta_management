@@ -26,5 +26,12 @@ CREATE TABLE IF NOT EXISTS `${tableName}` (
       ,CONSTRAINT ${constraint}
     </#list>
   </#if>
+  
+  <#-- 添加UNIQUE约束 -->
+  <#if uniqueConstraints?has_content>
+    <#list uniqueConstraints as constraint>
+      ,${constraint}
+    </#list>
+  </#if>
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='${table.description!table.tableName}';
 

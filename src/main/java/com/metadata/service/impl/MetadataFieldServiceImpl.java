@@ -4,17 +4,23 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.entity.MetadataFunctionNode;
+import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
+import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.mapper.MetadataTableMapper;
 import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.CodeGeneratorService;
+import com.metadata.service.MetadataBusinessRuleService;
 import com.metadata.service.MetadataFieldService;
 import com.metadata.service.OperationLogService;
 import com.metadata.service.SqlExecuteService;
 import com.metadata.util.CodeValidator;
+import com.metadata.util.SpringContextUtil;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -48,6 +54,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     
     @Autowired
     private MetadataTableMapper tableMapper;
+    
+    @Autowired
+    private MetadataBusinessRuleService businessRuleService;
 
     /**
      * 从校验规则中提取message字段
@@ -577,8 +586,11 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 } else {
                     throw new RuntimeException("查询字段类型失败，无法删除非空约束");
                 }
+            } else if (constraintType.equals("UNIQUE")) {
+                // 删除唯一索引，使用DROP INDEX语法
+                dropSql = "ALTER TABLE `" + tableName + "` DROP INDEX `" + constraintName + "`";
             } else {
-                // 常规约束删除语句
+                // 其他约束类型使用常规语法
                 dropSql = "ALTER TABLE `" + tableName + "` DROP " + constraintType + " `" + constraintName + "`";
             }
 
@@ -661,6 +673,87 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                             break;
                         }
                     }
+                }
+            } else if (constraintType.equals("UNIQUE")) {
+                // 如果删除的是UNIQUE约束，同时删除对应的业务规则
+                try {
+                    // 获取表的业务系统编码
+                    String businessCode = "DEFAULT";
+                    if (tableCode != null) {
+                        // 如果有tableCode，直接查询表的业务系统编码
+                        MetadataTable table = tableMapper.selectByCode(tableCode);
+                        if (table != null) {
+                            businessCode = table.getBusinessCode();
+                        }
+                    }
+                    
+                    // 获取表关联的模块编码列表（通过功能节点关联）
+                    List<MetadataFunctionNode> nodes = null;
+                    try {
+                        // 尝试获取功能节点Mapper
+                        MetadataFunctionNodeMapper nodeMapper = SpringContextUtil.getBean(com.metadata.mapper.MetadataFunctionNodeMapper.class);
+                        if (nodeMapper != null) {
+                            nodes = nodeMapper.selectByRelatedTableCode(tableCode, businessCode);
+                        }
+                    } catch (Exception e) {
+                        // 如果获取失败，忽略
+                    }
+                    
+                    if (nodes != null && !nodes.isEmpty()) {
+                        // 遍历每个关联的模块，获取业务规则
+                        for (MetadataFunctionNode node : nodes) {
+                            String moduleCode = node.getModuleCode();
+                            if (moduleCode != null) {
+                                // 获取模块的所有业务规则
+                                List<MetadataBusinessRule> rules = businessRuleService.listByModuleCode(moduleCode, businessCode);
+                                
+                                // 筛选出VALIDATION_RULE类型的规则
+                                for (MetadataBusinessRule rule : rules) {
+                                    if ("VALIDATION_RULE".equals(rule.getRuleType())) {
+                                        // 解析规则内容
+                                        JSONObject ruleContent = JSONObject.parseObject(rule.getRuleContent());
+                                        if (ruleContent != null) {
+                                            String ruleType = ruleContent.getString("type");
+                                            if ("unique".equals(ruleType) || "unique_combo".equals(ruleType)) {
+                                                // 提取字段列表
+                                                java.util.List<String> uniqueFields = new java.util.ArrayList<>();
+                                                if ("unique".equals(ruleType)) {
+                                                    // 单字段唯一
+                                                    String uniqueField = ruleContent.getString("field");
+                                                    if (uniqueField != null && !uniqueField.isEmpty()) {
+                                                        uniqueFields.add(uniqueField);
+                                                    }
+                                                } else if ("unique_combo".equals(ruleType)) {
+                                                    // 组合字段唯一
+                                                    Object fieldsObj = ruleContent.get("fields");
+                                                    if (fieldsObj instanceof com.alibaba.fastjson2.JSONArray) {
+                                                        com.alibaba.fastjson2.JSONArray fieldsArray = (com.alibaba.fastjson2.JSONArray) fieldsObj;
+                                                        for (Object fieldObj : fieldsArray) {
+                                                            if (fieldObj instanceof String) {
+                                                                uniqueFields.add((String) fieldObj);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                
+                                                // 生成预期的约束名称，与生成SQL时的逻辑保持一致
+                                                String expectedConstraintName = "uk_" + tableName + "_" + String.join("_", uniqueFields);
+                                                if (constraintName.equals(expectedConstraintName)) {
+                                                    // 删除对应的业务规则
+                                                    businessRuleService.delete(rule.getId());
+                                                    logService.logSuccess("admin", "DELETE", "删除业务规则: " + rule.getRuleCode());
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 记录错误日志，但不影响主流程
+                    logService.logError("admin", "DELETE_BUSINESS_RULE", "删除业务规则失败", e.getMessage());
                 }
             }
         } catch (Exception e) {

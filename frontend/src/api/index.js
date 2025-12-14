@@ -45,7 +45,7 @@ export const updateNodeSort = (data) => request.post('/node/updateSort', data)
 export const getRuleList = (moduleCode, params) => request.get(`/rule/list/${moduleCode}`, { params })
 export const addRule = (data) => request.post('/rule/add', data)
 export const updateRule = (data) => request.post('/rule/update', data)
-export const deleteRule = (data) => request.post('/rule/delete', data)
+export const deleteRule = (id) => request.delete(`/rule/delete/${id}`)
 
 // 表关联关系相关
 export const getRelationsByMain = (mainTableCode) => request.get(`/relation/listByMain/${mainTableCode}`)

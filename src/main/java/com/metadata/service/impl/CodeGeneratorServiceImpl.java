@@ -8,6 +8,7 @@ import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.service.CodeGeneratorService;
+import com.metadata.service.MetadataBusinessRuleService;
 import com.metadata.service.MetadataBusinessSystemService;
 import com.metadata.service.MetadataFieldService;
 import com.metadata.service.MetadataTableService;
@@ -38,6 +39,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     
     @Autowired
     private MetadataBusinessSystemService businessSystemService;
+    
+    @Autowired
+    private MetadataBusinessRuleService businessRuleService;
 
     private Configuration freemarkerConfig;
 
@@ -79,12 +83,90 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                 checkConstraints.add(constraintName + " " + checkConstraint);
             }
         }
+        
+        // 生成UNIQUE约束列表
+        List<String> uniqueConstraints = new ArrayList<>();
+        try {
+            // 获取表关联的模块编码列表（通过功能节点关联）
+            List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode, businessCode);
+            Set<String> moduleCodes = nodes.stream()
+                .map(MetadataFunctionNode::getModuleCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+            
+            // 遍历每个关联的模块，获取业务规则
+            for (String moduleCode : moduleCodes) {
+                // 获取模块的所有业务规则
+                List<com.metadata.entity.MetadataBusinessRule> rules = businessRuleService.listByModuleCode(moduleCode, businessCode);
+                
+                // 筛选出VALIDATION_RULE类型的规则
+                for (com.metadata.entity.MetadataBusinessRule rule : rules) {
+                    if ("VALIDATION_RULE".equals(rule.getRuleType())) {
+                        // 解析规则内容
+                        JSONObject ruleContent = JSONObject.parseObject(rule.getRuleContent());
+                        if (ruleContent != null) {
+                            String ruleType = ruleContent.getString("type");
+                            if ("unique".equals(ruleType) || "unique_combo".equals(ruleType)) {
+                                // 提取字段列表
+                                List<String> uniqueFields = new ArrayList<>();
+                                if ("unique".equals(ruleType)) {
+                                    // 单字段唯一
+                                    String field = ruleContent.getString("field");
+                                    if (field != null && !field.isEmpty()) {
+                                        uniqueFields.add(field);
+                                    }
+                                } else if ("unique_combo".equals(ruleType)) {
+                                    // 组合字段唯一
+                                    Object fieldsObj = ruleContent.get("fields");
+                                    if (fieldsObj instanceof com.alibaba.fastjson2.JSONArray) {
+                                        com.alibaba.fastjson2.JSONArray fieldsArray = (com.alibaba.fastjson2.JSONArray) fieldsObj;
+                                        for (Object fieldObj : fieldsArray) {
+                                            if (fieldObj instanceof String) {
+                                                uniqueFields.add((String) fieldObj);
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // 生成UNIQUE约束
+                                if (!uniqueFields.isEmpty()) {
+                                    // 检查字段是否都存在于当前表中
+                                    Set<String> tableFieldNames = fields.stream()
+                                        .map(MetadataField::getFieldName)
+                                        .collect(Collectors.toSet());
+                                    
+                                    boolean allFieldsExist = true;
+                                    for (String uniqueField : uniqueFields) {
+                                        if (!tableFieldNames.contains(uniqueField)) {
+                                            allFieldsExist = false;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (allFieldsExist) {
+                                        // 生成约束名称
+                                        String constraintName = "uk_" + tableName + "_" + String.join("_", uniqueFields);
+                                        // 生成约束SQL
+                                        String constraintSql = "UNIQUE KEY `" + constraintName + "` (`" + String.join("`, `", uniqueFields) + "`)";
+                                        uniqueConstraints.add(constraintSql);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 如果获取业务规则失败，不影响建表SQL生成
+            e.printStackTrace();
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
         data.put("tableName", tableName);
         data.put("checkConstraints", checkConstraints);
+        data.put("uniqueConstraints", uniqueConstraints);
         data.put("businessCode", businessCode);
         data.put("businessName", getBusinessName(businessCode));
 

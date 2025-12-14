@@ -291,7 +291,7 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await deleteRule({ id: row.id })
+          await deleteRule(row.id)
           ElMessage.success('删除成功')
           loadRules()
         } catch (error) {
