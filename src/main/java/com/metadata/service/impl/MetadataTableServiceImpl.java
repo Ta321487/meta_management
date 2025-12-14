@@ -4,6 +4,7 @@ import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataTable;
+import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataModuleTableMapper;
 import com.metadata.mapper.MetadataTableMapper;
@@ -18,8 +19,11 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 表服务实现
@@ -256,6 +260,10 @@ public class MetadataTableServiceImpl implements MetadataTableService {
      */
     @Override
     public List<MetadataTable> list(String tableName, String businessCode) {
+        // 当businessCode为null或空字符串时，返回空列表，确保不返回所有表
+        if (businessCode == null || businessCode.isEmpty()) {
+            return new ArrayList<>();
+        }
         return tableMapper.selectAll(tableName, businessCode);
     }
 
@@ -274,7 +282,58 @@ public class MetadataTableServiceImpl implements MetadataTableService {
      */
     @Override
     public List<MetadataTable> listByModuleCode(String moduleCode, String businessCode) {
-        return tableMapper.selectByModuleCode(moduleCode, businessCode);
+        // 1. 获取模块直接关联的表
+        List<MetadataTable> directTables = tableMapper.selectByModuleCode(moduleCode, businessCode);
+        
+        // 2. 如果没有直接关联的表，直接返回空列表
+        if (directTables == null || directTables.isEmpty()) {
+            return new ArrayList<>();
+        }
+        
+        // 3. 创建一个Set用于存储所有相关表的编码，确保唯一性
+        Set<String> tableCodeSet = new HashSet<>();
+        List<MetadataTable> allTables = new ArrayList<>();
+        
+        // 4. 添加直接关联的表到结果列表和Set中
+        for (MetadataTable table : directTables) {
+            allTables.add(table);
+            tableCodeSet.add(table.getTableCode());
+        }
+        
+        // 5. 遍历直接关联的表，查找与它们有外键关联的其他表
+        for (MetadataTable table : directTables) {
+            String currentTableCode = table.getTableCode();
+            
+            // 获取当前表作为主表的所有关联关系（主表 -> 从表）
+            List<MetadataTableRelation> mainRelations = relationService.listByMainTableCode(currentTableCode, businessCode);
+            for (MetadataTableRelation relation : mainRelations) {
+                String slaveTableCode = relation.getSlaveTableCode();
+                if (!tableCodeSet.contains(slaveTableCode)) {
+                    // 传递业务系统编码，确保只返回当前业务系统的表
+                    MetadataTable slaveTable = tableMapper.selectByCode(slaveTableCode, businessCode);
+                    if (slaveTable != null) {
+                        allTables.add(slaveTable);
+                        tableCodeSet.add(slaveTableCode);
+                    }
+                }
+            }
+            
+            // 获取当前表作为从表的所有关联关系（从表 <- 主表）
+            List<MetadataTableRelation> slaveRelations = relationService.listBySlaveTableCode(currentTableCode, businessCode);
+            for (MetadataTableRelation relation : slaveRelations) {
+                String mainTableCode = relation.getMainTableCode();
+                if (!tableCodeSet.contains(mainTableCode)) {
+                    // 传递业务系统编码，确保只返回当前业务系统的表
+                    MetadataTable mainTable = tableMapper.selectByCode(mainTableCode, businessCode);
+                    if (mainTable != null) {
+                        allTables.add(mainTable);
+                        tableCodeSet.add(mainTableCode);
+                    }
+                }
+            }
+        }
+        
+        return allTables;
     }
 
     /**

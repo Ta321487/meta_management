@@ -60,5 +60,10 @@ public interface MetadataFunctionNodeMapper {
                                                        @Param("pageRequest") PageRequest pageRequest) {
         return selectPageByModuleCode(moduleCode, "DEFAULT", pageRequest);
     }
+    
+    /**
+     * 批量删除功能节点
+     */
+    int batchDeleteByIds(@Param("ids") List<Long> ids);
 }
 

@@ -130,6 +130,16 @@ public interface CodeGeneratorService {
     default Map<String, String> generateAll(String tableCode, String packageName) throws Exception {
         return generateAll(tableCode, packageName, "DEFAULT");
     }
+    
+    /**
+     * 生成业务系统下所有表的完整代码包
+     */
+    Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName) throws Exception;
+    
+    /**
+     * 生成业务系统下所有表的建表SQL
+     */
+    Map<String, String> generateAllSQLByBusinessSystem(String businessCode) throws Exception;
 
     /**
      * 工具方法：转换为表名（下划线）

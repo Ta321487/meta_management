@@ -125,6 +125,7 @@
 
     <!-- 获取表的所有类型约束 -->
     <select id="selectAllConstraints" resultType="map">
+        -- 查询常规约束
         SELECT 
             tc.constraint_name, 
             tc.constraint_type, 
@@ -151,6 +152,21 @@
         WHERE 
             tc.table_schema = DATABASE() 
             AND tc.table_name = #{tableName}
+        UNION ALL
+        -- 查询非空约束
+        SELECT 
+            CONCAT('NN_', c.column_name) AS constraint_name,
+            'NOT NULL' AS constraint_type,
+            c.column_name,
+            'COLUMN' AS constraint_level,
+            'NOT NULL' AS constraint_content
+        FROM 
+            information_schema.columns c
+        WHERE 
+            c.table_schema = DATABASE() 
+            AND c.table_name = #{tableName}
+            AND c.IS_NULLABLE = 'NO'
+            AND c.COLUMN_KEY != 'PRI' -- 排除主键（主键自带非空约束）
     </select>
 
     <!-- 根据表编码更新字段的业务系统 -->

@@ -44,7 +44,11 @@
         <el-table-column prop="slaveFieldCode" label="从表字段" width="150" />
         <el-table-column prop="relationType" label="关联类型" width="120">
           <template #default="{ row }">
-            <el-tag>{{ row.relationType === 'ONE_TO_ONE' ? '一对一' : '一对多' }}</el-tag>
+            <el-tag>
+              {{ row.relationType === 'ONE_TO_ONE' ? '一对一' : 
+                 row.relationType === 'ONE_TO_MANY' ? '一对多' : 
+                 row.relationType === 'MANY_TO_ONE' ? '多对一' : '多对多' }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
@@ -128,6 +132,8 @@
           <el-select v-model="form.relationType" placeholder="请选择" style="width: 100%">
             <el-option label="一对一" value="ONE_TO_ONE" />
             <el-option label="一对多" value="ONE_TO_MANY" />
+            <el-option label="多对一" value="MANY_TO_ONE" />
+            <el-option label="多对多" value="MANY_TO_MANY" />
           </el-select>
         </el-form-item>
         <el-form-item label="关联描述" prop="description">
@@ -146,7 +152,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTableList, getFieldList, addRelation, updateRelation, deleteRelation, getAllRelations, createForeignKey, syncForeignKeys, getBusinessSystemList } from '../api'
 
@@ -191,10 +197,18 @@ export default {
 
     const loadTables = async () => {
       try {
-        const res = await getTableList({})
-        if (res.code === 200) {
-          // 过滤掉禁用状态的表
-          tables.value = res.data.filter(table => table.isEnabled === 1)
+        // 只有选择了业务系统，才加载表列表
+        if (selectedBusinessCode.value) {
+          const res = await getTableList({
+            businessCode: selectedBusinessCode.value
+          })
+          if (res.code === 200) {
+            // 过滤掉禁用状态的表
+            tables.value = res.data.filter(table => table.isEnabled === 1)
+          }
+        } else {
+          // 未选择业务系统时，清空表列表
+          tables.value = []
         }
       } catch (error) {
         ElMessage.error('加载表列表失败')
@@ -253,14 +267,16 @@ export default {
     // 筛选关联关系
     const handleFilter = () => {
       pagination.current = 1 // 重置页码
-      loadRelations()
+      loadRelations() // 重新加载关联关系
+      loadTables() // 重新加载表列表
     }
     
     // 重置筛选条件
     const handleReset = () => {
       selectedBusinessCode.value = '' // 重置选中的业务系统
       pagination.current = 1 // 重置页码
-      loadRelations() // 重新加载数据
+      loadRelations() // 重新加载关联关系
+      loadTables() // 重新加载表列表
     }
 
     const handleMainTableChange = async (tableCode) => {
@@ -384,7 +400,7 @@ export default {
     }
 
     const handleSyncForeignKeys = () => {
-      ElMessageBox.confirm('确定要从数据库同步外键到元数据系统吗？这将扫描所有表的外键约束并创建关联关系记录。', '同步外键', {
+      ElMessageBox.confirm('确定要从元数据系统同步外键到业务系统吗？这将为您补充缺失的外键约束', '同步外键', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'info'
@@ -405,6 +421,11 @@ export default {
         // 处理用户取消操作，不做任何处理
       })
     }
+
+    // 监听业务系统变化，重新加载表列表
+    watch(selectedBusinessCode, () => {
+      loadTables()
+    })
 
     onMounted(() => {
       loadTables()

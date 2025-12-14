@@ -5,6 +5,15 @@
         <div class="card-header">
           <span>字段管理</span>
           <div>
+            <el-select v-model="selectedBusinessCode" placeholder="请选择业务系统" style="width: 200px; margin-right: 10px">
+              <el-option label="全部" value="" />
+              <el-option
+                v-for="system in businessSystems"
+                :key="system.businessCode"
+                :label="system.businessName"
+                :value="system.businessCode"
+              />
+            </el-select>
             <el-select v-model="selectedTableCode" placeholder="请选择表" style="width: 200px; margin-right: 10px" @change="handleTableChange">
               <el-option
                 v-for="table in tables"
@@ -189,11 +198,11 @@
         <el-form-item label="校验规则" prop="validateRule">
           <json-editor
             v-model="form.validateRule"
-            min-height="60px"
-            max-height="200px"
+            min-height="100px"
+            max-height="300px"
             :options="{
-              maxLines: 10,
-              minLines: 1
+              maxLines: 15,
+              minLines: 5
             }"
           />
         </el-form-item>
@@ -250,6 +259,7 @@ export default {
     const tables = ref([])
     const fieldData = ref([])
     const businessSystems = ref([])
+    const selectedBusinessCode = ref('')
     const selectedTableCode = ref('')
     const currentTableBusinessCode = ref('')
     const loading = ref(false)
@@ -426,6 +436,11 @@ export default {
         loadConstraints()
       }
     })
+    
+    // 监听业务系统变化，重新加载表列表
+    watch(selectedBusinessCode, () => {
+      loadTables()
+    })
 
     const rules = {
       fieldCode: [
@@ -456,11 +471,23 @@ export default {
 
     const loadTables = async () => {
       try {
-        const res = await getTableList({})
-        if (res.code === 200) {
-          // 过滤掉禁用状态的表
-          tables.value = res.data.filter(table => table.isEnabled === 1)
+        // 只有选择了业务系统，才加载表列表
+        if (selectedBusinessCode.value) {
+          const res = await getTableList({
+            businessCode: selectedBusinessCode.value
+          })
+          if (res.code === 200) {
+            // 过滤掉禁用状态的表
+            tables.value = res.data.filter(table => table.isEnabled === 1)
+          }
+        } else {
+          // 未选择业务系统时，清空表列表
+          tables.value = []
         }
+        // 清空当前选择的表，确保表列表与业务系统同步
+        selectedTableCode.value = ''
+        fieldData.value = []
+        pagination.total = 0
       } catch (error) {
         ElMessage.error('加载表列表失败')
       }
@@ -935,6 +962,7 @@ export default {
       tables,
       fieldData,
       businessSystems,
+      selectedBusinessCode,
       selectedTableCode,
       currentTableBusinessCode,
       loading,

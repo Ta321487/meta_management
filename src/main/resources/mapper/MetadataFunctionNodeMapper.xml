@@ -58,6 +58,13 @@
         DELETE FROM metadata_function_node WHERE module_code = #{moduleCode}
     </delete>
 
+    <delete id="batchDeleteByIds">
+        DELETE FROM metadata_function_node WHERE id IN
+        <foreach item="id" collection="ids" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT fn.* FROM metadata_function_node fn
         JOIN metadata_module m ON fn.module_code = m.module_code AND m.status = 1

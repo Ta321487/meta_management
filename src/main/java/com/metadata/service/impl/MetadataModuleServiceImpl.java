@@ -257,6 +257,25 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         }
         return moduleMapper.selectByCodes(moduleCodes);
     }
+    
+    /**
+     * 重建模块的功能节点
+     */
+    @Override
+    public void rebuildNodes(String moduleCode) {
+        // 获取模块详情
+        MetadataModule module = getByCode(moduleCode);
+        if (module == null) {
+            throw new RuntimeException("模块不存在：" + moduleCode);
+        }
+        
+        // 获取模块关联的表列表
+        List<MetadataTable> tables = tableService.listByModuleCode(moduleCode);
+        List<String> tableCodes = tables.stream().map(MetadataTable::getTableCode).toList();
+        
+        // 调用现有的创建默认功能节点方法
+        createDefaultFunctionNodes(module, tableCodes);
+    }
 
     /**
      * 根据模块类型自动创建默认功能节点

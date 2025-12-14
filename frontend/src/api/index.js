@@ -13,6 +13,7 @@ export const updateModule = (data) => request.post('/module/update', data)
 export const deleteModule = (id) => request.delete(`/module/delete/${id}`)
 export const batchDeleteModule = (data) => request.post('/module/batchDelete', data)
 export const updateModuleStatus = (data) => request.post('/module/updateStatus', data)
+export const rebuildNodes = (moduleCode) => request.post(`/module/rebuildNodes/${moduleCode}`)
 
 // 表相关
 export const getTableList = (params) => request.get('/table/list', { params })
@@ -21,7 +22,7 @@ export const addTable = (data) => request.post('/table/add', data)
 export const updateTable = (data) => request.post('/table/update', data)
 export const deleteTable = (id) => request.delete(`/table/delete/${id}`)
 export const batchDeleteTable = (data) => request.post('/table/batchDelete', data)
-export const getTablesByModule = (moduleCode) => request.get(`/table/listByModule/${moduleCode}`)
+export const getTablesByModule = (moduleCode, params) => request.get(`/table/listByModule/${moduleCode}`, { params })
 
 // 字段相关
 export const getFieldList = (tableCode, params) => request.get(`/field/list/${tableCode}`, { params })
@@ -36,7 +37,8 @@ export const deleteConstraint = (data) => request.post('/field/constraint/delete
 export const getNodeList = (moduleCode, params) => request.get(`/node/list/${moduleCode}`, { params })
 export const addNode = (data) => request.post('/node/add', data)
 export const updateNode = (data) => request.post('/node/update', data)
-export const deleteNode = (data) => request.post('/node/delete', data)
+export const deleteNode = (id) => request.delete(`/node/delete/${id}`)
+export const batchDeleteNode = (ids) => request.post('/node/batchDelete', { ids })
 export const updateNodeSort = (data) => request.post('/node/updateSort', data)
 
 // 业务规则相关
@@ -56,16 +58,18 @@ export const createForeignKey = (data) => request.post('/relation/createForeignK
 export const syncForeignKeys = (tableCode) => request.post('/relation/syncForeignKeys', tableCode ? { tableCode } : {})
 
 // 代码生成相关
-export const generateSQL = (tableCode) => request.get(`/codegen/sql/${tableCode}`)
-export const generateEntity = (tableCode, packageName) => request.get(`/codegen/entity/${tableCode}`, { params: { packageName } })
-export const generateController = (tableCode, packageName) => request.get(`/codegen/controller/${tableCode}`, { params: { packageName } })
-export const generateService = (tableCode, packageName) => request.get(`/codegen/service/${tableCode}`, { params: { packageName } })
-export const generateMapper = (tableCode, packageName) => request.get(`/codegen/mapper/${tableCode}`, { params: { packageName } })
-export const generateMapperXml = (tableCode, packageName) => request.get(`/codegen/mapperxml/${tableCode}`, { params: { packageName } })
-export const generateVueList = (tableCode) => request.get(`/codegen/vue/list/${tableCode}`)
-export const generateVueForm = (tableCode) => request.get(`/codegen/vue/form/${tableCode}`)
-export const generateAll = (tableCode, packageName) => request.get(`/codegen/all/${tableCode}`, { params: { packageName } })
-export const generateRoutes = (tableCode) => request.get(`/codegen/routes/${tableCode}`)
+export const generateSQL = (tableCode, businessCode) => request.get(`/codegen/sql/${tableCode}`, { params: { businessCode } })
+export const generateEntity = (tableCode, packageName, businessCode) => request.get(`/codegen/entity/${tableCode}`, { params: { packageName, businessCode } })
+export const generateController = (tableCode, packageName, businessCode) => request.get(`/codegen/controller/${tableCode}`, { params: { packageName, businessCode } })
+export const generateService = (tableCode, packageName, businessCode) => request.get(`/codegen/service/${tableCode}`, { params: { packageName, businessCode } })
+export const generateMapper = (tableCode, packageName, businessCode) => request.get(`/codegen/mapper/${tableCode}`, { params: { packageName, businessCode } })
+export const generateMapperXml = (tableCode, packageName, businessCode) => request.get(`/codegen/mapperxml/${tableCode}`, { params: { packageName, businessCode } })
+export const generateVueList = (tableCode, businessCode) => request.get(`/codegen/vue/list/${tableCode}`, { params: { businessCode } })
+export const generateVueForm = (tableCode, businessCode) => request.get(`/codegen/vue/form/${tableCode}`, { params: { businessCode } })
+export const generateAll = (tableCode, packageName, businessCode) => request.get(`/codegen/all/${tableCode}`, { params: { packageName, businessCode } })
+export const generateRoutes = (tableCode, businessCode) => request.get(`/codegen/routes/${tableCode}`, { params: { businessCode } })
+export const generateAllByBusinessSystem = (businessCode, packageName) => request.get(`/codegen/allByBusinessSystem/${businessCode}`, { params: { packageName } })
+export const generateAllSQLByBusinessSystem = (businessCode) => request.get(`/codegen/sqlByBusinessSystem/${businessCode}`)
 
 // 代码测试相关
 export const testCode = (tableCode, packageName) => request.get(`/codetest/test/${tableCode}`, { params: { packageName } })

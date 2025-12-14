@@ -119,8 +119,9 @@ public class MetadataTableController {
      */
     @GetMapping("/listByModule/{moduleCode}")
     @Operation(summary = "根据模块查询表", description = "根据模块编码查询关联的表列表")
-    public Result<List<MetadataTable>> listByModuleCode(@Parameter(description = "模块编码") @PathVariable String moduleCode) {
-        List<MetadataTable> list = tableService.listByModuleCode(moduleCode);
+    public Result<List<MetadataTable>> listByModuleCode(@Parameter(description = "模块编码") @PathVariable String moduleCode,
+                                                       @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode) {
+        List<MetadataTable> list = tableService.listByModuleCode(moduleCode, businessCode);
         return Result.success(list);
     }
 }

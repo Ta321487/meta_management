@@ -131,5 +131,19 @@ public class MetadataModuleController {
             return Result.error(e.getMessage());
         }
     }
+
+    /**
+     * 重建模块功能节点
+     */
+    @PostMapping("/rebuildNodes/{moduleCode}")
+    @Operation(summary = "重建模块功能节点", description = "根据模块类型的默认节点重新生成模块的功能节点")
+    public Result<?> rebuildNodes(@Parameter(description = "模块编码") @PathVariable String moduleCode) {
+        try {
+            moduleService.rebuildNodes(moduleCode);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }
 

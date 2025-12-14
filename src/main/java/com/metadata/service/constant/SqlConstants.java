@@ -61,7 +61,10 @@ public class SqlConstants {
     public static final String FORM_COMPONENT_SELECT = "select";
     
     // 关联关系相关
+    public static final String RELATION_TYPE_ONE_TO_ONE = "ONE_TO_ONE";
     public static final String RELATION_TYPE_ONE_TO_MANY = "ONE_TO_MANY";
+    public static final String RELATION_TYPE_MANY_TO_ONE = "MANY_TO_ONE";
+    public static final String RELATION_TYPE_MANY_TO_MANY = "MANY_TO_MANY";
     public static final String RELATION_CODE_PREFIX = "REL_";
     public static final int MAX_RELATION_CODE_LENGTH = 50;
     

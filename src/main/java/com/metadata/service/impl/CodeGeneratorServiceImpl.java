@@ -140,6 +140,18 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     }
 
     /**
+     * 内置正则表达式映射表，根据type值提供相应的正则表达式
+     */
+    private static final Map<String, String> BUILT_IN_REGEX_MAP = new HashMap<String, String>() {
+        {
+            put("email", "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+            put("url", "^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$");
+            put("number", "^-?\\d+(\\.\\d+)?$");
+            put("integer", "^-?\\d+$");
+        }
+    };
+    
+    /**
      * 解析校验规则JSON，提取正则表达式等信息
      */
     private Map<String, Object> parseValidationRule(String validateRule) {
@@ -158,9 +170,18 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         try {
             JSONObject jsonObject = JSON.parseObject(validateRule);
             
-            // 提取正则表达式
+            // 提取正则表达式或type属性对应的内置正则表达式
+            String pattern = null;
             if (jsonObject.containsKey("pattern")) {
-                String pattern = jsonObject.getString("pattern");
+                pattern = jsonObject.getString("pattern");
+            } else if (jsonObject.containsKey("type")) {
+                String type = jsonObject.getString("type");
+                if (BUILT_IN_REGEX_MAP.containsKey(type)) {
+                    pattern = BUILT_IN_REGEX_MAP.get(type);
+                }
+            }
+            
+            if (pattern != null) {
                 String message = jsonObject.getString("message");
                 rules.put("hasPattern", true);
                 rules.put("pattern", pattern);
@@ -536,6 +557,48 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         }
 
         return codeMap;
+    }
+    
+    /**
+     * 生成业务系统下所有表的完整代码包
+     */
+    @Override
+    public Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName) throws Exception {
+        Map<String, Map<String, String>> allCodeMap = new HashMap<>();
+        
+        // 获取业务系统下所有表
+        List<MetadataTable> tables = tableService.list(null, businessCode);
+        
+        // 为每个表生成代码
+        for (MetadataTable table : tables) {
+            if (table.getIsEnabled() == 1) { // 只处理启用的表
+                Map<String, String> codeMap = generateAll(table.getTableCode(), packageName, businessCode);
+                allCodeMap.put(table.getTableCode(), codeMap);
+            }
+        }
+        
+        return allCodeMap;
+    }
+    
+    /**
+     * 生成业务系统下所有表的建表SQL
+     */
+    @Override
+    public Map<String, String> generateAllSQLByBusinessSystem(String businessCode) throws Exception {
+        Map<String, String> sqlMap = new HashMap<>();
+        
+        // 获取业务系统下所有表
+        List<MetadataTable> tables = tableService.list(null, businessCode);
+        
+        // 为每个表生成SQL
+        for (MetadataTable table : tables) {
+            if (table.getIsEnabled() == 1) { // 只处理启用的表
+                String sql = generateCreateTableSQL(table.getTableCode(), businessCode);
+                sqlMap.put(table.getTableCode() + ".sql", sql);
+            }
+        }
+        
+        return sqlMap;
     }
 
     /**

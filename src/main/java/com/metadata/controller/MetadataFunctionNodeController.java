@@ -1,5 +1,6 @@
 package com.metadata.controller;
 
+import com.metadata.common.BatchDeleteRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
@@ -52,6 +53,16 @@ public class MetadataFunctionNodeController {
     public Result<?> delete(@PathVariable Long id) {
         try {
             nodeService.delete(id);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    @PostMapping("/batchDelete")
+    public Result<?> batchDelete(@RequestBody BatchDeleteRequest request) {
+        try {
+            nodeService.batchDelete(request.getIds());
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

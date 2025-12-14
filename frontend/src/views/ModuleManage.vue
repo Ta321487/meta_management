@@ -93,6 +93,7 @@
               >
                 {{ row.status === 1 ? '禁用' : '启用' }}
               </el-button>
+              <el-button type="info" size="small" @click="handleRebuildNodes(row)">重建功能节点</el-button>
               <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
             </el-space>
           </template>
@@ -139,7 +140,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="业务系统">
-          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%">
+          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%" @change="loadTables(form.businessCode)">
             <el-option
               v-for="system in businessSystems"
               :key="system.businessCode"
@@ -206,6 +207,7 @@ import {
   deleteModule,
   batchDeleteModule,
   updateModuleStatus,
+  rebuildNodes,
   getModuleTypeList,
   getTableList,
   getTablesByModule,
@@ -308,9 +310,9 @@ export default {
       }
     }
 
-    const loadTables = async () => {
+    const loadTables = async (businessCode = '') => {
       try {
-        const res = await getTableList({})
+        const res = await getTableList({ businessCode })
         if (res.code === 200) {
           allTables.value = res.data
         }
@@ -385,6 +387,8 @@ export default {
         componentPath: row.componentPath || '',
         tableCodes: []
       })
+      // 加载当前业务系统的表数据
+      loadTables(form.businessCode)
       // 加载关联的表
       getTablesByModule(row.moduleCode).then((res) => {
         if (res.code === 200 && res.data) {
@@ -432,6 +436,26 @@ export default {
         } catch (error) {
           // 显示后端返回的具体错误信息，适配多种错误格式
           ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '删除失败')
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
+    }
+
+    // 重建功能节点
+    const handleRebuildNodes = (row) => {
+      ElMessageBox.confirm('确定要重建该模块的功能节点吗？', '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          await rebuildNodes(row.moduleCode)
+          ElMessage.success('功能节点重建成功')
+          loadData()
+        } catch (error) {
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '功能节点重建失败')
         }
       }).catch(() => {
         // 处理用户取消操作，不做任何处理
@@ -519,12 +543,14 @@ export default {
       rules,
       pagination,
       showIconSelector,
+      loadTables,
       handleSearch,
       handleReset,
       handleAdd,
       handleEdit,
       handleSubmit,
       handleDelete,
+      handleRebuildNodes,
       handleBatchDelete,
       handleToggleStatus,
       handleDialogClose,

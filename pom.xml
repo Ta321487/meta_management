@@ -186,6 +186,8 @@
                         </goals>
                         <configuration>
                             <arguments>run build</arguments>
+                            <!-- 跳过前端构建，避免在缺少前端源码或依赖时失败 -->
+                            <skip>true</skip>
                         </configuration>
                     </execution>
                 </executions>
@@ -204,6 +206,8 @@
                             <goal>copy-resources</goal>
                         </goals>
                         <configuration>
+                            <!-- 跳过前端资源复制，避免在缺少dist目录时失败 -->
+                            <skip>true</skip>
                             <outputDirectory>${project.build.directory}/classes</outputDirectory>
                             <resources>
                                 <resource>

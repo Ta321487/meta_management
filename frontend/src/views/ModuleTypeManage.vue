@@ -78,7 +78,8 @@ export default {
       'PROCESS_PAGE': '流程页',
       'REPORT_PAGE': '报表页',
       'BATCH_IMPORT_PAGE': '批量导入页',
-      'BATCH_EXPORT_PAGE': '批量导出页'
+      'BATCH_EXPORT_PAGE': '批量导出页',
+      'CUSTOM_PAGE': '自定义页面'
     }
     
     // 格式化默认节点显示为中文

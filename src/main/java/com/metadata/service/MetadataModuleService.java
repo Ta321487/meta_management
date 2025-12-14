@@ -71,4 +71,10 @@ public interface MetadataModuleService {
      * @return 模块列表
      */
     List<MetadataModule> getModulesByCodes(List<String> moduleCodes);
+    
+    /**
+     * 重建模块的功能节点
+     * @param moduleCode 模块编码
+     */
+    void rebuildNodes(String moduleCode);
 }

@@ -20,7 +20,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -418,6 +417,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 case "UNIQUE" -> "唯一约束";
                 case "CHECK" -> "检查约束";
                 case "DEFAULT" -> "默认约束";
+                case "NOT NULL" -> "非空约束";
                 default -> constraintType;
             };
 
@@ -541,6 +541,8 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                     constraintType = "CHECK";
                 } else if (constraintName.toUpperCase().startsWith("UK_")) {
                     constraintType = "UNIQUE";
+                } else if (constraintName.toUpperCase().startsWith("NN_")) {
+                    constraintType = "NOT NULL";
                 } else {
                     // 默认为CHECK约束
                     constraintType = "CHECK";
@@ -553,12 +555,37 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             }
 
             // 构建删除约束的SQL语句
-            String dropSql = "ALTER TABLE `" + tableName + "` DROP " + constraintType + " `" + constraintName + "`";
+            String dropSql;
+            if (constraintType.equals("NOT NULL")) {
+                // 非空约束需要特殊处理：获取字段类型，然后修改为允许NULL
+                String columnName = constraintName.substring(3); // 去掉前缀"NN_"
+                
+                // 查询字段的当前类型信息
+                String typeQuerySql = "SELECT COLUMN_TYPE FROM information_schema.columns " +
+                        "WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' AND column_name = '" + columnName + "'";
+                Map<String, Object> columnTypeResult = sqlExecuteService.executeSql(typeQuerySql, false);
+                
+                if (columnTypeResult != null && Boolean.TRUE.equals(columnTypeResult.get("success"))) {
+                    List<Map<String, Object>> typeRows = (List<Map<String, Object>>) columnTypeResult.get("data");
+                    if (typeRows != null && !typeRows.isEmpty()) {
+                        String columnType = (String) typeRows.get(0).get("COLUMN_TYPE");
+                        // 构建修改字段允许NULL的SQL
+                        dropSql = "ALTER TABLE `" + tableName + "` MODIFY COLUMN `" + columnName + "` " + columnType + " NULL";
+                    } else {
+                        throw new RuntimeException("未找到字段信息，无法删除非空约束");
+                    }
+                } else {
+                    throw new RuntimeException("查询字段类型失败，无法删除非空约束");
+                }
+            } else {
+                // 常规约束删除语句
+                dropSql = "ALTER TABLE `" + tableName + "` DROP " + constraintType + " `" + constraintName + "`";
+            }
 
             // 删除数据库中的约束
             Map<String, Object> result = sqlExecuteService.executeSql(dropSql, true);
 
-            // 如果有字段信息，则将validate_rule设置为空
+            // 如果有字段信息，则更新相关字段属性
             if (field != null) {
                 // 查询完整的字段信息，避免更新时丢失其他字段值
                 MetadataField fullField = fieldMapper.selectById(field.getId());
@@ -570,9 +597,23 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                     updateField.setFieldName(fullField.getFieldName());
                     updateField.setFieldType(fullField.getFieldType());
                     updateField.setLabel(fullField.getLabel());
-                    updateField.setIsRequired(fullField.getIsRequired());
+                    
+                    // 如果是删除非空约束，则将字段设置为非必填
+                    if (constraintType.equals("NOT NULL")) {
+                        updateField.setIsRequired(0); // 0表示非必填
+                    } else {
+                        updateField.setIsRequired(fullField.getIsRequired());
+                    }
+                    
                     updateField.setFormComponent(fullField.getFormComponent());
-                    updateField.setValidateRule(null);
+                    
+                    // 只有CHECK约束才清空validate_rule
+                    if (constraintType.equals("CHECK")) {
+                        updateField.setValidateRule(null);
+                    } else {
+                        updateField.setValidateRule(fullField.getValidateRule());
+                    }
+                    
                     updateField.setSort(fullField.getSort());
                     updateField.setIsEnabled(fullField.getIsEnabled());
                     updateField.setBusinessCode(fullField.getBusinessCode());

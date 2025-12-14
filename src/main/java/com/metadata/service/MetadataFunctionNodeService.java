@@ -50,4 +50,9 @@ public interface MetadataFunctionNodeService {
      * 更新节点排序
      */
     void updateSort(Long id, Integer sort);
+    
+    /**
+     * 批量删除节点
+     */
+    void batchDelete(List<Long> ids);
 }

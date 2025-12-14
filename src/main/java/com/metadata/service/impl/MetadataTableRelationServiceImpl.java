@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -76,15 +77,35 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                 relation.getSlaveTableCode(), relation.getMainFieldCode(), relation.getSlaveFieldCode())) {
             throw new RuntimeException("编码格式不正确");
         }
-        // 校验表是否存在
-        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
+        
+        // 首先获取业务系统编码，如果relation中已有则使用，否则先从主表获取
+        String businessCode = relation.getBusinessCode();
+        if (businessCode == null || businessCode.isEmpty()) {
+            // 先查询主表获取业务系统编码
+            MetadataTable tempMainTable = tableMapper.selectByCode(relation.getMainTableCode());
+            if (tempMainTable == null) {
+                throw new RuntimeException("主表不存在");
+            }
+            businessCode = tempMainTable.getBusinessCode();
+        }
+        
+        // 校验表是否存在并检查启用状态
+        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode(), businessCode);
         if (mainTable == null) {
             throw new RuntimeException("主表不存在");
         }
-        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+        if (mainTable.getIsEnabled() != 1) {
+            throw new RuntimeException("主表未启用");
+        }
+        
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode(), businessCode);
         if (slaveTable == null) {
             throw new RuntimeException("从表不存在");
         }
+        if (slaveTable.getIsEnabled() != 1) {
+            throw new RuntimeException("从表未启用");
+        }
+        
         // 校验字段是否存在
         if (fieldMapper.selectByCode(relation.getMainTableCode(), relation.getMainFieldCode()) == null) {
             throw new RuntimeException("主表关联字段不存在");
@@ -92,14 +113,18 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         if (fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode()) == null) {
             throw new RuntimeException("从表外键字段不存在");
         }
+        
         // 校验主表和从表是否属于同一个业务系统
         validateBusinessSystemConsistency(mainTable, slaveTable);
+        
         // 自动从表中获取业务系统编码
         relation.setBusinessCode(mainTable.getBusinessCode());
+        
         // 检查关联编码是否已存在（使用正确的businessCode）
         if (relationMapper.countByCode(relation.getRelationCode(), relation.getBusinessCode()) > 0) {
             throw new RuntimeException("关联编码已存在");
         }
+        
         relationMapper.insert(relation);
         logService.logSuccess("admin", "ADD", "新增表关联关系：" + JSON.toJSONString(relation));
     }
@@ -110,15 +135,25 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     @Override
     @Transactional
     public void update(MetadataTableRelation relation) {
-        // 先从主表获取业务系统编码
-        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
-        if (mainTable == null) {
-            throw new RuntimeException("主表不存在");
-        }
-        String businessCode = mainTable.getBusinessCode();
+        // 先获取业务系统编码，如果relation中已有则使用，否则先从现有关联中获取
+        String businessCode = relation.getBusinessCode();
+        MetadataTableRelation existing;
         
-        // 使用正确的businessCode查询关联关系
-        MetadataTableRelation existing = relationMapper.selectByCode(relation.getRelationCode(), businessCode);
+        if (businessCode == null || businessCode.isEmpty()) {
+            // 先查询现有关联获取业务系统编码
+            MetadataTable tempMainTable = tableMapper.selectByCode(relation.getMainTableCode());
+            if (tempMainTable == null) {
+                throw new RuntimeException("主表不存在");
+            }
+            businessCode = tempMainTable.getBusinessCode();
+            
+            // 使用正确的businessCode查询关联关系
+            existing = relationMapper.selectByCode(relation.getRelationCode(), businessCode);
+        } else {
+            // 直接使用提供的业务系统编码查询关联关系
+            existing = relationMapper.selectByCode(relation.getRelationCode(), businessCode);
+        }
+        
         if (existing == null) {
             throw new RuntimeException("关联关系不存在");
         }
@@ -129,18 +164,25 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                                   !existing.getMainFieldCode().equals(relation.getMainFieldCode()) ||
                                   !existing.getSlaveFieldCode().equals(relation.getSlaveFieldCode());
         
+        // 获取主表和从表信息，并检查启用状态
+        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode(), businessCode);
+        if (mainTable == null) {
+            throw new RuntimeException("主表不存在");
+        }
+        if (mainTable.getIsEnabled() != 1) {
+            throw new RuntimeException("主表未启用");
+        }
+        
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode(), businessCode);
+        if (slaveTable == null) {
+            throw new RuntimeException("从表不存在");
+        }
+        if (slaveTable.getIsEnabled() != 1) {
+            throw new RuntimeException("从表未启用");
+        }
+        
         // 如果关联关系发生变化，需要验证新的主表和从表的业务系统一致性
         if (relationChanged) {
-            // 重新获取主表信息，因为主表可能已经改变
-            mainTable = tableMapper.selectByCode(relation.getMainTableCode());
-            if (mainTable == null) {
-                throw new RuntimeException("主表不存在");
-            }
-            MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
-            if (slaveTable == null) {
-                throw new RuntimeException("从表不存在");
-            }
-            
             // 校验主表和从表是否属于同一个业务系统
             validateBusinessSystemConsistency(mainTable, slaveTable);
             
@@ -226,7 +268,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             System.out.println("Catalog: " + catalog);
             System.out.println("Schema: " + schema);
             
-            try (java.sql.ResultSet foreignKeys = metaData.getImportedKeys(catalog, schema, tableName)) {
+            try (ResultSet foreignKeys = metaData.getImportedKeys(catalog, schema, tableName)) {
                 System.out.println("获取外键信息结果集");
                 
                 boolean foundAny = false;
@@ -342,11 +384,27 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     }
 
     /**
+     * 根据主表编码和业务系统编码查询关联关系
+     */
+    @Override
+    public List<MetadataTableRelation> listByMainTableCode(String mainTableCode, String businessCode) {
+        return relationMapper.selectByMainTableCode(mainTableCode, businessCode);
+    }
+
+    /**
      * 查询从表的关联关系
      */
     @Override
     public List<MetadataTableRelation> listBySlaveTableCode(String slaveTableCode) {
         return relationMapper.selectBySlaveTableCode(slaveTableCode);
+    }
+
+    /**
+     * 根据从表编码和业务系统编码查询关联关系
+     */
+    @Override
+    public List<MetadataTableRelation> listBySlaveTableCode(String slaveTableCode, String businessCode) {
+        return relationMapper.selectBySlaveTableCode(slaveTableCode, businessCode);
     }
 
     /**

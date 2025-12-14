@@ -33,9 +33,19 @@ public interface MetadataTableRelationService {
     List<MetadataTableRelation> listByMainTableCode(String mainTableCode);
 
     /**
+     * 根据主表编码和业务系统编码查询关联关系
+     */
+    List<MetadataTableRelation> listByMainTableCode(String mainTableCode, String businessCode);
+
+    /**
      * 查询从表的关联关系
      */
     List<MetadataTableRelation> listBySlaveTableCode(String slaveTableCode);
+
+    /**
+     * 根据从表编码和业务系统编码查询关联关系
+     */
+    List<MetadataTableRelation> listBySlaveTableCode(String slaveTableCode, String businessCode);
 
     /**
      * 查询所有关联关系

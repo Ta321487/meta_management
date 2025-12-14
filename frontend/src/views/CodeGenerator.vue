@@ -8,6 +8,16 @@
       </template>
 
       <el-form :inline="true" :model="form" class="search-form">
+        <el-form-item label="业务系统">
+          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 200px" @change="handleBusinessSystemChange">
+            <el-option
+              v-for="business in businessSystems"
+              :key="business.businessCode"
+              :label="business.businessName"
+              :value="business.businessCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="选择表">
           <el-select v-model="form.tableCode" placeholder="请选择表" style="width: 300px" @change="handleTableChange">
             <el-option
@@ -22,16 +32,18 @@
           <el-input v-model="form.packageName" placeholder="如：com.example" style="width: 300px" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleGenerateAll">生成所有代码</el-button>
+          <el-button type="primary" @click="form.tableCode ? handleGenerateCurrentTable() : handleGenerateAllTables()">
+            生成代码
+          </el-button>
           <el-button type="success" @click="runTest" :disabled="!form.tableCode">测试代码</el-button>
         </el-form-item>
       </el-form>
 
       <el-tabs v-model="activeTab" type="border-card">
         <el-tab-pane label="SQL建表语句" name="sql">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.sql">
             <div class="code-header">
-              <span>create_table.sql</span>
+              <span>{{ form.tableCode ? form.tableCode + '.sql' : 'all_tables.sql' }}</span>
               <el-button type="primary" size="small" @click="handleGenerate('sql')">生成</el-button>
               <el-button type="success" size="small" @click="handleCopy('sql')">复制</el-button>
             </div>
@@ -43,12 +55,15 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Entity实体类" name="entity">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.entity">
             <div class="code-header">
-              <span>Entity.java</span>
+              <span>{{ form.tableCode ? form.tableCode + 'Entity.java' : 'Entity.java' }}</span>
               <el-button type="primary" size="small" @click="handleGenerate('entity')">生成</el-button>
               <el-button type="success" size="small" @click="handleCopy('entity')">复制</el-button>
             </div>
@@ -60,12 +75,15 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Controller" name="controller">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.controller">
             <div class="code-header">
-              <span>Controller.java</span>
+              <span>{{ form.tableCode ? form.tableCode + 'Controller.java' : 'Controller.java' }}</span>
               <el-button type="primary" size="small" @click="handleGenerate('controller')">生成</el-button>
               <el-button type="success" size="small" @click="handleCopy('controller')">复制</el-button>
             </div>
@@ -77,12 +95,15 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Service" name="service">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.service">
             <div class="code-header">
-              <span>Service.java</span>
+              <span>{{ form.tableCode ? form.tableCode + 'Service.java' : 'Service.java' }}</span>
               <el-button type="primary" size="small" @click="handleGenerate('service')">生成</el-button>
               <el-button type="success" size="small" @click="handleCopy('service')">复制</el-button>
             </div>
@@ -94,12 +115,15 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Mapper接口" name="mapper">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.mapper">
             <div class="code-header">
-              <span>Mapper.java</span>
+              <span>{{ form.tableCode ? form.tableCode + 'Mapper.java' : 'Mapper.java' }}</span>
               <el-button type="primary" size="small" @click="handleGenerate('mapper')">生成</el-button>
               <el-button type="success" size="small" @click="handleCopy('mapper')">复制</el-button>
             </div>
@@ -111,12 +135,15 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Mapper XML" name="mapperxml">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.mapperxml">
             <div class="code-header">
-              <span>Mapper.xml</span>
+              <span>{{ form.tableCode ? form.tableCode + 'Mapper.xml' : 'Mapper.xml' }}</span>
               <el-button type="primary" size="small" @click="handleGenerate('mapperxml')">生成</el-button>
               <el-button type="success" size="small" @click="handleCopy('mapperxml')">复制</el-button>
             </div>
@@ -128,18 +155,21 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Vue列表页" name="vueList">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.vueList">
             <div class="code-header">
-              <span>List.vue</span>
+              <span>{{ form.tableCode ? form.tableCode + 'List.vue' : 'List.vue' }}</span>
               <div>
                 <el-button type="primary" size="small" @click="handleGenerate('vueList')">生成</el-button>
                 <el-button type="success" size="small" @click="handleCopy('vueList')">复制</el-button>
-                <el-button 
-                  type="warning" 
-                  size="small" 
+                <el-button
+                  type="warning"
+                  size="small"
                   @click="handlePreviewList"
                   :disabled="!form.tableCode"
                 >
@@ -155,18 +185,21 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Vue表单页" name="vueForm">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.vueForm">
             <div class="code-header">
-              <span>Form.vue</span>
+              <span>{{ form.tableCode ? form.tableCode + 'Form.vue' : 'Form.vue' }}</span>
               <div>
                 <el-button type="primary" size="small" @click="handleGenerate('vueForm')">生成</el-button>
                 <el-button type="success" size="small" @click="handleCopy('vueForm')">复制</el-button>
-                <el-button 
-                  type="warning" 
-                  size="small" 
+                <el-button
+                  type="warning"
+                  size="small"
                   @click="handlePreviewForm"
                   :disabled="!form.tableCode"
                 >
@@ -182,10 +215,13 @@
               class="code-textarea"
             />
           </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
         </el-tab-pane>
 
         <el-tab-pane label="Routes" name="routes">
-          <div class="code-container">
+          <div class="code-container" v-if="form.tableCode || codeMap.routes">
             <div class="code-header">
               <span>routes.js</span>
               <div>
@@ -201,6 +237,9 @@
               readonly
               class="code-textarea"
             />
+          </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -297,12 +336,11 @@
 
       <!-- 列表页预览对话框 -->
       <el-dialog
-        close-on-click-modal="false"
-        close-on-press-escape="false"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
         v-model="listPreviewVisible"
         title="列表页样式预览"
         width="1200px"
-        :close-on-click-modal="false"
       >
         <div v-if="listPreviewLoading" style="text-align: center; padding: 40px;">
           <el-icon class="is-loading"><Loading /></el-icon>
@@ -416,8 +454,8 @@
 
         <!-- 新增/编辑对话框 -->
         <el-dialog
-          close-on-click-modal="false"
-          close-on-press-escape="false"
+          :close-on-click-modal="false"
+          :close-on-press-escape="false"
           v-model="listPreviewDialogVisible"
           :title="listPreviewDialogTitle"
           width="600px"
@@ -498,12 +536,11 @@
 
       <!-- 表单预览对话框 -->
       <el-dialog
-        close-on-click-modal="false"
-        close-on-press-escape="false"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
         v-model="formPreviewVisible"
         title="表单样式预览"
         width="900px"
-        :close-on-click-modal="false"
       >
         <div v-if="formPreviewLoading" style="text-align: center; padding: 40px;">
           <el-icon class="is-loading"><Loading /></el-icon>
@@ -611,15 +648,20 @@ import {
   generateRoutes,
   testCode,
   getFieldList,
-  getTableByCode
+  getTableByCode,
+  getBusinessSystemList,
+  generateAllByBusinessSystem,
+  generateAllSQLByBusinessSystem
 } from '../api'
 
 export default {
   name: 'CodeGenerator',
   setup() {
     const tables = ref([])
+    const businessSystems = ref([])
     const activeTab = ref('sql')
     const form = reactive({
+      businessCode: '',
       tableCode: '',
       packageName: 'com.example'
     })
@@ -672,23 +714,69 @@ export default {
     const formPreviewRef = ref(null)
     const formPreviewTableName = ref('')
 
-    const loadTables = async () => {
+    const loadBusinessSystems = async () => {
       try {
-        const res = await getTableList({})
+        const res = await getBusinessSystemList()
         if (res.code === 200) {
-          // 过滤掉禁用状态的表
-          tables.value = res.data.filter(table => table.isEnabled === 1)
+          businessSystems.value = res.data
         }
       } catch (error) {
-        ElMessage.error('加载表列表失败')
+        ElMessage.error('加载业务系统列表失败')
       }
     }
 
-    const handleTableChange = () => {
-      // 清空代码
+    const loadTables = async (businessCode = '') => {
+      try {
+        if (!businessCode) {
+          // 当businessCode为空时，清空表列表
+          tables.value = []
+          return
+        }
+        ElMessage.info('正在加载表列表...')
+        const res = await getTableList({ businessCode })
+      
+        if (res.code === 200) {
+        
+          // 过滤掉禁用状态的表
+          const enabledTables = res.data.filter(table => table.isEnabled === 1)
+          
+          tables.value = enabledTables
+          ElMessage.success(`成功加载${enabledTables.length}个表`)
+        } else {
+          ElMessage.error('加载表列表失败：' + res.message)
+        }
+      } catch (error) {
+        ElMessage.error('加载表列表失败：' + (error.message || '未知错误'))
+        console.error('加载表列表异常:', error)
+      }
+    }
+
+    const handleBusinessSystemChange = () => {
+      // 清空表选择和代码
+      form.tableCode = ''
       Object.keys(codeMap).forEach(key => {
         codeMap[key] = ''
       })
+      // 根据业务系统加载表
+      loadTables(form.businessCode)
+    }
+
+    // 切换表时更新代码显示
+    const handleTableChange = async () => {
+      if (!form.tableCode) {
+        // 清空代码
+        Object.keys(codeMap).forEach(key => {
+          codeMap[key] = ''
+        })
+        return
+      }
+      
+      try {
+        // 生成当前选中表的代码
+        await handleGenerateCurrentTable()
+      } catch (error) {
+        ElMessage.error('切换表失败：' + (error.message || '未知错误'))
+      }
     }
 
     const handleGenerate = async (type) => {
@@ -701,55 +789,55 @@ export default {
         let res
         switch (type) {
           case 'sql':
-            res = await generateSQL(form.tableCode)
+            res = await generateSQL(form.tableCode, form.businessCode)
             if (res.code === 200) {
               codeMap.sql = res.data
             }
             break
           case 'entity':
-            res = await generateEntity(form.tableCode, form.packageName)
+            res = await generateEntity(form.tableCode, form.packageName, form.businessCode)
             if (res.code === 200) {
               codeMap.entity = res.data
             }
             break
           case 'controller':
-            res = await generateController(form.tableCode, form.packageName)
+            res = await generateController(form.tableCode, form.packageName, form.businessCode)
             if (res.code === 200) {
               codeMap.controller = res.data
             }
             break
           case 'service':
-            res = await generateService(form.tableCode, form.packageName)
+            res = await generateService(form.tableCode, form.packageName, form.businessCode)
             if (res.code === 200) {
               codeMap.service = res.data
             }
             break
           case 'mapper':
-            res = await generateMapper(form.tableCode, form.packageName)
+            res = await generateMapper(form.tableCode, form.packageName, form.businessCode)
             if (res.code === 200) {
               codeMap.mapper = res.data
             }
             break
           case 'mapperxml':
-            res = await generateMapperXml(form.tableCode, form.packageName)
+            res = await generateMapperXml(form.tableCode, form.packageName, form.businessCode)
             if (res.code === 200) {
               codeMap.mapperxml = res.data
             }
             break
           case 'vueList':
-            res = await generateVueList(form.tableCode)
+            res = await generateVueList(form.tableCode, form.businessCode)
             if (res.code === 200) {
               codeMap.vueList = res.data
             }
             break
           case 'vueForm':
-            res = await generateVueForm(form.tableCode)
+            res = await generateVueForm(form.tableCode, form.businessCode)
             if (res.code === 200) {
               codeMap.vueForm = res.data
             }
             break
           case 'routes':
-            res = await generateRoutes(form.tableCode)
+            res = await generateRoutes(form.tableCode, form.businessCode)
             if (res.code === 200) {
               codeMap.routes = res.data
             }
@@ -761,14 +849,15 @@ export default {
       }
     }
 
-    const handleGenerateAll = async () => {
+    // 生成当前选中表的代码
+    const handleGenerateCurrentTable = async () => {
       if (!form.tableCode) {
         ElMessage.warning('请先选择表')
         return
       }
 
       try {
-        const res = await generateAll(form.tableCode, form.packageName)
+        const res = await generateAll(form.tableCode, form.packageName, form.businessCode)
         if (res.code === 200 && res.data) {
           const data = res.data
           codeMap.sql = data['create_table.sql'] || ''
@@ -780,7 +869,7 @@ export default {
           codeMap.vueList = data['List.vue'] || ''
           codeMap.vueForm = data['Form.vue'] || ''
           codeMap.routes = data['routes.js'] || data['routes'] || ''
-          ElMessage.success('所有代码生成成功')
+          ElMessage.success('代码生成成功')
           // 生成成功后自动运行测试
           await runTest()
         }
@@ -788,6 +877,103 @@ export default {
         ElMessage.error('生成失败：' + (error.message || '未知错误'))
       }
     }
+
+    // 生成当前业务系统所有表的代码
+    const handleGenerateAllTables = async () => {
+      if (!form.businessCode) {
+        ElMessage.warning('请先选择业务系统')
+        return
+      }
+
+      try {
+        ElMessage.info('正在生成所有表代码，请稍候...')
+        
+        // 生成业务系统下所有表的SQL
+        const sqlRes = await generateAllSQLByBusinessSystem(form.businessCode)
+        if (sqlRes.code === 200 && sqlRes.data) {
+          // 获取所有SQL键
+          const sqlKeys = Object.keys(sqlRes.data)
+          
+          if (form.tableCode) {
+            // 如果有选中表，找对应的SQL
+            const targetSqlKey = form.tableCode + '.sql'
+            if (targetSqlKey && sqlRes.data[targetSqlKey]) {
+              codeMap.sql = sqlRes.data[targetSqlKey]
+            }
+          } else if (sqlKeys.length > 0) {
+            // 否则生成所有表的SQL，用换行分隔
+            let allSql = ''
+            sqlKeys.forEach(sqlKey => {
+              allSql += `-- ------------------------------\n`
+              allSql += `-- ${sqlKey}\n`
+              allSql += `-- ------------------------------\n`
+              allSql += sqlRes.data[sqlKey]
+              allSql += `\n\n`
+            })
+            codeMap.sql = allSql
+          }
+        } else {
+          console.error('SQL generation failed:', sqlRes)
+          codeMap.sql = '-- 生成SQL失败：' + (sqlRes.message || '未知错误')
+        }
+        
+        // 只有选择了表，才生成其他代码
+        if (form.tableCode) {
+          // 生成业务系统下所有表的完整代码包
+          const allCodeRes = await generateAllByBusinessSystem(form.businessCode, form.packageName)
+          if (allCodeRes.code === 200 && allCodeRes.data) {
+            // 生成所有表的代码，但当前只显示当前选中表的代码
+            const tableCodes = Object.keys(allCodeRes.data)
+            const targetTableCode = form.tableCode
+            
+            if (targetTableCode && allCodeRes.data[targetTableCode]) {
+              const tableCodeMap = allCodeRes.data[targetTableCode]
+              // 更新所有代码类型
+              codeMap.entity = tableCodeMap['Entity.java'] || ''
+              codeMap.controller = tableCodeMap['Controller.java'] || ''
+              codeMap.service = tableCodeMap['Service.java'] || ''
+              codeMap.mapper = tableCodeMap['Mapper.java'] || ''
+              codeMap.mapperxml = tableCodeMap['Mapper.xml'] || ''
+              codeMap.vueList = tableCodeMap['List.vue'] || ''
+              codeMap.vueForm = tableCodeMap['Form.vue'] || ''
+              codeMap.routes = tableCodeMap['routes.js'] || ''
+              console.log('Generated code for table:', targetTableCode)
+            }
+          } else {
+            console.error('Code generation failed:', allCodeRes)
+            // 清空非SQL代码，显示提示信息
+            Object.keys(codeMap).forEach(key => {
+              if (key !== 'sql') {
+                codeMap[key] = ''
+              }
+            })
+          }
+          
+          // 运行测试
+          await runTest()
+        } else {
+          // 没有选择表，清空非SQL代码，只保留SQL代码
+          Object.keys(codeMap).forEach(key => {
+            if (key !== 'sql') {
+              codeMap[key] = ''
+            }
+          })
+        }
+        
+        ElMessage.success('所有表代码生成成功')
+        
+      } catch (error) {
+        console.error('Generate all tables error:', error)
+        ElMessage.error('生成失败：' + (error.message || '未知错误'))
+        // 清空代码，显示提示信息
+        Object.keys(codeMap).forEach(key => {
+          codeMap[key] = ''
+        })
+      }
+    }
+
+    // 保留原有方法，兼容已有代码
+    const handleGenerateAll = handleGenerateAllTables
 
     // 运行测试
     const runTest = async () => {
@@ -916,6 +1102,14 @@ export default {
               })
             }
             
+            // 内置正则表达式映射表，根据type值提供相应的正则表达式
+            const builtInRegexMap = {
+              email: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+              url: '^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$',
+              number: '^-?\\d+(\\.\\d+)?$',
+              integer: '^-?\\d+$'
+            }
+            
             // 解析校验规则
             if (field.validateRule) {
               try {
@@ -923,6 +1117,13 @@ export default {
                 if (validateRule.pattern) {
                   rules.push({
                     pattern: new RegExp(validateRule.pattern),
+                    message: validateRule.message || '格式不正确',
+                    trigger: 'blur'
+                  })
+                } else if (validateRule.type && builtInRegexMap[validateRule.type]) {
+                  // 处理带有type属性的约束
+                  rules.push({
+                    pattern: new RegExp(builtInRegexMap[validateRule.type]),
                     message: validateRule.message || '格式不正确',
                     trigger: 'blur'
                   })
@@ -959,22 +1160,288 @@ export default {
     }
 
     // 生成模拟表格数据
+    // 内置正则表达式映射表，根据type值提供相应的正则表达式
+    const builtInRegexMap = {
+      email: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+      url: '^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$',
+      number: '^-?\\d+(\\.\\d+)?$',
+      integer: '^-?\\d+$',
+      phone: '^1[3-9]\\d{9}$',
+      idcard: '^[1-9]\\d{5}(18|19|20)\\d{2}((0[1-9])|(1[0-2]))(([0-2][1-9])|10|20|30|31)\\d{3}[0-9Xx]$'
+    }
+    
+    // 解析校验规则
+    const parseValidationRule = (validateRule) => {
+      const rules = {
+        hasPattern: false,
+        hasOptions: false,
+        hasLength: false,
+        hasRange: false,
+        hasOperator: false,
+        pattern: null,
+        minLength: null,
+        maxLength: null,
+        min: null,
+        max: null,
+        options: [],
+        operator: null,
+        values: []
+      }
+      
+      if (!validateRule) {
+        return rules
+      }
+      
+      try {
+        const jsonRule = typeof validateRule === 'string' ? JSON.parse(validateRule) : validateRule
+        
+        // 提取正则表达式或type属性对应的内置正则表达式
+        let pattern = null
+        if (jsonRule.pattern) {
+          pattern = jsonRule.pattern
+        } else if (jsonRule.type && builtInRegexMap[jsonRule.type]) {
+          pattern = builtInRegexMap[jsonRule.type]
+        }
+        
+        if (pattern) {
+          rules.hasPattern = true
+          rules.pattern = pattern
+        }
+        
+        // 提取长度限制
+        if (jsonRule.minLength !== undefined || jsonRule.maxLength !== undefined) {
+          rules.hasLength = true
+          rules.minLength = parseInt(jsonRule.minLength) || null
+          rules.maxLength = parseInt(jsonRule.maxLength) || null
+        }
+        
+        // 提取数值范围
+        if (jsonRule.min !== undefined || jsonRule.max !== undefined) {
+          rules.hasRange = true
+          rules.min = typeof jsonRule.min === 'number' ? jsonRule.min : parseFloat(jsonRule.min) || null
+          rules.max = typeof jsonRule.max === 'number' ? jsonRule.max : parseFloat(jsonRule.max) || null
+        }
+        
+        // 提取选项（用于下拉框）
+        if (jsonRule.options) {
+          rules.hasOptions = true
+          rules.options = Array.isArray(jsonRule.options) ? jsonRule.options : []
+        }
+        
+        // 提取操作符（IN、BETWEEN等）
+        if (jsonRule.operator) {
+          rules.hasOperator = true
+          rules.operator = jsonRule.operator
+          
+          if (jsonRule.values) {
+            rules.values = Array.isArray(jsonRule.values) ? jsonRule.values : []
+          }
+          
+          if (jsonRule.operator === 'BETWEEN') {
+            rules.hasRange = true
+            rules.min = typeof jsonRule.min === 'number' ? jsonRule.min : parseFloat(jsonRule.min) || null
+            rules.max = typeof jsonRule.max === 'number' ? jsonRule.max : parseFloat(jsonRule.max) || null
+          }
+        }
+        
+      } catch (e) {
+        // 解析失败，返回默认规则
+      }
+      
+      return rules
+    }
+    
+    // 生成符合正则表达式的随机字符串
+    const generateRandomStringByRegex = (pattern, fieldLabel) => {
+      // 生成随机手机号
+      const generateRandomPhone = () => {
+        return '1' + [3, 5, 7, 8, 9][Math.floor(Math.random() * 5)] + Math.floor(Math.random() * 1000000000).toString().padStart(9, '0')
+      }
+      
+      // 生成随机邮箱
+      const generateRandomEmail = () => {
+        const domains = ['example.com', 'test.com', 'demo.com', 'sample.com', 'mail.com']
+        return `user${Math.floor(Math.random() * 10000)}@${domains[Math.floor(Math.random() * domains.length)]}`
+      }
+      
+      // 生成随机URL
+      const generateRandomUrl = () => {
+        const domains = ['example.com', 'test.com', 'demo.com', 'sample.com', 'site.com']
+        return `https://www.${domains[Math.floor(Math.random() * domains.length)]}/page${Math.floor(Math.random() * 1000)}`
+      }
+      
+      // 生成随机身份证号
+      const generateRandomIdCard = () => {
+        return '110101' + (new Date().getFullYear() - Math.floor(Math.random() * 60)).toString() + Math.floor(Math.random() * 12 + 1).toString().padStart(2, '0') + Math.floor(Math.random() * 28 + 1).toString().padStart(2, '0') + Math.floor(Math.random() * 100000000).toString().padStart(8, '0') + (Math.floor(Math.random() * 10) === 9 ? 'X' : Math.floor(Math.random() * 10))
+      }
+      
+      // 生成随机数字
+      const generateRandomNum = () => {
+        return Math.floor(Math.random() * 1000)
+      }
+      
+      // 首先根据字段标签生成数据
+      if (fieldLabel?.includes('手机')) {
+        return generateRandomPhone()
+      } else if (fieldLabel?.includes('邮箱')) {
+        return generateRandomEmail()
+      } else if (fieldLabel?.includes('URL') || fieldLabel?.includes('网址')) {
+        return generateRandomUrl()
+      } else if (fieldLabel?.includes('身份证')) {
+        return generateRandomIdCard()
+      }
+      
+      // 尝试根据正则表达式特征识别类型
+      try {
+        const regex = new RegExp(pattern)
+        
+        // 测试手机号正则
+        if (regex.test('13800138001')) {
+          return generateRandomPhone()
+        }
+        
+        // 测试邮箱正则
+        if (regex.test('test@example.com')) {
+          return generateRandomEmail()
+        }
+        
+        // 测试URL正则
+        if (regex.test('https://www.example.com')) {
+          return generateRandomUrl()
+        }
+        
+        // 测试身份证正则
+        if (regex.test('110101199001011234')) {
+          return generateRandomIdCard()
+        }
+        
+        // 测试数字正则
+        if (regex.test('123') || regex.test('123.45')) {
+          return generateRandomNum()
+        }
+      } catch (e) {
+        // 忽略正则表达式错误
+      }
+      
+      // 根据正则表达式字符串特征识别类型
+      if (pattern.includes('@')) {
+        return generateRandomEmail()
+      } else if (pattern.includes('://')) {
+        return generateRandomUrl()
+      } else if (pattern.includes('1[3-9]') || pattern.includes('\\d{9}') || pattern.includes('\\d{11}')) {
+        return generateRandomPhone()
+      } else if (pattern.includes('18|19|20')) {
+        return generateRandomIdCard()
+      } else if (pattern.includes('\\d')) {
+        return generateRandomNum()
+      }
+      
+      // 默认生成随机字符串
+      return fieldLabel + Math.floor(Math.random() * 1000)
+    }
+    
+    // 生成指定长度的随机字符串
+    const generateRandomString = (minLength = 5, maxLength = 20) => {
+      const length = Math.floor(Math.random() * (maxLength - minLength + 1)) + minLength
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+      let result = ''
+      for (let i = 0; i < length; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length))
+      }
+      return result
+    }
+    
+    // 生成指定范围内的随机数值
+    const generateRandomNumber = (min = 0, max = 1000, isInteger = true) => {
+      if (isInteger) {
+        return Math.floor(Math.random() * (max - min + 1)) + min
+      } else {
+        return Math.random() * (max - min) + min
+      }
+    }
+    
+    // 生成模拟表数据
     const generateMockTableData = (fields, count) => {
       const data = []
       for (let i = 1; i <= count; i++) {
         const row = {}
         fields.forEach(field => {
           const propName = getListFieldPropName(field)
-          if (field.fieldType?.includes('int') || field.fieldType?.includes('decimal') || field.fieldType?.includes('numeric')) {
-            row[propName] = i * 10
-          } else if (field.fieldType?.includes('date') || field.fieldType?.includes('time')) {
-            row[propName] = new Date().toISOString().split('T')[0]
-          } else if (field.formComponent === 'select') {
-            const options = getFormFieldOptions(field)
-            row[propName] = options.length > 0 ? options[0].value : '选项' + i
-          } else {
-            row[propName] = `${field.label}示例${i}`
+          const validationRules = parseValidationRule(field.validateRule)
+          
+          let mockValue
+          
+          // 处理选项列表（用于下拉框）
+          if (validationRules.hasOptions && validationRules.options.length > 0) {
+            const options = validationRules.options
+            const randomOption = options[Math.floor(Math.random() * options.length)]
+            mockValue = typeof randomOption === 'object' ? randomOption.value : randomOption
+          } 
+          // 处理操作符为IN的情况
+          else if (validationRules.hasOperator && validationRules.operator === 'IN' && validationRules.values.length > 0) {
+            mockValue = validationRules.values[Math.floor(Math.random() * validationRules.values.length)]
+          } 
+          // 处理日期时间类型
+          else if (field.fieldType?.includes('date') || field.fieldType?.includes('time')) {
+            mockValue = new Date().toISOString().split('T')[0]
+          } 
+          // 处理数值类型
+          else if (field.fieldType?.includes('int') || field.fieldType?.includes('decimal') || field.fieldType?.includes('numeric')) {
+            let min = 0
+            let max = 1000
+            let isInteger = field.fieldType?.includes('int')
+            
+            if (validationRules.hasRange) {
+              if (validationRules.min !== null) {
+                min = validationRules.min
+              }
+              if (validationRules.max !== null) {
+                max = validationRules.max
+              }
+            }
+            
+            mockValue = generateRandomNumber(min, max, isInteger)
+          } 
+          // 首先根据字段标签或正则表达式生成数据
+          else {
+            // 优先使用正则表达式规则
+            if (validationRules.hasPattern) {
+              mockValue = generateRandomStringByRegex(validationRules.pattern, field.label)
+            } 
+            // 然后根据字段标签关键词生成数据
+            else if (field.label?.includes('手机')) {
+              mockValue = generateRandomStringByRegex(builtInRegexMap.phone, field.label)
+            } 
+            else if (field.label?.includes('邮箱')) {
+              mockValue = generateRandomStringByRegex(builtInRegexMap.email, field.label)
+            } 
+            else if (field.label?.includes('URL') || field.label?.includes('网址')) {
+              mockValue = generateRandomStringByRegex(builtInRegexMap.url, field.label)
+            } 
+            else if (field.label?.includes('身份证')) {
+              mockValue = generateRandomStringByRegex(builtInRegexMap.idcard, field.label)
+            } 
+            // 处理文本类型（考虑长度限制）
+            else {
+              let minLength = 5
+              let maxLength = 20
+              
+              if (validationRules.hasLength) {
+                if (validationRules.minLength !== null) {
+                  minLength = validationRules.minLength
+                }
+                if (validationRules.maxLength !== null) {
+                  maxLength = validationRules.maxLength
+                }
+              }
+              
+              // 生成符合长度要求的随机字符串
+              const randomStr = generateRandomString(minLength, maxLength)
+              mockValue = randomStr
+            }
           }
+          
+          row[propName] = mockValue
         })
         data.push(row)
       }
@@ -1239,6 +1706,14 @@ export default {
               })
             }
             
+            // 内置正则表达式映射表，根据type值提供相应的正则表达式
+            const builtInRegexMap = {
+              email: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+              url: '^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$',
+              number: '^-?\\d+(\\.\\d+)?$',
+              integer: '^-?\\d+$'
+            }
+            
             // 解析校验规则
             if (field.validateRule) {
               try {
@@ -1246,6 +1721,13 @@ export default {
                 if (validateRule.pattern) {
                   rules.push({
                     pattern: new RegExp(validateRule.pattern),
+                    message: validateRule.message || '格式不正确',
+                    trigger: 'blur'
+                  })
+                } else if (validateRule.type && builtInRegexMap[validateRule.type]) {
+                  // 处理带有type属性的约束
+                  rules.push({
+                    pattern: new RegExp(builtInRegexMap[validateRule.type]),
                     message: validateRule.message || '格式不正确',
                     trigger: 'blur'
                   })
@@ -1302,12 +1784,14 @@ export default {
       formPreviewRef.value?.resetFields()
     }
 
-    onMounted(() => {
-      loadTables()
+    onMounted(async () => {
+      await loadBusinessSystems()
+      // 不自动加载表，只在选择业务系统后加载
     })
 
     return {
       tables,
+      businessSystems,
       activeTab,
       form,
       codeMap,
@@ -1319,9 +1803,12 @@ export default {
       ArrowUp,
       ArrowDown,
       Loading,
+      handleBusinessSystemChange,
       handleTableChange,
       handleGenerate,
       handleGenerateAll,
+      handleGenerateCurrentTable,
+      handleGenerateAllTables,
       handleCopy,
       runTest,
       toggleTestArea,

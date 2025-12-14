@@ -22,7 +22,7 @@
             v-model="rawRegexpFromJson"
             readonly
             type="textarea"
-            rows="2"
+            rows="4"
             placeholder="未检测到正则表达式"
             style="font-family: monospace;"
           />
@@ -32,7 +32,7 @@
             v-model="testRegexp"
             readonly
             type="textarea"
-            rows="2"
+            rows="4"
             placeholder="未检测到正则表达式"
             style="font-family: monospace;"
           />
@@ -132,7 +132,7 @@ export default {
     },
     minHeight: {
       type: String,
-      default: '36px' // 至少显示一行
+      default: '100px' // 至少显示多行
     },
     maxHeight: {
       type: String,
@@ -161,6 +161,14 @@ export default {
     const selectedExample = ref('')
     const currentExample = ref({ title: '', description: '', code: '{}' })
     const currentExampleCode = ref('{}')
+    
+    // 内置正则表达式映射表，根据type值提供相应的正则表达式
+    const builtInRegexMap = {
+      email: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
+      url: '^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$',
+      number: '^-?\\d+(\\.\\d+)?$',
+      integer: '^-?\\d+$'
+    }
     
     // 示例模板列表
     const exampleTemplates = ref([
@@ -267,6 +275,31 @@ export default {
         }
       }
     })
+    
+    // JSON验证方法，检查JSON格式是否正确
+    const validateJson = (jsonString) => {
+      if (!jsonString || !jsonString.trim()) {
+        return { valid: true, error: '' }
+      }
+      try {
+        JSON.parse(jsonString)
+        return { valid: true, error: '' }
+      } catch (error) {
+        // 解析错误信息，提取有用部分
+        let errorMessage = error.message
+        // 尝试提取更友好的错误信息
+        if (errorMessage.includes('Unexpected token')) {
+          // 处理未转义的反斜杠问题
+          if (errorMessage.includes('in JSON at position')) {
+            const position = parseInt(errorMessage.match(/position (\d+)/)[1])
+            errorMessage = `JSON格式错误：在位置${position}处检测到未转义的特殊字符，请确保所有反斜杠已转义（如\\d应写作\\\\d）`
+          } else {
+            errorMessage = `JSON格式错误：${errorMessage}。请检查是否有未转义的反斜杠或其他特殊字符`
+          }
+        }
+        return { valid: false, error: errorMessage }
+      }
+    }
 
     const initEditor = () => {
       if (!editorContainer.value) return
@@ -317,10 +350,10 @@ export default {
         emit('update:modelValue', value)
         
         // 验证JSON格式
-        try {
-          JSON.parse(value)
-        } catch (error) {
-          emit('error', error.message)
+        const validation = validateJson(value)
+        if (!validation.valid) {
+          emit('error', validation.error)
+          console.error('JSON格式错误:', validation.error)
         }
         
         // 动态调整高度
@@ -351,6 +384,33 @@ export default {
       editor.layout()
     }
 
+    // 自动转义正则表达式中的反斜杠
+    const escapeRegexp = (regexpString) => {
+      if (typeof regexpString !== 'string') return regexpString
+      
+      // 转义正则表达式中的反斜杠
+      return regexpString.replace(/\\/g, '\\\\')
+    }
+    
+    // 递归处理对象，转义所有正则表达式
+    const escapeRegexpInObject = (obj) => {
+      if (obj === null || typeof obj !== 'object') {
+        return escapeRegexp(obj)
+      }
+      
+      if (Array.isArray(obj)) {
+        return obj.map(item => escapeRegexpInObject(item))
+      }
+      
+      const result = {}
+      for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+          result[key] = escapeRegexpInObject(obj[key])
+        }
+      }
+      return result
+    }
+    
     // 格式化JSON，使用setTimeout避免阻塞主线程
     const formatJson = () => {
       if (!editor || isFormatting.value) return
@@ -372,8 +432,61 @@ export default {
               return
             }
             
+            // 尝试直接解析JSON
+            let parsed
+            let originalValue = value
+            
+            try {
+              parsed = JSON.parse(value)
+            } catch (error) {
+              // JSON解析失败，尝试自动修复
+              ElMessage.warning('JSON解析失败，尝试自动修复...')
+              console.log('JSON解析失败，尝试自动修复:', error)
+              
+              // 保存原始值用于后续错误信息
+              originalValue = value
+              
+              // 1. 自动修复：处理pattern和其他可能包含正则表达式的字段
+              let processedValue = value
+              
+              // 改进的正则表达式自动转义逻辑，处理更多可能的字段
+              // 处理pattern, regex, validate等可能包含正则表达式的字段
+              processedValue = processedValue.replace(/"(pattern|regex|validate|format)"\s*:\s*"([^"]+)"/g, (match, field, pattern) => {
+                // 转义pattern中的反斜杠
+                const escapedPattern = pattern.replace(/\\/g, '\\\\')
+                return `"${field}": "${escapedPattern}"`
+              })
+              
+              // 2. 尝试重新解析处理后的JSON
+              try {
+                parsed = JSON.parse(processedValue)
+                ElMessage.success('成功自动修复JSON格式')
+              } catch (secondError) {
+                // 3. 尝试更全面的修复
+                // 处理可能的JSON语法错误，如缺少引号、冒号等
+                let comprehensiveFix = processedValue
+                
+                // 示例：修复常见的语法错误（根据实际情况调整）
+                // 注意：这些修复可能不适用所有情况，仅作为辅助手段
+                
+                // 尝试修复：添加缺失的引号（简单情况）
+                comprehensiveFix = comprehensiveFix.replace(/(\w+)\s*:/g, '"$1":')
+                
+                // 尝试修复：添加缺失的闭合引号
+                comprehensiveFix = comprehensiveFix.replace(/:"([^"\\\n]+)$/gm, ':"$1"')
+                
+                // 尝试重新解析
+                try {
+                  parsed = JSON.parse(comprehensiveFix)
+                  ElMessage.success('成功自动修复JSON格式')
+                } catch (thirdError) {
+                  // 所有修复尝试失败，抛出原始错误
+                  throw error
+                }
+              }
+            }
+            
             // 使用JSON.parse和JSON.stringify进行格式化
-            const parsed = JSON.parse(value)
             const formatted = JSON.stringify(parsed, null, 2)
             
             editor.setValue(formatted)
@@ -382,7 +495,21 @@ export default {
           // 格式化后调整高度
           adjustEditorHeight()
         } catch (error) {
-          ElMessage.error('JSON格式错误，无法格式化')
+          // 提供更详细的错误信息
+          let errorMessage = `JSON格式错误，无法格式化：${error.message}`
+          
+          // 提取错误位置信息
+          if (error.message.includes('position')) {
+            const positionMatch = error.message.match(/position (\d+)/)
+            if (positionMatch) {
+              const position = parseInt(positionMatch[1])
+              errorMessage += `\n错误位置：${position}`
+              errorMessage += `\n建议：请检查该位置附近的语法，确保所有引号、冒号、逗号等符号都正确使用`
+            }
+          }
+          
+          ElMessage.error(errorMessage)
+          console.error('JSON格式化错误:', error)
         } finally {
           isFormatting.value = false
         }
@@ -452,6 +579,17 @@ export default {
       let rawRegex = ''
       
       try {
+        // 验证JSON格式
+        const validation = validateJson(jsonContent)
+        if (!validation.valid) {
+          // JSON格式错误，显示错误信息
+          ElMessage.warning(`JSON格式错误：${validation.error}`)
+          console.error('JSON格式错误:', validation.error)
+          // 显示对话框，让用户看到错误
+          testDialogVisible.value = true
+          return
+        }
+        
         // 解析JSON获取约束类型
         const parsed = JSON.parse(jsonContent)
         
@@ -461,8 +599,42 @@ export default {
           rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
           testRegexp.value = JSON.stringify(parsed.values, null, 2)
           console.log('  检测到IN约束:', parsed)
+        } else if (parsed.required) {
+          // 处理必填字段约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          testRegexp.value = 'required: true'
+          console.log('  检测到必填字段约束:', parsed)
+        } else if (parsed.min !== undefined && parsed.max !== undefined) {
+          // 处理between约束 - 增强检测，只要存在min和max属性就识别为between约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          testRegexp.value = `between ${parsed.min} and ${parsed.max}`
+          console.log('  检测到between约束:', parsed)
+        } else if (parsed.min !== undefined) {
+          // 处理只有min属性的约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          testRegexp.value = `min: ${parsed.min}`
+          console.log('  检测到min约束:', parsed)
+        } else if (parsed.max !== undefined) {
+          // 处理只有max属性的约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          testRegexp.value = `max: ${parsed.max}`
+          console.log('  检测到max约束:', parsed)
+        } else if (parsed.type) {
+          // 处理带有type属性的约束
+          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
+          
+          // 检查是否有对应的内置正则表达式
+          if (builtInRegexMap[parsed.type]) {
+            testRegexp.value = builtInRegexMap[parsed.type]
+            console.log('  检测到type约束:', parsed)
+            console.log('  使用内置正则表达式:', testRegexp.value)
+          } else {
+            // 没有对应内置正则的type，显示原始JSON
+            testRegexp.value = ''
+            console.log('  检测到type约束，但没有对应内置正则:', parsed)
+          }
         } else if (parsed.pattern) {
-          // 原有正则表达式逻辑
+          // 处理pattern约束
           // 获取解析后的pattern
           rawRegex = parsed.pattern
           
@@ -474,11 +646,6 @@ export default {
           
           // 调试：显示rawRegex的字符编码，便于理解转义情况
           console.log('  字符编码:', JSON.stringify(rawRegex))
-        } else if (parsed.min && parsed.max) {
-          // 处理between约束
-          rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
-          testRegexp.value = `between ${parsed.min} and ${parsed.max}`
-          console.log('  检测到between约束:', parsed)
         } else {
           // 其他约束类型，显示原始JSON
           rawRegexpFromJson.value = jsonContent
@@ -507,6 +674,16 @@ export default {
         // 获取编辑器中的原始JSON内容
         const jsonContent = editor.getValue()
         const testInputValue = testInput.value
+        
+        // 验证JSON格式
+        const validation = validateJson(jsonContent)
+        if (!validation.valid) {
+          // JSON格式错误，显示错误信息
+          ElMessage.error(`JSON格式错误：${validation.error}`)
+          console.error('JSON格式错误:', validation.error)
+          testResult.value = { match: false, message: `JSON格式错误：${validation.error}` }
+          return
+        }
         
         // 解析JSON获取约束类型
         const parsed = JSON.parse(jsonContent)
@@ -540,31 +717,17 @@ export default {
           console.log('  匹配结果:', matchResult, ' 消息:', message)
           testResult.value = { match: matchResult, message }
           return
-        } else if (parsed.min && parsed.max) {
-          // between约束测试逻辑
-          console.log('between约束测试过程：')
+        } else if (parsed.required) {
+          // 必填字段约束测试逻辑
+          console.log('必填字段约束测试过程：')
           console.log('  测试输入:', testInputValue)
-          console.log('  between约束:', parsed)
-          console.log('  范围:', `${parsed.min} - ${parsed.max}`)
+          console.log('  必填约束:', parsed)
           
-          // 检查测试输入是否在指定范围内
-          // 支持数值类型的匹配
-          const inputValue = Number(testInputValue)
-          const min = Number(parsed.min)
-          const max = Number(parsed.max)
           let matchResult = false
           let message = ''
           
-          // 检查是否为有效数值
-          if (isNaN(inputValue)) {
-            // 使用JSON中的message字段
-            message = parsed.message || ''
-            console.log('  匹配结果: false (输入不是有效数值) 消息:', message)
-            testResult.value = { match: false, message }
-            return
-          }
-          
-          matchResult = inputValue >= min && inputValue <= max
+          // 检查测试输入是否为空
+          matchResult = testInputValue !== '' && testInputValue !== undefined && testInputValue !== null
           if (!matchResult) {
             // 使用JSON中的message字段
             message = parsed.message || ''
@@ -573,36 +736,228 @@ export default {
           console.log('  匹配结果:', matchResult, ' 消息:', message)
           testResult.value = { match: matchResult, message }
           return
-        }
-        
-        // 原有正则表达式测试逻辑
-        const pattern = parsed.pattern
-        console.log('正则表达式测试过程：')
-        console.log('  原始pattern:', pattern)
-        console.log('  测试输入:', testInputValue)
-        
-        // 修复：当从JSON解析出pattern时，需要确保正则表达式语法正确
-        // 问题：JSON中的反斜杠已经被转义，需要确保正则表达式构造时正确处理
-        let fixedPattern = pattern
-        
-        // 手动解析转义字符，确保正则表达式中的元字符被正确识别
-        // 例如：将\\w转换为\w，确保它被识别为单词字符匹配符
-        fixedPattern = fixedPattern.replace(/\\\\w/g, "\\w")
-        fixedPattern = fixedPattern.replace(/\\\\d/g, "\\d")
-        fixedPattern = fixedPattern.replace(/\\\\s/g, "\\s")
-        fixedPattern = fixedPattern.replace(/\\\\b/g, "\\b")
-        fixedPattern = fixedPattern.replace(/\\\\B/g, "\\B")
-        fixedPattern = fixedPattern.replace(/\\\\d/g, "\\d")
-        fixedPattern = fixedPattern.replace(/\\\\D/g, "\\D")
-        fixedPattern = fixedPattern.replace(/\\\\s/g, "\\s")
-        fixedPattern = fixedPattern.replace(/\\\\S/g, "\\S")
-        fixedPattern = fixedPattern.replace(/\\\\w/g, "\\w")
-        fixedPattern = fixedPattern.replace(/\\\\W/g, "\\W")
-        
-        console.log('  修复后的pattern:', fixedPattern)
-        
-        // 使用修复后的pattern构建正则表达式对象
-        const regex = new RegExp(fixedPattern)
+        } else if (parsed.min !== undefined && parsed.max !== undefined) {
+          // between约束测试逻辑
+          console.log('between约束测试过程：')
+          console.log('  测试输入:', testInputValue)
+          console.log('  between约束:', parsed)
+          console.log('  范围:', `${parsed.min} - ${parsed.max}`)
+          
+          let matchResult = false
+          let message = ''
+          const min = Number(parsed.min)
+          const max = Number(parsed.max)
+          
+          // 判断是否为字符串长度约束（message中包含"长度"）
+          const isLengthConstraint = parsed.message && parsed.message.includes('长度')
+          console.log('  是否为长度约束:', isLengthConstraint)
+          
+          if (isLengthConstraint) {
+            // 字符串长度约束
+            const inputLength = String(testInputValue).length
+            console.log('  输入长度:', inputLength)
+            
+            matchResult = inputLength >= min && inputLength <= max
+            if (!matchResult) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+            }
+          } else {
+            // 数值约束
+            const inputValue = Number(testInputValue)
+            console.log('  数值输入:', inputValue)
+            
+            // 检查是否为有效数值
+            if (isNaN(inputValue)) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+              console.log('  匹配结果: false (输入不是有效数值) 消息:', message)
+              testResult.value = { match: false, message }
+              return
+            }
+            
+            matchResult = inputValue >= min && inputValue <= max
+            if (!matchResult) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+            }
+          }
+          
+          console.log('  匹配结果:', matchResult, ' 消息:', message)
+          testResult.value = { match: matchResult, message }
+          return
+        } else if (parsed.min !== undefined) {
+          // 只有min属性的约束测试逻辑
+          console.log('min约束测试过程：')
+          console.log('  测试输入:', testInputValue)
+          console.log('  min约束:', parsed)
+          console.log('  最小值:', parsed.min)
+          
+          let matchResult = false
+          let message = ''
+          const min = Number(parsed.min)
+          
+          // 判断是否为字符串长度约束（message中包含"长度"）
+          const isLengthConstraint = parsed.message && parsed.message.includes('长度')
+          console.log('  是否为长度约束:', isLengthConstraint)
+          
+          if (isLengthConstraint) {
+            // 字符串长度约束
+            const inputLength = String(testInputValue).length
+            console.log('  输入长度:', inputLength)
+            
+            matchResult = inputLength >= min
+            if (!matchResult) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+            }
+          } else {
+            // 数值约束
+            const inputValue = Number(testInputValue)
+            console.log('  数值输入:', inputValue)
+            
+            // 检查是否为有效数值
+            if (isNaN(inputValue)) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+              console.log('  匹配结果: false (输入不是有效数值) 消息:', message)
+              testResult.value = { match: false, message }
+              return
+            }
+            
+            matchResult = inputValue >= min
+            if (!matchResult) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+            }
+          }
+          
+          console.log('  匹配结果:', matchResult, ' 消息:', message)
+          testResult.value = { match: matchResult, message }
+          return
+        } else if (parsed.max !== undefined) {
+          // 只有max属性的约束测试逻辑
+          console.log('max约束测试过程：')
+          console.log('  测试输入:', testInputValue)
+          console.log('  max约束:', parsed)
+          console.log('  最大值:', parsed.max)
+          
+          let matchResult = false
+          let message = ''
+          const max = Number(parsed.max)
+          
+          // 判断是否为字符串长度约束（message中包含"长度"）
+          const isLengthConstraint = parsed.message && parsed.message.includes('长度')
+          console.log('  是否为长度约束:', isLengthConstraint)
+          
+          if (isLengthConstraint) {
+            // 字符串长度约束
+            const inputLength = String(testInputValue).length
+            console.log('  输入长度:', inputLength)
+            
+            matchResult = inputLength <= max
+            if (!matchResult) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+            }
+          } else {
+            // 数值约束
+            const inputValue = Number(testInputValue)
+            console.log('  数值输入:', inputValue)
+            
+            // 检查是否为有效数值
+            if (isNaN(inputValue)) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+              console.log('  匹配结果: false (输入不是有效数值) 消息:', message)
+              testResult.value = { match: false, message }
+              return
+            }
+            
+            matchResult = inputValue <= max
+            if (!matchResult) {
+              // 使用JSON中的message字段
+              message = parsed.message || ''
+            }
+          }
+          
+          console.log('  匹配结果:', matchResult, ' 消息:', message)
+          testResult.value = { match: matchResult, message }
+          return
+        } else if (parsed.type && builtInRegexMap[parsed.type]) {
+          // type属性约束测试逻辑
+          console.log('type约束测试过程：')
+          console.log('  测试输入:', testInputValue)
+          console.log('  type约束:', parsed)
+          
+          let matchResult = false
+          let message = ''
+          
+          // 先使用内置正则表达式测试type约束
+          const pattern = builtInRegexMap[parsed.type]
+          console.log('  使用内置正则表达式:', pattern)
+          
+          // 构建正则表达式对象
+          const regex = new RegExp(pattern)
+          console.log('  最终正则对象:', regex)
+          console.log('  正则表达式源:', regex.source)
+          
+          // 测试匹配，去除输入前后的空格和不可见字符
+          const trimmedInput = testInputValue.trim()
+          console.log('  修剪后的测试输入:', trimmedInput)
+          console.log('  修剪后的输入长度:', trimmedInput.length)
+          matchResult = regex.test(trimmedInput)
+          
+          // 如果type约束通过，再检查是否有min/max/integer属性
+          if (matchResult) {
+            if (parsed.min !== undefined || parsed.max !== undefined) {
+              // 处理type与min/max属性的组合
+              const inputValue = Number(testInputValue)
+              const min = Number(parsed.min)
+              const max = Number(parsed.max)
+              
+              console.log('  type约束通过，检查min/max约束:', parsed.min, parsed.max)
+              
+              // 检查是否为有效数值
+              if (!isNaN(inputValue)) {
+                // 只有当输入是有效数值时，才检查min/max约束
+                if (parsed.min !== undefined && inputValue < min) {
+                  matchResult = false
+                } else if (parsed.max !== undefined && inputValue > max) {
+                  matchResult = false
+                }
+              }
+            } else if (parsed.integer) {
+              // 处理type与integer属性的组合
+              console.log('  type约束通过，检查integer约束:', parsed.integer)
+              
+              // 检查是否为整数
+              const inputValue = Number(testInputValue)
+              if (!isNaN(inputValue)) {
+                // 只有当输入是有效数值时，才检查integer约束
+                matchResult = Number.isInteger(inputValue)
+              }
+            }
+          }
+          
+          if (!matchResult) {
+            // 使用JSON中的message字段
+            message = parsed.message || ''
+          }
+          
+          console.log('  匹配结果:', matchResult, ' 消息:', message)
+          testResult.value = { match: matchResult, message }
+          return
+        } else if (parsed.pattern) {
+          // 原有正则表达式测试逻辑
+          const pattern = parsed.pattern
+          console.log('正则表达式测试过程：')
+          console.log('  原始pattern:', pattern)
+          console.log('  测试输入:', testInputValue)
+          
+          // 直接使用解析后的pattern构建正则表达式对象，添加i标志支持大小写不敏感匹配
+          // JSON中的反斜杠已经被正确转义，直接使用即可
+          const regex = new RegExp(pattern, 'i')
         console.log('  最终正则对象:', regex)
         console.log('  正则表达式源:', regex.source)
         
@@ -616,9 +971,15 @@ export default {
           // 使用JSON中的message字段
           message = parsed.message || ''
         }
-        console.log('  匹配结果:', match, ' 消息:', message)
-        testResult.value = { match, message }
-        
+          console.log('  匹配结果:', match, ' 消息:', message)
+          testResult.value = { match, message }
+          return
+        } else {
+          // 其他约束类型，无法测试
+          console.log('  无法测试的约束类型:', parsed)
+          testResult.value = { match: false, message: '无法测试的约束类型' }
+      }
+      
       } catch (error) {
         console.error('约束测试错误:', error)
         ElMessage.error('约束测试错误: ' + error.message)

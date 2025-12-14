@@ -113,4 +113,14 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     public void updateSort(Long id, Integer sort) {
         nodeMapper.updateSort(id, sort);
     }
+    
+    /**
+     * 批量删除节点
+     */
+    @Override
+    @Transactional
+    public void batchDelete(List<Long> ids) {
+        nodeMapper.batchDeleteByIds(ids);
+        logService.logSuccess("admin", "DELETE", "批量删除功能节点ID：" + ids.toString());
+    }
 }
