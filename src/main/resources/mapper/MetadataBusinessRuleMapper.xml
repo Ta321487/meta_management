@@ -39,6 +39,9 @@
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_business_rule 
         WHERE module_code = #{moduleCode} AND rule_code = #{ruleCode}
+        <if test="businessCode != null and businessCode != ''">
+            AND business_code = #{businessCode}
+        </if>
     </select>
 
     <select id="selectByModuleCode" resultMap="BaseResultMap">

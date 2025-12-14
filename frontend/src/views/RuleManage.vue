@@ -5,6 +5,14 @@
         <div class="card-header">
           <span>业务规则管理</span>
           <div>
+            <el-select v-model="selectedBusinessCode" placeholder="请选择业务系统" style="width: 200px; margin-right: 10px" @change="handleBusinessSystemChange">
+              <el-option
+                v-for="business in businessSystems"
+                :key="business.businessCode"
+                :label="business.businessName"
+                :value="business.businessCode"
+              />
+            </el-select>
             <el-select v-model="selectedModuleCode" placeholder="请选择模块" style="width: 200px; margin-right: 10px" @change="loadRules">
               <el-option
                 v-for="module in modules"
@@ -63,6 +71,9 @@
         </el-form-item>
         <el-form-item label="规则类型" prop="ruleType">
           <el-select v-model="form.ruleType" placeholder="请选择" style="width: 100%">
+            <el-option label="验证规则" value="VALIDATION_RULE" />
+            <el-option label="搜索规则" value="SEARCH_RULE" />
+            <el-option label="显示规则" value="DISPLAY_RULE" />
             <el-option label="流程规则" value="PROCESS_RULE" />
             <el-option label="报表规则" value="REPORT_RULE" />
             <el-option label="批量操作规则" value="BATCH_RULE" />
@@ -99,7 +110,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getModuleList, getRuleList, addRule, updateRule, deleteRule } from '../api'
+import { getModuleList, getRuleList, addRule, updateRule, deleteRule, getBusinessSystemList } from '../api'
 import JsonEditor from '../components/JsonEditor'
 
 export default {
@@ -108,8 +119,10 @@ export default {
     JsonEditor
   },
   setup() {
+    const businessSystems = ref([])
     const modules = ref([])
     const ruleData = ref([])
+    const selectedBusinessCode = ref('')
     const selectedModuleCode = ref('')
     const loading = ref(false)
     const dialogVisible = ref(false)
@@ -128,7 +141,8 @@ export default {
       moduleCode: '',
       ruleType: '',
       ruleContent: '',
-      description: ''
+      description: '',
+      businessCode: ''
     })
     const rules = {
       ruleCode: [{ required: true, message: '请输入规则编码', trigger: 'blur' }],
@@ -136,9 +150,23 @@ export default {
       ruleContent: [{ required: true, message: '请输入规则内容', trigger: 'blur' }]
     }
 
+    const loadBusinessSystems = async () => {
+      try {
+        const res = await getBusinessSystemList()
+        if (res.code === 200) {
+          businessSystems.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载业务系统列表失败')
+      }
+    }
+
     const loadModules = async () => {
       try {
-        const res = await getModuleList({})
+        const params = {
+          businessCode: selectedBusinessCode.value
+        }
+        const res = await getModuleList(params)
         if (res.code === 200) {
           modules.value = res.data
         }
@@ -157,7 +185,8 @@ export default {
       try {
         const params = {
           current: pagination.current,
-          size: pagination.size
+          size: pagination.size,
+          businessCode: selectedBusinessCode.value
         }
         const res = await getRuleList(selectedModuleCode.value, params)
         if (res.code === 200) {
@@ -199,7 +228,8 @@ export default {
         moduleCode: selectedModuleCode.value,
         ruleType: '',
         ruleContent: '',
-        description: ''
+        description: '',
+        businessCode: selectedBusinessCode.value
       })
       dialogVisible.value = true
     }
@@ -212,7 +242,8 @@ export default {
         moduleCode: row.moduleCode,
         ruleType: row.ruleType,
         ruleContent: row.ruleContent,
-        description: row.description || ''
+        description: row.description || '',
+        businessCode: row.businessCode || ''
       })
       dialogVisible.value = true
     }
@@ -277,12 +308,22 @@ export default {
     }
 
     onMounted(() => {
-      loadModules()
+      loadBusinessSystems()
     })
 
+    // 监听业务系统变化，重新加载模块
+    const handleBusinessSystemChange = () => {
+      selectedModuleCode.value = ''
+      ruleData.value = []
+      pagination.total = 0
+      loadModules()
+    }
+
     return {
+      businessSystems,
       modules,
       ruleData,
+      selectedBusinessCode,
       selectedModuleCode,
       loading,
       dialogVisible,
@@ -301,7 +342,8 @@ export default {
       handlePreview,
       handleSubmit,
       handleDelete,
-      handleDialogClose
+      handleDialogClose,
+      handleBusinessSystemChange
     }
   }
 }

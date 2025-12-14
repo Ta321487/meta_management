@@ -73,12 +73,30 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
     }
 
     /**
+     * 查询模块的所有规则（按业务系统）
+     */
+    @Override
+    public List<MetadataBusinessRule> listByModuleCode(String moduleCode, String businessCode) {
+        return ruleMapper.selectByModuleCode(moduleCode, businessCode);
+    }
+
+    /**
      * 分页查询模块的规则
      */
     @Override
     public PageResult<MetadataBusinessRule> pageByModuleCode(String moduleCode, PageRequest pageRequest) {
         Long total = ruleMapper.countByModuleCode(moduleCode);
         List<MetadataBusinessRule> records = ruleMapper.selectPageByModuleCode(moduleCode, pageRequest);
+        return new PageResult<>(total, records);
+    }
+
+    /**
+     * 分页查询模块的规则（按业务系统）
+     */
+    @Override
+    public PageResult<MetadataBusinessRule> pageByModuleCode(String moduleCode, String businessCode, PageRequest pageRequest) {
+        Long total = ruleMapper.countByModuleCode(moduleCode, businessCode);
+        List<MetadataBusinessRule> records = ruleMapper.selectPageByModuleCode(moduleCode, businessCode, pageRequest);
         return new PageResult<>(total, records);
     }
 }

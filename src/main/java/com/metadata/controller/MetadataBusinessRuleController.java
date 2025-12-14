@@ -63,17 +63,19 @@ public class MetadataBusinessRuleController {
                                       @Parameter(description = "当前页",required = true)
                                       @RequestParam(required = false) Integer current,
                                       @Parameter(description = "每页显示数量")
-                                      @RequestParam(required = false) Integer size) {
+                                      @RequestParam(required = false) Integer size,
+                                      @Parameter(description = "业务系统编码")
+                                      @RequestParam(required = false) String businessCode) {
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataBusinessRule> pageResult = ruleService.pageByModuleCode(moduleCode, pageRequest);
+            PageResult<MetadataBusinessRule> pageResult = ruleService.pageByModuleCode(moduleCode, businessCode, pageRequest);
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataBusinessRule> list = ruleService.listByModuleCode(moduleCode);
+        List<MetadataBusinessRule> list = ruleService.listByModuleCode(moduleCode, businessCode);
         return Result.success(list);
     }
 }
