@@ -1,5 +1,5 @@
-<#-- 生成前端路由配置（routes.js） -->
-<#-- data: routes, businessCode -->
+<#-- 生成业务系统下所有表的整合路由配置 -->
+<#-- data: routes, businessCode, businessName -->
 export default [
 <#list routes as route>
   {

@@ -2,7 +2,6 @@ package ${packageName}.mapper;
 
 import ${packageName}.common.PageRequest;
 import ${packageName}.entity.${className};
-import org.apache.ibatis.annotations.Mapper;
 
 import java.util.List;
 
@@ -10,7 +9,6 @@ import java.util.List;
  * ${table.tableName}Mapper接口
  * 业务系统：${businessName}
  */
-@Mapper
 public interface ${className}Mapper {
 
     /**

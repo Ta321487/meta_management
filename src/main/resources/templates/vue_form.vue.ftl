@@ -107,6 +107,39 @@ export default {
           trigger: 'blur' 
         }
         </#if>
+        <#-- 检查是否有针对该字段的唯一性规则 -->
+        <#list businessRules as rule>
+        <#if rule.ruleType == "unique">
+        <#list rule.fields as ruleField>
+        <#if ruleField.fieldName == field.field.fieldName>
+        { 
+          validator: async (rule, value, callback) => {
+            if (!value) {
+              callback();
+              return;
+            }
+            try {
+              const params = { ${ruleField.fieldName}: value };
+              // 更新时排除自身
+              if (form.id) {
+                params.id = form.id;
+              }
+              const res = await ${componentName}Api.checkUnique(params);
+              if (res.code === 200 && !res.data) {
+                callback();
+              } else {
+                callback(new Error('${rule.message}'));
+              }
+            } catch (error) {
+              callback(new Error('验证失败'));
+            }
+          }, 
+          trigger: 'blur' 
+        },
+        </#if>
+        </#list>
+        </#if>
+        </#list>
       ]<#sep>,</#sep>
       </#if>
 </#list>
@@ -126,9 +159,48 @@ export default {
       }
     }
 
+    // 验证组合字段唯一性
+    const validateUniqueCombo = async () => {
+      <#if businessRules?has_content>
+      <#list businessRules as rule>
+      <#if rule.ruleType == "unique_combo">
+      try {
+        const params = {
+          <#list rule.fields as fieldName>
+          <#list fields as field>
+          <#if field.field.fieldName == fieldName.fieldName>
+          ${fieldName.fieldName}: form.${field.camelCaseName},
+          </#if>
+          </#list>
+          </#list>
+        }
+        // 更新时排除自身
+        if (form.id) {
+          params.id = form.id;
+        }
+        const res = await ${componentName}Api.checkUniqueCombo(params)
+        if (res.code === 200 && res.data) {
+          ElMessage.error('${rule.message}')
+          return false
+        }
+      } catch (error) {
+        ElMessage.error('验证失败')
+        return false
+      }
+      </#if>
+      </#list>
+      </#if>
+      return true
+    }
+
     const handleSubmit = async () => {
       await formRef.value.validate(async (valid) => {
         if (valid) {
+          // 验证组合字段唯一性
+          const isUniqueCombo = await validateUniqueCombo()
+          if (!isUniqueCombo) {
+            return
+          }
           try {
             if (form.id) {
               await ${componentName}Api.update(form)

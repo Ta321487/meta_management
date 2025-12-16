@@ -112,7 +112,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         // 获取所有表的字段
         Set<String> allFieldNames = new HashSet<>();
         for (MetadataTable table : tables) {
-            List<MetadataField> fields = fieldService.listByTableCode(table.getTableCode());
+            List<MetadataField> fields = fieldService.listByTableCode(table.getTableCode(), rule.getBusinessCode());
             for (MetadataField field : fields) {
                 allFieldNames.add(field.getFieldName());
             }

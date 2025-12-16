@@ -21,7 +21,15 @@ const resizeObserverLimitErrRe = /ResizeObserver loop limit exceeded/
 const originalError = window.console.error
 window.console.error = function(...args) {
   if (args.length > 0) {
-    const message = args[0]?.toString() || ''
+    // 增强错误信息处理，确保能正确处理 Event 对象
+    let message = ''
+    if (args[0] instanceof Event) {
+      message = `Event: ${args[0].type}`
+    } else if (args[0] instanceof Error) {
+      message = args[0].message
+    } else {
+      message = args[0]?.toString() || ''
+    }
     if (resizeObserverLoopErrRe.test(message) || resizeObserverLimitErrRe.test(message)) {
       return // 忽略 ResizeObserver 错误
     }

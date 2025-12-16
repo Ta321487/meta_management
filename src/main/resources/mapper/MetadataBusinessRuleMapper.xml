@@ -15,7 +15,7 @@
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessRule" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_business_rule (rule_code, module_code, rule_type, rule_content, description, business_code)
+        INSERT INTO metadata_business_rule (rule_code, module_code, rule_type, rule_content, description,business_code)
         VALUES (#{ruleCode}, #{moduleCode}, #{ruleType}, #{ruleContent}, #{description}, #{businessCode})
     </insert>
 

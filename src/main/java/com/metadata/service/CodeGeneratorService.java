@@ -120,6 +120,11 @@ public interface CodeGeneratorService {
     }
 
     /**
+     * 生成业务系统下所有表的整合路由配置（routes.js）
+     */
+    String generateIntegratedRoutes(String businessCode) throws Exception;
+
+    /**
      * 生成完整的代码包（包含所有文件）
      */
     Map<String, String> generateAll(String tableCode, String packageName, String businessCode) throws Exception;
@@ -185,4 +190,39 @@ public interface CodeGeneratorService {
      * 生成删除字段的ALTER TABLE语句
      */
     String generateAlterTableDropColumnSQL(String tableCode, String fieldName) throws Exception;
+
+    /**
+     * 生成Result统一响应结果类
+     */
+    String generateResult(String packageName) throws Exception;
+
+    /**
+     * 生成PageRequest分页请求类
+     */
+    String generatePageRequest(String packageName) throws Exception;
+
+    /**
+     * 生成PageResult分页结果类
+     */
+    String generatePageResult(String packageName) throws Exception;
+
+    /**
+     * 生成Spring Boot启动类
+     */
+    String generateApplication(String packageName) throws Exception;
+
+    /**
+     * 生成application.yml配置文件
+     */
+    String generateApplicationConfig(String packageName) throws Exception;
+    
+    /**
+     * 生成MyBatis配置类
+     */
+    String generateMyBatisConfig(String packageName) throws Exception;
+    
+    /**
+     * 生成pom.xml配置文件
+     */
+    String generatePomXml(String groupId, String artifactId, String name, String description) throws Exception;
 }

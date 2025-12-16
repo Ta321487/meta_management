@@ -36,6 +36,11 @@ public interface MetadataFieldService {
      * 查询表的所有字段
      */
     List<MetadataField> listByTableCode(String tableCode);
+    
+    /**
+     * 查询表的所有字段（按业务系统）
+     */
+    List<MetadataField> listByTableCode(String tableCode, String businessCode);
 
     /**
      * 分页查询表的字段

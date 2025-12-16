@@ -115,7 +115,6 @@ public class ${className}Controller {
      * @param size 每页大小
      * @param orderBy 排序字段（如：id, createTime）
      * @param orderDirection 排序方式（ASC/DESC）
-     * @param conditions 查询条件（JSON格式，通过@RequestBody接收）
      */
     @GetMapping("/list")
     public Result<?> list(@RequestParam(required = false) Integer current,

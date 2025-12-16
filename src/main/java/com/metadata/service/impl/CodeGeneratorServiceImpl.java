@@ -1,17 +1,11 @@
 package com.metadata.service.impl;
 
 import com.alibaba.fastjson2.JSON;
+import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
-import com.metadata.entity.MetadataField;
-import com.metadata.entity.MetadataTable;
-import com.metadata.entity.MetadataFunctionNode;
-import com.metadata.entity.MetadataBusinessSystem;
+import com.metadata.entity.*;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
-import com.metadata.service.CodeGeneratorService;
-import com.metadata.service.MetadataBusinessRuleService;
-import com.metadata.service.MetadataBusinessSystemService;
-import com.metadata.service.MetadataFieldService;
-import com.metadata.service.MetadataTableService;
+import com.metadata.service.*;
 import freemarker.cache.ClassTemplateLoader;
 import freemarker.template.Configuration;
 import freemarker.template.Template;
@@ -60,6 +54,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateCreateTableSQL(String tableCode, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -97,10 +94,10 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             // 遍历每个关联的模块，获取业务规则
             for (String moduleCode : moduleCodes) {
                 // 获取模块的所有业务规则
-                List<com.metadata.entity.MetadataBusinessRule> rules = businessRuleService.listByModuleCode(moduleCode, businessCode);
+                List<MetadataBusinessRule> rules = businessRuleService.listByModuleCode(moduleCode, businessCode);
                 
                 // 筛选出VALIDATION_RULE类型的规则
-                for (com.metadata.entity.MetadataBusinessRule rule : rules) {
+                for (MetadataBusinessRule rule : rules) {
                     if ("VALIDATION_RULE".equals(rule.getRuleType())) {
                         // 解析规则内容
                         JSONObject ruleContent = JSONObject.parseObject(rule.getRuleContent());
@@ -118,8 +115,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                                 } else if ("unique_combo".equals(ruleType)) {
                                     // 组合字段唯一
                                     Object fieldsObj = ruleContent.get("fields");
-                                    if (fieldsObj instanceof com.alibaba.fastjson2.JSONArray) {
-                                        com.alibaba.fastjson2.JSONArray fieldsArray = (com.alibaba.fastjson2.JSONArray) fieldsObj;
+                                    if (fieldsObj instanceof JSONArray) {
+                                        JSONArray fieldsArray = (JSONArray) fieldsObj;
                                         for (Object fieldObj : fieldsArray) {
                                             if (fieldObj instanceof String) {
                                                 uniqueFields.add((String) fieldObj);
@@ -190,6 +187,102 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             return businessCode;
         }
     }
+    
+    /**
+     * 获取表相关的业务规则
+     */
+    private List<Map<String, Object>> getTableBusinessRules(String tableCode, String businessCode) {
+        List<Map<String, Object>> tableRules = new ArrayList<>();
+        try {
+            // 获取表关联的模块编码列表（通过功能节点关联）
+            List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode, businessCode);
+            Set<String> moduleCodes = nodes.stream()
+                .map(MetadataFunctionNode::getModuleCode)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+            
+            // 遍历每个关联的模块，获取业务规则
+            for (String moduleCode : moduleCodes) {
+                // 获取模块的所有业务规则
+                List<MetadataBusinessRule> rules = businessRuleService.listByModuleCode(moduleCode, businessCode);
+                
+                // 筛选出VALIDATION_RULE类型的规则
+                for (MetadataBusinessRule rule : rules) {
+                    if ("VALIDATION_RULE".equals(rule.getRuleType())) {
+                        // 解析规则内容
+                        JSONObject ruleContent = JSONObject.parseObject(rule.getRuleContent());
+                        if (ruleContent != null) {
+                            String ruleType = ruleContent.getString("type");
+                            if ("unique".equals(ruleType) || "unique_combo".equals(ruleType)) {
+                                // 提取字段列表
+                                List<String> ruleFields = new ArrayList<>();
+                                if ("unique".equals(ruleType)) {
+                                    // 单字段唯一
+                                    String field = ruleContent.getString("field");
+                                    if (field != null && !field.isEmpty()) {
+                                        ruleFields.add(field);
+                                    }
+                                } else if ("unique_combo".equals(ruleType)) {
+                                    // 组合字段唯一
+                                    Object fieldsObj = ruleContent.get("fields");
+                                    if (fieldsObj instanceof JSONArray) {
+                                        JSONArray fieldsArray = (JSONArray) fieldsObj;
+                                        for (Object fieldObj : fieldsArray) {
+                                            if (fieldObj instanceof String) {
+                                                ruleFields.add((String) fieldObj);
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // 检查字段是否都存在于当前表中
+                                List<MetadataField> tableFields = fieldService.listByTableCode(tableCode);
+                                Set<String> tableFieldNames = tableFields.stream()
+                                    .map(MetadataField::getFieldName)
+                                    .collect(Collectors.toSet());
+                                
+                                boolean allFieldsExist = true;
+                                for (String ruleField : ruleFields) {
+                                    if (!tableFieldNames.contains(ruleField)) {
+                                        allFieldsExist = false;
+                                        break;
+                                    }
+                                }
+                                
+                                if (allFieldsExist && !ruleFields.isEmpty()) {
+                                    // 将原始字段名转换为包含camelCaseName属性的field对象
+                                    List<Map<String, Object>> fieldObjects = new ArrayList<>();
+                                    for (String ruleField : ruleFields) {
+                                        for (MetadataField tableField : tableFields) {
+                                            if (tableField.getFieldName().equals(ruleField)) {
+                                                Map<String, Object> fieldMap = new HashMap<>();
+                                                fieldMap.put("fieldName", ruleField);
+                                                fieldMap.put("camelCaseName", convertToCamelCase(ruleField, false));
+                                                fieldObjects.add(fieldMap);
+                                                break;
+                                            }
+                                        }
+                                    }
+                                    
+                                    Map<String, Object> ruleMap = new HashMap<>();
+                                    ruleMap.put("ruleCode", rule.getRuleCode());
+                                    ruleMap.put("ruleType", ruleType);
+                                    ruleMap.put("fields", fieldObjects);
+                                    ruleMap.put("message", ruleContent.getString("message"));
+                                    ruleMap.put("description", rule.getDescription());
+                                    tableRules.add(ruleMap);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // 如果获取业务规则失败，不影响代码生成
+            e.printStackTrace();
+        }
+        return tableRules;
+    }
 
     /**
      * 准备字段列表，添加转换后的属性
@@ -205,7 +298,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             Map<String, Object> fieldMap = new HashMap<>();
             fieldMap.put("field", field);
             fieldMap.put("fieldName", field.getFieldName());
-            fieldMap.put("fieldType", field.getFieldType());
+            // 格式化字段类型，确保生成有效的MySQL数据类型
+            String formattedFieldType = formatFieldType(field.getFieldType());
+            fieldMap.put("fieldType", formattedFieldType);
             fieldMap.put("label", field.getLabel());
             fieldMap.put("isRequired", field.getIsRequired());
             fieldMap.put("formComponent", field.getFormComponent());
@@ -219,6 +314,80 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             fieldList.add(fieldMap);
         }
         return fieldList;
+    }
+    
+    /**
+     * 格式化字段类型，确保生成有效的MySQL数据类型
+     */
+    private String formatFieldType(String fieldType) {
+        if (fieldType == null || fieldType.trim().isEmpty()) {
+            return "varchar(255)";
+        }
+        
+        String type = fieldType.trim().toLowerCase();
+        
+        // 处理常见的无效字段类型
+        if (type.equals("var")) {
+            return "varchar(255)";
+        } else if (type.equals("varchar")) {
+            return "varchar(255)";
+        } else if (type.equals("char")) {
+            return "char(1)";
+        } else if (type.equals("int")) {
+            return "int(11)";
+        } else if (type.equals("bigint")) {
+            return "bigint(20)";
+        } else if (type.equals("tinyint")) {
+            return "tinyint(4)";
+        } else if (type.equals("smallint")) {
+            return "smallint(6)";
+        } else if (type.equals("mediumint")) {
+            return "mediumint(9)";
+        } else if (type.equals("float")) {
+            return "float(10,2)";
+        } else if (type.equals("double")) {
+            return "double(16,2)";
+        } else if (type.equals("decimal")) {
+            return "decimal(18,2)";
+        } else if (type.equals("date")) {
+            return "date";
+        } else if (type.equals("time")) {
+            return "time";
+        } else if (type.equals("datetime")) {
+            return "datetime";
+        } else if (type.equals("timestamp")) {
+            return "timestamp";
+        } else if (type.equals("text")) {
+            return "text";
+        } else if (type.equals("longtext")) {
+            return "longtext";
+        } else if (type.equals("mediumtext")) {
+            return "mediumtext";
+        } else if (type.equals("tinytext")) {
+            return "tinytext";
+        } else if (type.equals("blob")) {
+            return "blob";
+        } else if (type.equals("longblob")) {
+            return "longblob";
+        } else if (type.equals("mediumblob")) {
+            return "mediumblob";
+        } else if (type.equals("tinyblob")) {
+            return "tinyblob";
+        } else if (type.equals("enum")) {
+            return "enum('')";
+        } else if (type.equals("set")) {
+            return "set('')";
+        } else if (type.equals("boolean")) {
+            return "tinyint(1)";
+        }
+        
+        // 如果是已经包含括号的类型，直接返回
+        if (type.contains("(")) {
+            return fieldType;
+        }
+        
+        // 默认返回varchar(255)
+        return "varchar(255)";
     }
 
     /**
@@ -379,6 +548,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateEntity(String tableCode, String packageName, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -413,6 +585,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateController(String tableCode, String packageName, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -441,18 +616,28 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateService(String tableCode, String packageName, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
         }
 
+        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        List<Map<String, Object>> fieldList = prepareFieldList(fields);
+        // 获取表相关的业务规则
+        List<Map<String, Object>> businessRules = getTableBusinessRules(tableCode, businessCode);
+
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
+        data.put("fields", fieldList);
         data.put("packageName", packageName);
         data.put("className", convertToClassName(table.getTableCode()));
         data.put("entityName", convertToEntityName(table.getTableCode()));
         data.put("businessCode", businessCode);
         data.put("businessName", getBusinessName(businessCode));
+        data.put("businessRules", businessRules);
 
         Template template = freemarkerConfig.getTemplate("service.java.ftl");
         StringWriter writer = new StringWriter();
@@ -465,6 +650,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateMapper(String tableCode, String packageName, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -494,6 +682,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateMapperXml(String tableCode, String packageName, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -523,6 +714,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateVueList(String tableCode, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -554,6 +748,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateVueForm(String tableCode, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -561,6 +758,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
         List<Map<String, Object>> fieldList = prepareFieldList(fields);
+        // 获取表相关的业务规则
+        List<Map<String, Object>> businessRules = getTableBusinessRules(tableCode, businessCode);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
@@ -568,6 +767,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         data.put("componentName", convertToComponentName(table.getTableCode()));
         data.put("businessCode", businessCode);
         data.put("businessName", getBusinessName(businessCode));
+        data.put("businessRules", businessRules);
 
         Template template = freemarkerConfig.getTemplate("vue_form.vue.ftl");
         StringWriter writer = new StringWriter();
@@ -580,6 +780,25 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public String generateRoutes(String tableCode, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
+        List<Map<String, Object>> routeList = generateTableRoutes(tableCode, businessCode);
+        
+        Map<String, Object> data = new HashMap<>();
+        data.put("routes", routeList);
+        data.put("businessCode", businessCode);
+        
+        Template template = freemarkerConfig.getTemplate("routes.js.ftl");
+        StringWriter writer = new StringWriter();
+        template.process(data, writer);
+        return writer.toString();
+    }
+    
+    /**
+     * 生成单表的路由配置列表
+     */
+    private List<Map<String, Object>> generateTableRoutes(String tableCode, String businessCode) throws Exception {
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new RuntimeException("表不存在: " + tableCode);
@@ -595,16 +814,151 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         nodes = nodes.stream()
                 .filter(node -> node.getIsEnabled() == null || node.getIsEnabled() == 1)
                 .collect(Collectors.toList());
-
+        
+        List<Map<String, Object>> routeList = new ArrayList<>();
+        
+        if (!nodes.isEmpty()) {
+            // 有配置的功能节点，生成对应的路由
+            for (MetadataFunctionNode node : nodes) {
+                // 对已配置路由信息或需要默认生成路由的节点生成路由
+                if (node.getRoutePath() != null && !node.getRoutePath().isEmpty() || 
+                    node.getJumpRelation() != null && !node.getJumpRelation().isEmpty() || 
+                    (node.getNodeType() != null && (node.getNodeType().toUpperCase().contains("LIST") || 
+                                                   node.getNodeType().toUpperCase().contains("FORM") || 
+                                                   node.getNodeType().toUpperCase().contains("DETAIL")))) {
+                    
+                    Map<String, Object> route = new HashMap<>();
+                    
+                    // 生成路由路径
+                    String pathValue = "";
+                    if (node.getRoutePath() != null && !node.getRoutePath().isEmpty()) {
+                        // 使用配置的 routePath
+                        pathValue = node.getRoutePath();
+                    } else if (node.getJumpRelation() != null && !node.getJumpRelation().isEmpty()) {
+                        // 使用配置的 jumpRelation 作为路径
+                        pathValue = node.getJumpRelation();
+                    } else {
+                        // 没有配置 routePath 和 jumpRelation，根据节点类型生成默认路径
+                        // 使用组件目录作为基础路径
+                        String basePath = componentName.toLowerCase();
+                        if (node.getNodeType().toUpperCase().contains("LIST")) {
+                            pathValue = "/" + businessCode + "/" + basePath + "/list";
+                        } else if (node.getNodeType().toUpperCase().contains("FORM")) {
+                            pathValue = "/" + businessCode + "/" + basePath + "/form/:id?";
+                        } else if (node.getNodeType().toUpperCase().contains("DETAIL")) {
+                            pathValue = "/" + businessCode + "/" + basePath + "/detail/:id?";
+                        } else {
+                            // 其他类型不生成默认路径
+                            continue;
+                        }
+                    }
+                    route.put("path", pathValue);
+                    
+                    // 生成路由名称
+                    String nameValue = node.getNodeCode() != null && !node.getNodeCode().isEmpty() ? 
+                                      node.getNodeCode() : componentName + "List";
+                    route.put("name", nameValue);
+                    
+                    // 生成组件路径
+                    String componentPath = "";
+                    if (node.getComponentPath() != null && !node.getComponentPath().isEmpty()) {
+                        // 如果组件路径以 views/ 开头，直接使用，否则使用默认路径
+                        if (node.getComponentPath().startsWith("views/")) {
+                            componentPath = "@/" + node.getComponentPath();
+                        } else {
+                            componentPath = "@/views/" + node.getComponentPath();
+                        }
+                    } else if (node.getNodeType().toUpperCase().contains("LIST")) {
+                        // 没有配置 componentPath，使用默认路径
+                        componentPath = "@/views/" + componentDir + "/List.vue";
+                    } else if (node.getNodeType().toUpperCase().contains("FORM")) {
+                        componentPath = "@/views/" + componentDir + "/Form.vue";
+                    } else if (node.getNodeType().toUpperCase().contains("DETAIL")) {
+                        componentPath = "@/views/" + componentDir + "/Form.vue";
+                    } else {
+                        componentPath = "@/views/" + componentDir + "/Form.vue";
+                    }
+                    route.put("component", "() => import('" + componentPath + "')");
+                    
+                    // 生成路由元信息
+                    Map<String, Object> meta = new HashMap<>();
+                    meta.put("moduleCode", node.getModuleCode() != null ? node.getModuleCode() : "");
+                    meta.put("nodeCode", node.getNodeCode() != null ? node.getNodeCode() : "");
+                    meta.put("relatedTableCode", node.getRelatedTableCode() != null ? node.getRelatedTableCode() : tableCode);
+                    meta.put("isMenuVisible", node.getIsMenuVisible() != null ? node.getIsMenuVisible() : 1);
+                    meta.put("icon", node.getIcon() != null ? node.getIcon() : "");
+                    meta.put("businessCode", businessCode);
+                    route.put("meta", meta);
+                    
+                    routeList.add(route);
+                }
+            }
+        } else {
+            // 没有配置功能节点，生成默认的列表页和表单页路由
+            // 生成列表页路由
+            Map<String, Object> listRoute = new HashMap<>();
+            listRoute.put("path", "/" + businessCode + "/" + componentName.toLowerCase() + "/list");
+            listRoute.put("name", componentName + "List");
+            listRoute.put("component", "() => import('@/views/" + componentDir + "/List.vue')");
+            
+            Map<String, Object> listMeta = new HashMap<>();
+            listMeta.put("relatedTableCode", tableCode);
+            listMeta.put("isMenuVisible", 1);
+            listMeta.put("businessCode", businessCode);
+            listRoute.put("meta", listMeta);
+            
+            routeList.add(listRoute);
+            
+            // 生成表单页路由
+            Map<String, Object> formRoute = new HashMap<>();
+            formRoute.put("path", "/" + businessCode + "/" + componentName.toLowerCase() + "/form/:id?");
+            formRoute.put("name", componentName + "Form");
+            formRoute.put("component", "() => import('@/views/" + componentDir + "/Form.vue')");
+            
+            Map<String, Object> formMeta = new HashMap<>();
+            formMeta.put("relatedTableCode", tableCode);
+            formMeta.put("isMenuVisible", 0);
+            formMeta.put("businessCode", businessCode);
+            formRoute.put("meta", formMeta);
+            
+            routeList.add(formRoute);
+        }
+        
+        return routeList;
+    }
+    
+    /**
+     * 生成业务系统下所有表的整合路由配置（routes.js）
+     */
+    @Override
+    public String generateIntegratedRoutes(String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
+        // 获取业务系统下所有启用的表
+        List<MetadataTable> tables = tableService.list(null, businessCode);
+        List<MetadataTable> enabledTables = tables.stream()
+                .filter(table -> table.getIsEnabled() != null && table.getIsEnabled() == 1)
+                .collect(Collectors.toList());
+        
+        if (enabledTables.isEmpty()) {
+            throw new RuntimeException("业务系统下没有启用的表: " + businessCode);
+        }
+        
+        // 合并所有表的路由配置
+        List<Map<String, Object>> allRoutes = new ArrayList<>();
+        for (MetadataTable table : enabledTables) {
+            List<Map<String, Object>> tableRoutes = generateTableRoutes(table.getTableCode(), businessCode);
+            allRoutes.addAll(tableRoutes);
+        }
+        
+        // 生成完整的routes.js文件
         Map<String, Object> data = new HashMap<>();
-        data.put("table", table);
-        data.put("componentName", componentName);
-        data.put("componentDir", componentDir);
-        data.put("nodes", nodes);
+        data.put("routes", allRoutes);
         data.put("businessCode", businessCode);
         data.put("businessName", getBusinessName(businessCode));
-
-        Template template = freemarkerConfig.getTemplate("routes.js.ftl");
+        
+        Template template = freemarkerConfig.getTemplate("routes.integrated.js.ftl");
         StringWriter writer = new StringWriter();
         template.process(data, writer);
         return writer.toString();
@@ -615,6 +969,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      */
     @Override
     public Map<String, String> generateAll(String tableCode, String packageName, String businessCode) throws Exception {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
         Map<String, String> codeMap = new HashMap<>();
 
         // 生成SQL
@@ -627,6 +984,12 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         codeMap.put("Mapper.java", generateMapper(tableCode, packageName, businessCode));
         codeMap.put("Mapper.xml", generateMapperXml(tableCode, packageName, businessCode));
 
+        // 生成通用类
+        String commonPackage = packageName + ".common";
+        codeMap.put("Result.java", generateResult(commonPackage));
+        codeMap.put("PageRequest.java", generatePageRequest(commonPackage));
+        codeMap.put("PageResult.java", generatePageResult(commonPackage));
+
         // 生成Vue代码
         codeMap.put("List.vue", generateVueList(tableCode, businessCode));
         codeMap.put("Form.vue", generateVueForm(tableCode, businessCode));
@@ -637,6 +1000,19 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             // 不阻塞主流程，记录但仍返回其他文件
             codeMap.put("routes.js", "// 生成路由失败: " + e.getMessage());
         }
+
+        // 生成Spring Boot启动类
+        codeMap.put("Application.java", generateApplication(packageName));
+        // 生成application.yml配置文件
+        codeMap.put("application.yml", generateApplicationConfig(packageName));
+        // 生成MyBatis配置类
+        codeMap.put("MyBatisConfig.java", generateMyBatisConfig(packageName));
+        // 生成pom.xml配置文件
+        String groupId = packageName;
+        String artifactId = packageName.substring(packageName.lastIndexOf(".") + 1);
+        String name = artifactId.substring(0, 1).toUpperCase() + artifactId.substring(1);
+        String description = name;
+        codeMap.put("pom.xml", generatePomXml(groupId, artifactId, name, description));
 
         return codeMap;
     }
@@ -687,21 +1063,27 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 工具方法：转换为类名（大驼峰）
      */
     private String convertToClassName(String code) {
-        return convertToCamelCase(code, true);
+        // 去掉表编码中的_TABLE后缀，生成更简洁的类名
+        String processedCode = code.replace("_TABLE", "");
+        return convertToCamelCase(processedCode, true);
     }
 
     /**
      * 工具方法：转换为实体名（小驼峰）
      */
     private String convertToEntityName(String code) {
-        return convertToCamelCase(code, false);
+        // 去掉表编码中的_TABLE后缀，生成更简洁的实体名
+        String processedCode = code.replace("_TABLE", "");
+        return convertToCamelCase(processedCode, false);
     }
 
     /**
      * 工具方法：转换为组件名
      */
     private String convertToComponentName(String code) {
-        return convertToCamelCase(code, true);
+        // 去掉表编码中的_TABLE后缀，生成更简洁的组件名
+        String processedCode = code.replace("_TABLE", "");
+        return convertToCamelCase(processedCode, true);
     }
 
     /**
@@ -791,12 +1173,12 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     @Override
     public String generateCheckConstraint(MetadataField field) {
         Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
-        StringBuilder checkConstraint = new StringBuilder();
+        List<String> conditions = new ArrayList<>();
         
         // 处理正则表达式
         if (validationRules.containsKey("hasPattern") && (Boolean) validationRules.get("hasPattern")) {
             String pattern = (String) validationRules.get("pattern");
-            checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` REGEXP '").append(pattern).append("')");
+            conditions.add("`" + field.getFieldName() + "` REGEXP '" + pattern + "'");
         }
         
         // 处理数值范围
@@ -805,33 +1187,35 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             Number max = convertToNumber(validationRules.get("max"));
             
             if (min != null && max != null) {
-                checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` BETWEEN ").append(min).append(" AND ").append(max).append(")");
+                conditions.add("`" + field.getFieldName() + "` BETWEEN " + min + " AND " + max);
             } else if (min != null) {
-                checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` >= ").append(min).append(")");
+                conditions.add("`" + field.getFieldName() + "` >= " + min);
             } else if (max != null) {
-                checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` <= ").append(max).append(")");
+                conditions.add("`" + field.getFieldName() + "` <= " + max);
             }
         }
         
         // 处理枚举值
         if (validationRules.containsKey("hasOptions") && (Boolean) validationRules.get("hasOptions")) {
             Object options = validationRules.get("options");
-            if (options instanceof com.alibaba.fastjson2.JSONArray) {
-                com.alibaba.fastjson2.JSONArray optionsArray = (com.alibaba.fastjson2.JSONArray) options;
+            if (options instanceof JSONArray) {
+                JSONArray optionsArray = (JSONArray) options;
                 if (!optionsArray.isEmpty()) {
-                    checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` IN (");
+                    StringBuilder inClause = new StringBuilder();
+                    inClause.append("`").append(field.getFieldName()).append("` IN (");
                     for (int i = 0; i < optionsArray.size(); i++) {
                         if (i > 0) {
-                            checkConstraint.append(", ");
+                            inClause.append(", ");
                         }
                         Object option = optionsArray.get(i);
                         if (option instanceof String) {
-                            checkConstraint.append("'").append(option).append("'");
+                            inClause.append("'").append(option).append("'");
                         } else {
-                            checkConstraint.append(option);
+                            inClause.append(option);
                         }
                     }
-                    checkConstraint.append(")");
+                    inClause.append(")");
+                    conditions.add(inClause.toString());
                 }
             }
         }
@@ -843,22 +1227,24 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             // 处理IN操作符
             if ("IN".equalsIgnoreCase(operator)) {
                 Object values = validationRules.get("values");
-                if (values instanceof com.alibaba.fastjson2.JSONArray) {
-                    com.alibaba.fastjson2.JSONArray valuesArray = (com.alibaba.fastjson2.JSONArray) values;
+                if (values instanceof JSONArray) {
+                    JSONArray valuesArray = (JSONArray) values;
                     if (!valuesArray.isEmpty()) {
-                        checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` IN (");
+                        StringBuilder inClause = new StringBuilder();
+                        inClause.append("`").append(field.getFieldName()).append("` IN (");
                         for (int i = 0; i < valuesArray.size(); i++) {
                             if (i > 0) {
-                                checkConstraint.append(", ");
+                                inClause.append(", ");
                             }
                             Object value = valuesArray.get(i);
                             if (value instanceof String) {
-                                checkConstraint.append("'").append(value).append("'");
+                                inClause.append("'").append(value).append("'");
                             } else {
-                                checkConstraint.append(value);
+                                inClause.append(value);
                             }
                         }
-                        checkConstraint.append(")");
+                        inClause.append(")");
+                        conditions.add(inClause.toString());
                     }
                 }
             }
@@ -868,12 +1254,17 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                 Number min = convertToNumber(validationRules.get("min"));
                 Number max = convertToNumber(validationRules.get("max"));
                 if (min != null && max != null) {
-                    checkConstraint.append("CHECK (`").append(field.getFieldName()).append("` BETWEEN ").append(min).append(" AND ").append(max).append(")");
+                    conditions.add("`" + field.getFieldName() + "` BETWEEN " + min + " AND " + max);
                 }
             }
         }
         
-        return checkConstraint.length() > 0 ? checkConstraint.toString() : null;
+        // 如果有条件，生成单个CHECK约束
+        if (!conditions.isEmpty()) {
+            return "CHECK (" + String.join(" AND ", conditions) + ")";
+        }
+        
+        return null;
     }
 
     /**
@@ -1022,5 +1413,240 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         sql.append(" DROP COLUMN `").append(fieldName).append("`");
         
         return sql.toString();
+    }
+
+    /**
+     * 生成Result统一响应结果类
+     */
+    @Override
+    public String generateResult(String packageName) throws Exception {
+        return "package " + packageName + ";\n\n" +
+                "import lombok.Data;\n" +
+                "import java.io.Serializable;\n\n" +
+                "/**\n" +
+                " * 统一响应结果类\n" +
+                " */\n" +
+                "@Data\n" +
+                "public class Result<T> implements Serializable {\n" +
+                "    private Integer code;\n\n" +
+                "    /**\n" +
+                "     * 响应消息\n" +
+                "     */\n" +
+                "    private String message;\n\n" +
+                "    /**\n" +
+                "     * 响应数据\n" +
+                "     */\n" +
+                "    private T data;\n\n" +
+                "    public Result() {\n" +
+                "    }\n\n" +
+                "    public Result(Integer code, String message, T data) {\n" +
+                "        this.code = code;\n" +
+                "        this.message = message;\n" +
+                "        this.data = data;\n" +
+                "    }\n\n" +
+                "    public static <T> Result<T> success() {\n" +
+                "        return new Result<>(200, \"操作成功\", null);\n" +
+                "    }\n\n" +
+                "    public static <T> Result<T> success(T data) {\n" +
+                "        return new Result<>(200, \"操作成功\", data);\n" +
+                "    }\n\n" +
+                "    public static <T> Result<T> error(String message) {\n" +
+                "        return new Result<>(500, message, null);\n" +
+                "    }\n" +
+                "}";
+    }
+
+    /**
+     * 生成PageRequest分页请求类
+     */
+    @Override
+    public String generatePageRequest(String packageName) throws Exception {
+        return "package " + packageName + ";\n\n" +
+                "import java.util.HashMap;\n" +
+                "import java.util.Map;\n\n" +
+                "/**\n" +
+                " * 分页请求类\n" +
+                " */\n" +
+                "public class PageRequest {\n" +
+                "    private Integer current = 1;\n" +
+                "    private Integer size = 10;\n" +
+                "    private String orderBy;\n" +
+                "    private String orderDirection;\n" +
+                "    private Map<String, Object> conditions;\n\n" +
+                "    /**\n" +
+                "     * 无参构造函数，初始化条件映射\n" +
+                "     */\n" +
+                "    public PageRequest() {\n" +
+                "        this.conditions = new HashMap<>();\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 获取当前页码\n" +
+                "     */\n" +
+                "    public Integer getCurrent() {\n" +
+                "        return current;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 设置当前页码\n" +
+                "     */\n" +
+                "    public void setCurrent(Integer current) {\n" +
+                "        this.current = current;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 获取每页大小\n" +
+                "     */\n" +
+                "    public Integer getSize() {\n" +
+                "        return size;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 设置每页大小\n" +
+                "     */\n" +
+                "    public void setSize(Integer size) {\n" +
+                "        this.size = size;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 获取排序字段\n" +
+                "     */\n" +
+                "    public String getOrderBy() {\n" +
+                "        return orderBy;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 设置排序字段\n" +
+                "     */\n" +
+                "    public void setOrderBy(String orderBy) {\n" +
+                "        this.orderBy = orderBy;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 获取排序方向\n" +
+                "     */\n" +
+                "    public String getOrderDirection() {\n" +
+                "        return orderDirection;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 设置排序方向\n" +
+                "     */\n" +
+                "    public void setOrderDirection(String orderDirection) {\n" +
+                "        this.orderDirection = orderDirection;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 获取条件映射\n" +
+                "     */\n" +
+                "    public Map<String, Object> getConditions() {\n" +
+                "        return conditions;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 设置条件映射\n" +
+                "     */\n" +
+                "    public void setConditions(Map<String, Object> conditions) {\n" +
+                "        this.conditions = conditions;\n" +
+                "    }\n\n" +
+                "    /**\n" +
+                "     * 获取偏移量\n" +
+                "     */\n" +
+                "    public Integer getOffset() {\n" +
+                "        return (current - 1) * size;\n" +
+                "    }\n" +
+                "}";
+    }
+
+    /**
+     * 生成PageResult分页结果类
+     */
+    @Override
+    public String generatePageResult(String packageName) throws Exception {
+        return "package " + packageName + ";\n\n" +
+                "import lombok.Data;\n" +
+                "import java.util.List;\n\n" +
+                "/**\n" +
+                " * 分页结果类\n" +
+                " */\n" +
+                "@Data\n" +
+                "public class PageResult<T> {\n" +
+                "    private Long total;\n" +
+                "    private List<T> records;\n\n" +
+                "    public PageResult() {\n" +
+                "    }\n\n" +
+                "    public PageResult(Long total, List<T> records) {\n" +
+                "        this.total = total;\n" +
+                "        this.records = records;\n" +
+                "    }\n" +
+                "}";
+    }
+
+    /**
+     * 生成Spring Boot启动类
+     */
+    @Override
+    public String generateApplication(String packageName) throws Exception {
+        return "package " + packageName + ";\n\n" +
+                "import org.mybatis.spring.annotation.MapperScan;\n" +
+                "import org.springframework.boot.SpringApplication;\n" +
+                "import org.springframework.boot.autoconfigure.SpringBootApplication;\n\n" +
+                "/**\n" +
+                " * Spring Boot应用启动类\n" +
+                " */\n" +
+                "@SpringBootApplication\n" +
+                "@MapperScan(\"" + packageName + ".mapper\")\n" +
+                "public class Application {\n" +
+                "    public static void main(String[] args) {\n" +
+                "        SpringApplication.run(Application.class, args);\n" +
+                "    }\n" +
+                "}";
+    }
+
+    /**
+     * 生成application.yml配置文件
+     */
+    @Override
+    public String generateApplicationConfig(String packageName) throws Exception {
+        return "# Spring Boot 应用配置\n" +
+                "spring:\n" +
+                "  application:\n" +
+                "    name: application\n" +
+                "  datasource:\n" +
+                "    # 数据库连接配置\n" +
+                "    url: jdbc:mysql://localhost:3306/your_database?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true\n" +
+                "    username: root\n" +
+                "    password: your_password\n" +
+                "    driver-class-name: com.mysql.cj.jdbc.Driver\n" +
+                "\n" +
+                "# 服务器配置\n" +
+                "server:\n" +
+                "  port: 8080\n" +
+                "\n" +
+                "# 日志配置\n" +
+                "logging:\n" +
+                "  level:\n" +
+                "    root: INFO\n" +
+                "    " + packageName + ": DEBUG\n";}
+    
+    /**
+     * 生成MyBatis配置类
+     */
+    @Override
+    public String generateMyBatisConfig(String packageName) throws Exception {
+        Map<String, Object> data = new HashMap<>();
+        data.put("packageName", packageName);
+        
+        Template template = freemarkerConfig.getTemplate("mybatis-config.java.ftl");
+        StringWriter writer = new StringWriter();
+        template.process(data, writer);
+        return writer.toString();
+    }
+    
+    /**
+     * 生成pom.xml配置文件
+     */
+    @Override
+    public String generatePomXml(String groupId, String artifactId, String name, String description) throws Exception {
+        Map<String, Object> data = new HashMap<>();
+        data.put("groupId", groupId);
+        data.put("artifactId", artifactId);
+        data.put("name", name);
+        data.put("description", description);
+        
+        Template template = freemarkerConfig.getTemplate("pom.xml.ftl");
+        StringWriter writer = new StringWriter();
+        template.process(data, writer);
+        return writer.toString();
     }
 }

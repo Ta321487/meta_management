@@ -26,6 +26,8 @@ public class ${className}Service {
      * 新增
      */
     public void add(${className} ${entityName}) {
+        // 验证业务规则
+        validateBusinessRules(${entityName});
         ${entityName}Mapper.insert(${entityName});
     }
 
@@ -33,7 +35,58 @@ public class ${className}Service {
      * 更新
      */
     public void update(${className} ${entityName}) {
+        // 验证业务规则
+        validateBusinessRules(${entityName});
         ${entityName}Mapper.update(${entityName});
+    }
+    
+    /**
+     * 验证业务规则
+     */
+    private void validateBusinessRules(${className} ${entityName}) {
+        <#if businessRules?has_content>
+        <#list businessRules as rule>
+        <#if rule.ruleType == "unique">
+        // 单字段唯一性验证
+        <#list rule.fields as field>
+        // 单字段唯一性验证
+        <#assign getterMethod = entityName + ".get" + field.camelCaseName?cap_first + "()" />
+        PageRequest pageRequest = new PageRequest();
+        pageRequest.getConditions().put("${field.camelCaseName}", ${getterMethod});
+        List<${className}> ${entityName}List = ${entityName}Mapper.selectByCondition(pageRequest);
+        if (${entityName}List != null && !${entityName}List.isEmpty()) {
+            // 更新时排除自身
+            if (${entityName}.getId() != null) {
+                boolean isDuplicate = ${entityName}List.stream().anyMatch(item -> !item.getId().equals(${entityName}.getId()));
+                if (isDuplicate) {
+                    throw new RuntimeException("${rule.message}");
+                }
+            } else {
+                throw new RuntimeException("${rule.message}");
+            }
+        }
+        </#list>
+        <#elseif rule.ruleType == "unique_combo">
+        // 组合字段唯一性验证
+        PageRequest pageRequest = new PageRequest();
+        <#list rule.fields as field>
+        pageRequest.getConditions().put("${field.camelCaseName}", ${entityName}.get${field.camelCaseName?cap_first}());
+        </#list>
+        List<${className}> ${entityName}List = ${entityName}Mapper.selectByCondition(pageRequest);
+        if (${entityName}List != null && !${entityName}List.isEmpty()) {
+            // 更新时排除自身
+            if (${entityName}.getId() != null) {
+                boolean isDuplicate = ${entityName}List.stream().anyMatch(item -> !item.getId().equals(${entityName}.getId()));
+                if (isDuplicate) {
+                    throw new RuntimeException("${rule.message}");
+                }
+            } else {
+                throw new RuntimeException("${rule.message}");
+            }
+        }
+        </#if>
+        </#list>
+        </#if>
     }
 
     /**

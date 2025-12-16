@@ -178,7 +178,7 @@ public class CodeGeneratorController {
     public Result<Map<String, String>> generateAll(
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
-            @RequestParam(defaultValue = "com.example") String packageName,
+            @RequestParam String packageName,
             @Parameter(description = "业务系统编码")
             @RequestParam(required = false) String businessCode) {
         try {
@@ -201,6 +201,22 @@ public class CodeGeneratorController {
             @RequestParam(required = false) String businessCode) {
         try {
             String code = codeGeneratorService.generateRoutes(tableCode, businessCode);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成业务系统下所有表的整合路由配置
+     */
+    @GetMapping("/routes/integrated/{businessCode}")
+    @Operation(description = "生成业务系统下所有表的整合路由配置")
+    public Result<String> generateIntegratedRoutes(
+            @Parameter(description = "业务系统编码")
+            @PathVariable String businessCode) {
+        try {
+            String code = codeGeneratorService.generateIntegratedRoutes(businessCode);
             return Result.success(code);
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -240,6 +256,121 @@ public class CodeGeneratorController {
         }
     }
 
+    /**
+     * 生成Result统一响应结果类
+     */
+    @GetMapping("/common/result")
+    @Operation(summary = "生成Result统一响应结果类")
+    public Result<String> generateResult(
+            @Parameter(description = "包名")
+            @RequestParam(defaultValue = "com.example.common") String packageName) {
+        try {
+            String code = codeGeneratorService.generateResult(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 
+    /**
+     * 生成PageRequest分页请求类
+     */
+    @GetMapping("/common/pageRequest")
+    @Operation(summary = "生成PageRequest分页请求类")
+    public Result<String> generatePageRequest(
+            @Parameter(description = "包名")
+            @RequestParam(defaultValue = "com.example.common") String packageName) {
+        try {
+            String code = codeGeneratorService.generatePageRequest(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 生成PageResult分页结果类
+     */
+    @GetMapping("/common/pageResult")
+    @Operation(summary = "生成PageResult分页结果类")
+    public Result<String> generatePageResult(
+            @Parameter(description = "包名")
+            @RequestParam(defaultValue = "com.example.common") String packageName) {
+        try {
+            String code = codeGeneratorService.generatePageResult(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 生成Spring Boot启动类
+     */
+    @GetMapping("/common/application")
+    @Operation(summary = "生成Spring Boot启动类")
+    public Result<String> generateApplication(
+            @Parameter(description = "包名")
+            @RequestParam String packageName) {
+        try {
+            String code = codeGeneratorService.generateApplication(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+
+    /**
+     * 生成application.yml配置文件
+     */
+    @GetMapping("/common/applicationYml")
+    @Operation(summary = "生成application.yml配置文件")
+    public Result<String> generateApplicationYml(
+            @Parameter(description = "包名")
+            @RequestParam String packageName) {
+        try {
+            String code = codeGeneratorService.generateApplicationConfig(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成MyBatis配置类
+     */
+    @GetMapping("/common/mybatisConfig")
+    @Operation(summary = "生成MyBatis配置类")
+    public Result<String> generateMyBatisConfig(
+            @Parameter(description = "包名")
+            @RequestParam String packageName) {
+        try {
+            String code = codeGeneratorService.generateMyBatisConfig(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成pom.xml配置文件
+     */
+    @GetMapping("/common/pomXml")
+    @Operation(summary = "生成pom.xml配置文件")
+    public Result<String> generatePomXml(
+            @Parameter(description = "包名")
+            @RequestParam String packageName) {
+        try {
+            String groupId = packageName;
+            String artifactId = packageName.substring(packageName.lastIndexOf(".") + 1);
+            String name = artifactId.substring(0, 1).toUpperCase() + artifactId.substring(1);
+            String description = name;
+            String code = codeGeneratorService.generatePomXml(groupId, artifactId, name, description);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
 }
 

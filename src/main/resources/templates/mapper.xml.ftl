@@ -5,39 +5,50 @@
 <mapper namespace="${packageName}.mapper.${className}Mapper">
 
     <resultMap id="BaseResultMap" type="${packageName}.entity.${className}">
-<#list fields as field>
-        <#if field.field.fieldName == 'id'>
-        <id column="<#if table.pkStrategy == 'UUID'>uuid<#else>${field.field.fieldName}</#if>" property="${field.camelCaseName}"/>
-        <#else>
-        <result column="${field.field.fieldName}" property="${field.camelCaseName}"/>
-        </#if>
-</#list>
+        <#list fields as field>
+            <#if field.field.fieldName == 'id'>
+            <id column="<#if table.pkStrategy == 'UUID'>uuid<#else>${field.field.fieldName}</#if>" property="${field.camelCaseName}"/>
+            </#if>
+        </#list>
+        <#list fields as field>
+            <#if field.field.fieldName != 'id'>
+            <result column="${field.field.fieldName}" property="${field.camelCaseName}"/>
+            </#if>
+        </#list>
     </resultMap>
 
     <#if table.pkStrategy == 'UUID'>
     <insert id="insert" parameterType="${packageName}.entity.${className}">
         INSERT INTO ${tableName} (
-<#list fields as field>
-            <#if field.field.fieldName == 'id'><#if table.pkStrategy == 'UUID'>uuid<#else>${field.field.fieldName}</#if><#else>${field.field.fieldName}</#if><#if field_has_next>,</#if>
-</#list>
+            uuid
+            <#list fields as field>
+                <#if field.field.fieldName != 'id'>
+                    ,${field.field.fieldName}
+                </#if>
+            </#list>
         ) VALUES (
-<#list fields as field>
-            ${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
-</#list>
+            #{id}
+            <#list fields as field>
+                <#if field.field.fieldName != 'id'>
+                    ,${"#{" + field.camelCaseName + "}"}
+                </#if>
+            </#list>
         )
     </insert>
     <#else>
     <insert id="insert" parameterType="${packageName}.entity.${className}" useGeneratedKeys="true" keyProperty="<#noparse>id</#noparse>">
         INSERT INTO ${tableName} (
-<#list fields as field>
-            <#if field.field.fieldName != "id">${field.field.fieldName}<#if field_has_next>,</#if>
-            </#if>
-</#list>
+            <#list fields as field>
+                <#if field.field.fieldName != "id">
+                    ${field.field.fieldName}<#sep>,</#sep>
+                </#if>
+            </#list>
         ) VALUES (
-<#list fields as field>
-            <#if field.field.fieldName != "id">${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
-            </#if>
-</#list>
+            <#list fields as field>
+                <#if field.field.fieldName != "id">
+                    ${"#{" + field.camelCaseName + "}"}<#sep>,</#sep>
+                </#if>
+            </#list>
         )
     </insert>
     </#if>
@@ -45,10 +56,11 @@
     <update id="update" parameterType="${packageName}.entity.${className}">
         UPDATE ${tableName}
         SET
-<#list fields as field>
-            <#if field.field.fieldName != "id">${field.field.fieldName} = ${"#{" + field.camelCaseName + "}"}<#if field_has_next>,</#if>
-            </#if>
-</#list>
+            <#list fields as field>
+                <#if field.field.fieldName != "id">
+                    ${field.field.fieldName} = ${"#{" + field.camelCaseName + "}"}<#sep>,</#sep>
+                </#if>
+            </#list>
         WHERE <#if table.pkStrategy == 'UUID'>uuid<#else>id</#if> = <#noparse>#{id}</#noparse>
     </update>
 
@@ -132,4 +144,3 @@
     </select>
 
 </mapper>
-

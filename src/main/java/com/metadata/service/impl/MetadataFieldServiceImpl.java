@@ -356,6 +356,14 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     public List<MetadataField> listByTableCode(String tableCode) {
         return fieldMapper.selectByTableCode(tableCode);
     }
+    
+    /**
+     * 查询表的所有字段（按业务系统）
+     */
+    @Override
+    public List<MetadataField> listByTableCode(String tableCode, String businessCode) {
+        return fieldMapper.selectByTableCode(tableCode, businessCode);
+    }
 
     /**
      * 分页查询表的字段

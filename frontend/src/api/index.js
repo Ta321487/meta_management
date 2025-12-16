@@ -68,8 +68,16 @@ export const generateVueList = (tableCode, businessCode) => request.get(`/codege
 export const generateVueForm = (tableCode, businessCode) => request.get(`/codegen/vue/form/${tableCode}`, { params: { businessCode } })
 export const generateAll = (tableCode, packageName, businessCode) => request.get(`/codegen/all/${tableCode}`, { params: { packageName, businessCode } })
 export const generateRoutes = (tableCode, businessCode) => request.get(`/codegen/routes/${tableCode}`, { params: { businessCode } })
+export const generateIntegratedRoutes = (businessCode) => request.get(`/codegen/routes/integrated/${businessCode}`)
 export const generateAllByBusinessSystem = (businessCode, packageName) => request.get(`/codegen/allByBusinessSystem/${businessCode}`, { params: { packageName } })
 export const generateAllSQLByBusinessSystem = (businessCode) => request.get(`/codegen/sqlByBusinessSystem/${businessCode}`)
+export const generateResult = (packageName) => request.get(`/codegen/common/result`, { params: { packageName } })
+export const generatePageRequest = (packageName) => request.get(`/codegen/common/pageRequest`, { params: { packageName } })
+export const generatePageResult = (packageName) => request.get(`/codegen/common/pageResult`, { params: { packageName } })
+export const generateApplication = (packageName) => request.get(`/codegen/common/application`, { params: { packageName } })
+export const generateApplicationYml = (packageName) => request.get(`/codegen/common/applicationYml`, { params: { packageName } })
+export const generateMyBatisConfig = (packageName) => request.get(`/codegen/common/mybatisConfig`, { params: { packageName } })
+export const generatePomXml = (packageName) => request.get(`/codegen/common/pomXml`, { params: { packageName } })
 
 // 代码测试相关
 export const testCode = (tableCode, packageName) => request.get(`/codetest/test/${tableCode}`, { params: { packageName } })

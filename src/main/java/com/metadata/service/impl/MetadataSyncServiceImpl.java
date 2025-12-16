@@ -1,5 +1,7 @@
 package com.metadata.service.impl;
 
+import com.alibaba.fastjson2.JSONArray;
+import com.alibaba.fastjson2.JSONObject;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
@@ -12,22 +14,11 @@ import com.metadata.service.OperationLogService;
 import com.metadata.service.constant.SqlConstants;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.alibaba.fastjson2.JSONArray;
-import com.alibaba.fastjson2.JSONObject;
 
 import javax.sql.DataSource;
 import java.security.MessageDigest;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.ResultSet;
-import java.sql.Statement;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.sql.*;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -121,7 +112,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 
                 // 通过查询 information_schema 获取表注释（MySQL）
                 // 使用PreparedStatement防止SQL注入，表名使用反引号包裹
-                try (java.sql.PreparedStatement pstmt = connection.prepareStatement(
+                try (PreparedStatement pstmt = connection.prepareStatement(
                          "SELECT TABLE_COMMENT FROM information_schema.TABLES " +
                          "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?")) {
                     pstmt.setString(1, tableName);
@@ -648,7 +639,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
             }
             
             // 取前42个字符，加上"REL_"前缀，总共46个字符
-            String hash = hexString.toString().substring(0, Math.min(42, hexString.length()));
+            String hash = hexString.substring(0, Math.min(42, hexString.length()));
             return SqlConstants.RELATION_CODE_PREFIX + hash.toUpperCase();
         } catch (Exception e) {
             // 如果哈希生成失败，使用截断的方式（不推荐，但作为后备方案）

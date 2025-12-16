@@ -32,7 +32,7 @@
           <el-input v-model="form.packageName" placeholder="如：com.example" style="width: 300px" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="form.tableCode ? handleGenerateCurrentTable() : handleGenerateAllTables()">
+          <el-button type="primary" @click="form.tableCode ? handleGenerateCurrentTable() : handleGenerateAllTables()" :tooltip="'生成所有类型的代码'">
             生成代码
           </el-button>
           <el-button type="success" @click="runTest" :disabled="!form.tableCode">测试代码</el-button>
@@ -43,8 +43,8 @@
         <el-tab-pane label="SQL建表语句" name="sql">
           <div class="code-container" v-if="form.tableCode || codeMap.sql">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + '.sql' : 'all_tables.sql' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('sql')">生成</el-button>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + '.sql') : 'all_tables.sql' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('sql')" :tooltip="'刷新当前标签页的SQL代码'">刷新</el-button>
               <el-button type="success" size="small" @click="handleCopy('sql')">复制</el-button>
             </div>
             <el-input
@@ -63,8 +63,8 @@
         <el-tab-pane label="Entity实体类" name="entity">
           <div class="code-container" v-if="form.tableCode || codeMap.entity">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'Entity.java' : 'Entity.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('entity')">生成</el-button>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Entity.java') : 'Entity.java' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('entity')" :tooltip="'刷新当前标签页的实体类代码'">刷新</el-button>
               <el-button type="success" size="small" @click="handleCopy('entity')">复制</el-button>
             </div>
             <el-input
@@ -83,8 +83,8 @@
         <el-tab-pane label="Controller" name="controller">
           <div class="code-container" v-if="form.tableCode || codeMap.controller">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'Controller.java' : 'Controller.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('controller')">生成</el-button>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Controller.java') : 'Controller.java' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('controller')" :tooltip="'刷新当前标签页的Controller代码'">刷新</el-button>
               <el-button type="success" size="small" @click="handleCopy('controller')">复制</el-button>
             </div>
             <el-input
@@ -103,8 +103,8 @@
         <el-tab-pane label="Service" name="service">
           <div class="code-container" v-if="form.tableCode || codeMap.service">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'Service.java' : 'Service.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('service')">生成</el-button>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Service.java') : 'Service.java' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('service')" :tooltip="'刷新当前标签页的Service代码'">刷新</el-button>
               <el-button type="success" size="small" @click="handleCopy('service')">复制</el-button>
             </div>
             <el-input
@@ -123,8 +123,8 @@
         <el-tab-pane label="Mapper接口" name="mapper">
           <div class="code-container" v-if="form.tableCode || codeMap.mapper">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'Mapper.java' : 'Mapper.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('mapper')">生成</el-button>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Mapper.java') : 'Mapper.java' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('mapper')" :tooltip="'刷新当前标签页的Mapper接口代码'">刷新</el-button>
               <el-button type="success" size="small" @click="handleCopy('mapper')">复制</el-button>
             </div>
             <el-input
@@ -140,11 +140,83 @@
           </div>
         </el-tab-pane>
 
-        <el-tab-pane label="Mapper XML" name="mapperxml">
+        <el-tab-pane label="启动类" name="application">
+          <div class="code-container">
+            <div class="code-header">
+              <span>Application.java</span>
+              <el-button type="primary" size="small" @click="handleGenerate('application')" :tooltip="'刷新当前标签页的启动类代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('application')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.application"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成启动类代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="配置文件" name="applicationYml">
+          <div class="code-container">
+            <div class="code-header">
+              <span>application.yml</span>
+              <el-button type="primary" size="small" @click="handleGenerate('applicationYml')" :tooltip="'刷新当前标签页的配置文件代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('applicationYml')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.applicationYml"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成配置文件代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="MyBatis配置" name="mybatisConfig">
+          <div class="code-container">
+            <div class="code-header">
+              <span>MyBatisConfig.java</span>
+              <el-button type="primary" size="small" @click="handleGenerate('mybatisConfig')" :tooltip="'刷新当前标签页的MyBatis配置代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('mybatisConfig')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.mybatisConfig"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成MyBatis配置代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="pom.xml" name="pomXml">
+          <div class="code-container">
+            <div class="code-header">
+              <span>pom.xml</span>
+              <el-button type="primary" size="small" @click="handleGenerate('pomXml')" :tooltip="'刷新当前标签页的pom.xml代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('pomXml')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.pomXml"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成pom.xml代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="Mapper.xml" name="mapperxml">
           <div class="code-container" v-if="form.tableCode || codeMap.mapperxml">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'Mapper.xml' : 'Mapper.xml' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('mapperxml')">生成</el-button>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Mapper.xml') : 'Mapper.xml' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('mapperxml')" :tooltip="'刷新当前标签页的Mapper XML代码'">刷新</el-button>
               <el-button type="success" size="small" @click="handleCopy('mapperxml')">复制</el-button>
             </div>
             <el-input
@@ -163,9 +235,9 @@
         <el-tab-pane label="Vue列表页" name="vueList">
           <div class="code-container" v-if="form.tableCode || codeMap.vueList">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'List.vue' : 'List.vue' }}</span>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'List.vue') : 'List.vue' }}</span>
               <div>
-                <el-button type="primary" size="small" @click="handleGenerate('vueList')">生成</el-button>
+                <el-button type="primary" size="small" @click="handleGenerate('vueList')" :tooltip="'刷新当前标签页的Vue列表页代码'">刷新</el-button>
                 <el-button type="success" size="small" @click="handleCopy('vueList')">复制</el-button>
                 <el-button
                   type="warning"
@@ -193,9 +265,9 @@
         <el-tab-pane label="Vue表单页" name="vueForm">
           <div class="code-container" v-if="form.tableCode || codeMap.vueForm">
             <div class="code-header">
-              <span>{{ form.tableCode ? form.tableCode + 'Form.vue' : 'Form.vue' }}</span>
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Form.vue') : 'Form.vue' }}</span>
               <div>
-                <el-button type="primary" size="small" @click="handleGenerate('vueForm')">生成</el-button>
+                <el-button type="primary" size="small" @click="handleGenerate('vueForm')" :tooltip="'刷新当前标签页的Vue表单页代码'">刷新</el-button>
                 <el-button type="success" size="small" @click="handleCopy('vueForm')">复制</el-button>
                 <el-button
                   type="warning"
@@ -221,11 +293,12 @@
         </el-tab-pane>
 
         <el-tab-pane label="Routes" name="routes">
-          <div class="code-container" v-if="form.tableCode || codeMap.routes">
+          <div class="code-container" v-if="form.tableCode || codeMap.routes || form.businessCode">
             <div class="code-header">
               <span>routes.js</span>
               <div>
-                <el-button type="primary" size="small" @click="handleGenerate('routes')">生成</el-button>
+                <el-button type="primary" size="small" @click="handleGenerate('routes')" :disabled="!form.tableCode" :tooltip="'刷新当前标签页的路由配置代码'">刷新</el-button>
+                <el-button type="warning" size="small" @click="handleGenerate('integratedRoutes')" :disabled="!form.businessCode">生成整合路由</el-button>
                 <el-button type="success" size="small" @click="handleCopy('routes')">复制</el-button>
                 <el-button type="info" size="small" @click="handleDownload('routes', 'routes.js')">下载</el-button>
               </div>
@@ -242,6 +315,61 @@
             <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
           </div>
         </el-tab-pane>
+
+        <el-tab-pane label="Result类" name="result">
+          <div class="code-container">
+            <div class="code-header">
+              <span>Result.java</span>
+              <el-button type="primary" size="small" @click="handleGenerate('result')" :tooltip="'刷新当前标签页的Result类代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('result')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.result"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成Result类代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="PageRequest类" name="pageRequest">
+          <div class="code-container">
+            <div class="code-header">
+              <span>PageRequest.java</span>
+              <el-button type="primary" size="small" @click="handleGenerate('pageRequest')" :tooltip="'刷新当前标签页的PageRequest类代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('pageRequest')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.pageRequest"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成PageRequest类代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="PageResult类" name="pageResult">
+          <div class="code-container">
+            <div class="code-header">
+              <span>PageResult.java</span>
+              <el-button type="primary" size="small" @click="handleGenerate('pageResult')" :tooltip="'刷新当前标签页的PageResult类代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('pageResult')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.pageResult"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成PageResult类代码"
+            />
+          </div>
+        </el-tab-pane>
+
       </el-tabs>
 
       <!-- 测试结果卡片 -->
@@ -646,12 +774,20 @@ import {
   generateVueForm,
   generateAll,
   generateRoutes,
+  generateIntegratedRoutes,
   testCode,
   getFieldList,
   getTableByCode,
   getBusinessSystemList,
   generateAllByBusinessSystem,
-  generateAllSQLByBusinessSystem
+  generateAllSQLByBusinessSystem,
+  generateResult,
+  generatePageRequest,
+  generatePageResult,
+  generateApplication,
+  generateApplicationYml,
+  generateMyBatisConfig,
+  generatePomXml
 } from '../api'
 
 export default {
@@ -672,9 +808,16 @@ export default {
       service: '',
       mapper: '',
       mapperxml: '',
+      application: '',
+      applicationYml: '',
+      mybatisConfig: '',
+      pomXml: '',
       vueList: '',
       vueForm: '',
-      routes: ''
+      routes: '',
+      result: '',
+      pageRequest: '',
+      pageResult: ''
     })
     const testResult = ref(null)
     const activeTestItems = ref([])
@@ -780,11 +923,6 @@ export default {
     }
 
     const handleGenerate = async (type) => {
-      if (!form.tableCode) {
-        ElMessage.warning('请先选择表')
-        return
-      }
-
       try {
         let res
         switch (type) {
@@ -842,6 +980,65 @@ export default {
               codeMap.routes = res.data
             }
             break
+          case 'integratedRoutes':
+            if (!form.businessCode) {
+              ElMessage.warning('请先选择业务系统')
+              return
+            }
+            res = await generateIntegratedRoutes(form.businessCode)
+            if (res.code === 200) {
+              codeMap.routes = res.data
+            }
+            break
+          case 'result':
+            let commonPackage1 = form.packageName + '.common'
+            res = await generateResult(commonPackage1)
+            if (res.code === 200) {
+              codeMap.result = res.data
+            }
+            break
+          case 'pageRequest':
+            let commonPackage2 = form.packageName + '.common'
+            res = await generatePageRequest(commonPackage2)
+            if (res.code === 200) {
+              codeMap.pageRequest = res.data
+            }
+            break
+          case 'pageResult':
+            let commonPackage3 = form.packageName + '.common'
+            res = await generatePageResult(commonPackage3)
+            if (res.code === 200) {
+              codeMap.pageResult = res.data
+            }
+            break
+          case 'application':
+            // 生成启动类，不需要选择表
+            let resApp = await generateApplication(form.packageName)
+            if (resApp.code === 200) {
+              codeMap.application = resApp.data
+            }
+            break
+          case 'applicationYml':
+            // 生成配置文件，不需要选择表
+            let resAppYml = await generateApplicationYml(form.packageName)
+            if (resAppYml.code === 200) {
+              codeMap.applicationYml = resAppYml.data
+            }
+            break
+          case 'mybatisConfig':
+            // 生成MyBatis配置文件，不需要选择表
+            let resMyBatisConfig = await generateMyBatisConfig(form.packageName)
+            if (resMyBatisConfig.code === 200) {
+              codeMap.mybatisConfig = resMyBatisConfig.data
+            }
+            break
+          case 'pomXml':
+            // 生成pom.xml配置文件，不需要选择表
+            let resPomXml = await generatePomXml(form.packageName)
+            if (resPomXml.code === 200) {
+              codeMap.pomXml = resPomXml.data
+            }
+            break
         }
         ElMessage.success('生成成功')
       } catch (error) {
@@ -865,13 +1062,19 @@ export default {
           codeMap.controller = data['Controller.java'] || ''
           codeMap.service = data['Service.java'] || ''
           codeMap.mapper = data['Mapper.java'] || ''
+          codeMap.application = data['Application.java'] || ''
+          codeMap.applicationYml = data['application.yml'] || ''
+          codeMap.mybatisConfig = data['MyBatisConfig.java'] || ''
           codeMap.mapperxml = data['Mapper.xml'] || ''
           codeMap.vueList = data['List.vue'] || ''
           codeMap.vueForm = data['Form.vue'] || ''
           codeMap.routes = data['routes.js'] || data['routes'] || ''
+          codeMap.result = data['Result.java'] || ''
+          codeMap.pageRequest = data['PageRequest.java'] || ''
+          codeMap.pageResult = data['PageResult.java'] || ''
+          codeMap.pomXml = data['pom.xml'] || ''
           ElMessage.success('代码生成成功')
-          // 生成成功后自动运行测试
-          await runTest()
+          // 移除自动运行测试，避免因testCode接口404导致生成失败提示
         }
       } catch (error) {
         ElMessage.error('生成失败：' + (error.message || '未知错误'))
@@ -933,10 +1136,15 @@ export default {
               codeMap.controller = tableCodeMap['Controller.java'] || ''
               codeMap.service = tableCodeMap['Service.java'] || ''
               codeMap.mapper = tableCodeMap['Mapper.java'] || ''
+              codeMap.application = tableCodeMap['Application.java'] || ''
+              codeMap.applicationYml = tableCodeMap['application.yml'] || ''
               codeMap.mapperxml = tableCodeMap['Mapper.xml'] || ''
               codeMap.vueList = tableCodeMap['List.vue'] || ''
               codeMap.vueForm = tableCodeMap['Form.vue'] || ''
               codeMap.routes = tableCodeMap['routes.js'] || ''
+              codeMap.result = tableCodeMap['Result.java'] || ''
+              codeMap.pageRequest = tableCodeMap['PageRequest.java'] || ''
+              codeMap.pageResult = tableCodeMap['PageResult.java'] || ''
               console.log('Generated code for table:', targetTableCode)
             }
           } else {
@@ -949,25 +1157,26 @@ export default {
             })
           }
           
-          // 运行测试
-          await runTest()
+          // 移除自动运行测试，避免因testCode接口404导致生成失败提示
         } else {
-          // 没有选择表，清空非SQL代码，只保留SQL代码
-          Object.keys(codeMap).forEach(key => {
-            if (key !== 'sql') {
-              codeMap[key] = ''
-            }
-          })
-        }
+            // 没有选择表，清空非SQL代码，只保留SQL代码和通用类代码
+            Object.keys(codeMap).forEach(key => {
+              if (key !== 'sql' && key !== 'result' && key !== 'pageRequest' && key !== 'pageResult') {
+                codeMap[key] = ''
+              }
+            })
+          }
         
         ElMessage.success('所有表代码生成成功')
         
       } catch (error) {
         console.error('Generate all tables error:', error)
         ElMessage.error('生成失败：' + (error.message || '未知错误'))
-        // 清空代码，显示提示信息
+        // 清空代码，显示提示信息，保留通用类代码
         Object.keys(codeMap).forEach(key => {
-          codeMap[key] = ''
+          if (key !== 'result' && key !== 'pageRequest' && key !== 'pageResult') {
+            codeMap[key] = ''
+          }
         })
       }
     }

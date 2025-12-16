@@ -3,27 +3,20 @@ package com.metadata.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataModuleTableMapper;
 import com.metadata.mapper.MetadataTableMapper;
-import com.metadata.service.CodeGeneratorService;
-import com.metadata.service.MetadataTableRelationService;
-import com.metadata.service.MetadataTableService;
-import com.metadata.service.OperationLogService;
-import com.metadata.service.SqlExecuteService;
+import com.metadata.service.*;
 import com.metadata.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * 表服务实现
@@ -74,11 +67,11 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         tableMapper.insert(table);
         
         // 检查是否有字段配置
-        List<com.metadata.entity.MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
+        List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
         
         // 如果没有字段，根据主键策略自动创建一个主键字段
             if (fields.isEmpty()) {
-                com.metadata.entity.MetadataField primaryKeyField = new com.metadata.entity.MetadataField();
+                MetadataField primaryKeyField = new MetadataField();
                 primaryKeyField.setFieldCode("ID");
                 primaryKeyField.setTableCode(table.getTableCode());
                 // 根据主键策略设置不同的字段名

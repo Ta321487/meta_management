@@ -70,7 +70,7 @@
           <el-input v-model="form.ruleCode" placeholder="如：RULE_001" />
         </el-form-item>
         <el-form-item label="规则类型" prop="ruleType">
-          <el-select v-model="form.ruleType" placeholder="请选择" style="width: 100%">
+          <el-select v-model="form.ruleType" placeholder="请选择" style="width: 100%" @change="handleRuleTypeChange">
             <el-option label="验证规则" value="VALIDATION_RULE" />
             <el-option label="搜索规则" value="SEARCH_RULE" />
             <el-option label="显示规则" value="DISPLAY_RULE" />
@@ -84,6 +84,8 @@
             v-model="form.ruleContent"
             min-height="100px"
             max-height="400px"
+            :show-test-and-example="true"
+            :rule-type="form.ruleType"
             :options="{
               maxLines: 20,
               minLines: 1
@@ -318,6 +320,11 @@ export default {
       pagination.total = 0
       loadModules()
     }
+    
+    // 监听规则类型变化，清空规则内容
+    const handleRuleTypeChange = () => {
+      form.ruleContent = ''
+    }
 
     return {
       businessSystems,
@@ -343,7 +350,8 @@ export default {
       handleSubmit,
       handleDelete,
       handleDialogClose,
-      handleBusinessSystemChange
+      handleBusinessSystemChange,
+      handleRuleTypeChange
     }
   }
 }
