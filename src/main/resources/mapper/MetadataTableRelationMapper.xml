@@ -110,6 +110,18 @@
             AND business_code = #{businessCode}
         </if>
     </select>
+    
+    <update id="updateRelationBusinessSystemByMainTable">
+        UPDATE metadata_table_relation
+        SET business_code = #{businessCode}
+        WHERE main_table_code = #{mainTableCode}
+    </update>
+    
+    <update id="updateRelationBusinessSystemBySlaveTable">
+        UPDATE metadata_table_relation
+        SET business_code = #{businessCode}
+        WHERE slave_table_code = #{slaveTableCode}
+    </update>
 
 </mapper>
 

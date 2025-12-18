@@ -9,6 +9,7 @@ import com.metadata.entity.MetadataTableRelation;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataModuleTableMapper;
 import com.metadata.mapper.MetadataTableMapper;
+import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.*;
 import com.metadata.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,9 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     @Autowired
     @Lazy
     private MetadataTableRelationService relationService;
+
+    @Autowired
+    private MetadataTableRelationMapper relationMapper;
 
     /**
      * 新增表
@@ -253,10 +257,6 @@ public class MetadataTableServiceImpl implements MetadataTableService {
      */
     @Override
     public List<MetadataTable> list(String tableName, String businessCode) {
-        // 当businessCode为null或空字符串时，返回空列表，确保不返回所有表
-        if (businessCode == null || businessCode.isEmpty()) {
-            return new ArrayList<>();
-        }
         return tableMapper.selectAll(tableName, businessCode);
     }
 
@@ -347,6 +347,12 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         
         // 更新表关联的所有字段的业务系统
         fieldMapper.updateFieldsBusinessSystemByTable(tableCode, businessCode);
+        
+        // 更新该表作为主表的所有关联关系的业务系统编码
+        relationMapper.updateRelationBusinessSystemByMainTable(tableCode, businessCode);
+        
+        // 更新该表作为从表的所有关联关系的业务系统编码
+        relationMapper.updateRelationBusinessSystemBySlaveTable(tableCode, businessCode);
         
         logService.logSuccess("admin", "EDIT", "更新表业务系统：" + tableCode + " -> " + businessCode);
     }

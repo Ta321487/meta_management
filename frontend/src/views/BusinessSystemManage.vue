@@ -79,7 +79,7 @@
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入业务系统描述" />
         </el-form-item>
         <el-form-item label="是否默认">
-          <el-switch v-model="form.isDefault" active-value="1" inactive-value="0" />
+          <el-switch v-model="form.isDefault" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>

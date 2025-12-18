@@ -81,5 +81,21 @@ public interface MetadataTableRelationMapper {
     ) {
         return selectByTablesAndFields(mainTableCode, slaveTableCode, mainFieldCode, slaveFieldCode, "DEFAULT");
     }
+    
+    /**
+     * 根据主表编码更新关联关系的业务系统编码
+     * @param mainTableCode 主表编码
+     * @param businessCode 业务系统编码
+     * @return 更新的记录数
+     */
+    int updateRelationBusinessSystemByMainTable(@Param("mainTableCode") String mainTableCode, @Param("businessCode") String businessCode);
+    
+    /**
+     * 根据从表编码更新关联关系的业务系统编码
+     * @param slaveTableCode 从表编码
+     * @param businessCode 业务系统编码
+     * @return 更新的记录数
+     */
+    int updateRelationBusinessSystemBySlaveTable(@Param("slaveTableCode") String slaveTableCode, @Param("businessCode") String businessCode);
 }
 

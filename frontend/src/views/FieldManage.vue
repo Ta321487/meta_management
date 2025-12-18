@@ -64,6 +64,7 @@
                 :type="row.isEnabled === 1 ? 'warning' : 'success'" 
                 size="small" 
                 @click="handleToggleEnable(row)"
+                :disabled="isPrimaryKey(row)"
               >
                 {{ row.isEnabled === 1 ? '禁用' : '启用' }}
               </el-button>
@@ -801,6 +802,12 @@ export default {
       const newStatus = row.isEnabled === 1 ? 0 : 1
       const statusText = newStatus === 1 ? '启用' : '禁用'
       
+      // 增强主键字段判断：防止主键字段被禁用
+      if (newStatus === 0 && isPrimaryKey(row)) {
+        ElMessage.error('主键字段不允许禁用')
+        return
+      }
+      
       ElMessageBox.confirm(`确定要${statusText}该字段吗？`, '提示', {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
@@ -832,6 +839,11 @@ export default {
       selectedRows.value = selection
     }
 
+    // 判断字段是否为主键
+    const isPrimaryKey = (row) => {
+      return row.formComponent === 'primary_key' || row.fieldName === 'id' || row.fieldName === 'uuid'
+    }
+
     // 处理批量删除
     const handleBatchDelete = async () => {
       if (!selectedRows.value || selectedRows.value.length === 0) {
@@ -840,9 +852,7 @@ export default {
       }
       
       // 增强主键字段判断：检查formComponent或字段名为id/uuid
-      const hasPrimaryKey = selectedRows.value.some(row => 
-        row.formComponent === 'primary_key' || row.fieldName === 'id' || row.fieldName === 'uuid'
-      )
+      const hasPrimaryKey = selectedRows.value.some(row => isPrimaryKey(row))
       
       // 检查删除后是否会导致表中字段数量为0
       const remainingFieldsCount = pagination.total - selectedRows.value.length
@@ -996,7 +1006,9 @@ export default {
       // 约束相关方法
       handleViewConstraints,
       loadConstraints,
-      handleDeleteConstraint
+      handleDeleteConstraint,
+      // 辅助函数
+      isPrimaryKey
     }
   }
 }

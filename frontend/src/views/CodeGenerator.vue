@@ -19,7 +19,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="选择表">
-          <el-select v-model="form.tableCode" placeholder="请选择表" style="width: 300px" @change="handleTableChange">
+          <el-select v-model="form.tableCode" placeholder="请选择表" style="width: 300px" @change="handleTableChange" clearable>
             <el-option
               v-for="table in tables"
               :key="table.tableCode"
@@ -40,455 +40,470 @@
         </el-form-item>
       </el-form>
 
-      <el-tabs v-model="activeTab" type="border-card">
-        <el-tab-pane label="SQL建表语句" name="sql">
-          <div class="code-container" v-if="form.tableCode || codeMap.sql">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + '.sql') : 'all_tables.sql' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('sql')" :tooltip="'刷新当前标签页的SQL代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('sql')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.sql"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Entity实体类" name="entity">
-          <div class="code-container" v-if="form.tableCode || codeMap.entity">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Entity.java') : 'Entity.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('entity')" :tooltip="'刷新当前标签页的实体类代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('entity')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.entity"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Controller" name="controller">
-          <div class="code-container" v-if="form.tableCode || codeMap.controller">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Controller.java') : 'Controller.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('controller')" :tooltip="'刷新当前标签页的Controller代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('controller')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.controller"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Service" name="service">
-          <div class="code-container" v-if="form.tableCode || codeMap.service">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Service.java') : 'Service.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('service')" :tooltip="'刷新当前标签页的Service代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('service')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.service"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Mapper接口" name="mapper">
-          <div class="code-container" v-if="form.tableCode || codeMap.mapper">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Mapper.java') : 'Mapper.java' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('mapper')" :tooltip="'刷新当前标签页的Mapper接口代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('mapper')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.mapper"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="启动类" name="application">
-          <div class="code-container">
-            <div class="code-header">
-              <span>Application.java</span>
-              <el-button type="primary" size="small" @click="handleGenerate('application')" :tooltip="'刷新当前标签页的启动类代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('application')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.application"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成启动类代码"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="配置文件" name="applicationYml">
-          <div class="code-container">
-            <div class="code-header">
-              <span>application.yml</span>
-              <el-button type="primary" size="small" @click="handleGenerate('applicationYml')" :tooltip="'刷新当前标签页的配置文件代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('applicationYml')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.applicationYml"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成配置文件代码"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="MyBatis配置" name="mybatisConfig">
-          <div class="code-container">
-            <div class="code-header">
-              <span>MyBatisConfig.java</span>
-              <el-button type="primary" size="small" @click="handleGenerate('mybatisConfig')" :tooltip="'刷新当前标签页的MyBatis配置代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('mybatisConfig')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.mybatisConfig"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成MyBatis配置代码"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="CORS配置" name="corsConfig">
-          <div class="code-container">
-            <div class="code-header">
-              <span>CorsConfig.java</span>
-              <el-button type="primary" size="small" @click="handleGenerate('corsConfig')" :tooltip="'刷新当前标签页的CORS配置代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('corsConfig')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.corsConfig"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成CORS配置代码"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="pom.xml" name="pomXml">
-          <div class="code-container">
-            <div class="code-header">
-              <span>pom.xml</span>
-              <el-button type="primary" size="small" @click="handleGenerate('pomXml')" :tooltip="'刷新当前标签页的pom.xml代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('pomXml')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.pomXml"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成pom.xml代码"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Mapper.xml" name="mapperxml">
-          <div class="code-container" v-if="form.tableCode || codeMap.mapperxml">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Mapper.xml') : 'Mapper.xml' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('mapperxml')" :tooltip="'刷新当前标签页的Mapper XML代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('mapperxml')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.mapperxml"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Vue列表页" name="vueList">
-          <div class="code-container" v-if="form.tableCode || codeMap.vueList">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'List.vue') : 'List.vue' }}</span>
-              <div>
-                <el-button type="primary" size="small" @click="handleGenerate('vueList')" :tooltip="'刷新当前标签页的Vue列表页代码'">刷新</el-button>
-                <el-button type="success" size="small" @click="handleCopy('vueList')">复制</el-button>
-                <el-button
-                  type="warning"
-                  size="small"
-                  @click="handlePreviewList"
-                  :disabled="!form.tableCode"
-                >
-                  预览样式
-                </el-button>
+      <el-collapse v-model="activeCollapse" accordion>
+        <!-- Java相关 -->
+        <el-collapse-item title="Java相关" name="java">
+          <el-tabs v-model="activeTab" type="border-card" class="nested-tabs">
+            <el-tab-pane label="SQL建表语句" name="sql">
+              <div class="code-container" v-if="form.tableCode || codeMap.sql">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + '.sql') : 'all_tables.sql' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('sql')" :tooltip="'刷新当前标签页的SQL代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('sql')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.sql"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
               </div>
-            </div>
-            <el-input
-              v-model="codeMap.vueList"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Vue表单页" name="vueForm">
-          <div class="code-container" v-if="form.tableCode || codeMap.vueForm">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Form.vue') : 'Form.vue' }}</span>
-              <div>
-                <el-button type="primary" size="small" @click="handleGenerate('vueForm')" :tooltip="'刷新当前标签页的Vue表单页代码'">刷新</el-button>
-                <el-button type="success" size="small" @click="handleCopy('vueForm')">复制</el-button>
-                <el-button
-                  type="warning"
-                  size="small"
-                  @click="handlePreviewForm"
-                  :disabled="!form.tableCode"
-                >
-                  预览样式
-                </el-button>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
               </div>
-            </div>
-            <el-input
-              v-model="codeMap.vueForm"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
-        <el-tab-pane label="登录页" name="login">
-          <div class="code-container">
-            <div class="code-header">
-              <span>Login.vue</span>
-              <div>
-                <el-button type="primary" size="small" @click="handleGenerate('login')" :disabled="!form.businessCode" :tooltip="'刷新当前标签页的登录页代码'">刷新</el-button>
-                <el-button type="success" size="small" @click="handleCopy('login')">复制</el-button>
-                <el-button type="info" size="small" @click="handleDownload('login', 'Login.vue')">下载</el-button>
+            </el-tab-pane>
+
+            <el-tab-pane label="Entity实体类" name="entity">
+              <div class="code-container" v-if="form.tableCode || codeMap.entity">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Entity.java') : 'Entity.java' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('entity')" :tooltip="'刷新当前标签页的实体类代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('entity')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.entity"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
               </div>
-            </div>
-            <el-input
-              v-model="codeMap.login"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成登录页代码"
-            />
-          </div>
-        </el-tab-pane>
-
-        <el-tab-pane label="Routes" name="routes">
-          <div class="code-container" v-if="form.tableCode || codeMap.routes || form.businessCode">
-            <div class="code-header">
-              <span>routes.js</span>
-              <div>
-                <el-button type="primary" size="small" @click="handleGenerate('routes')" :disabled="!form.tableCode" :tooltip="'刷新当前标签页的路由配置代码'">刷新</el-button>
-                <el-button type="warning" size="small" @click="handleGenerate('integratedRoutes')" :disabled="!form.businessCode">生成整合路由</el-button>
-                <el-button type="success" size="small" @click="handleCopy('routes')">复制</el-button>
-                <el-button type="info" size="small" @click="handleDownload('routes', 'routes.js')">下载</el-button>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
               </div>
-            </div>
-            <el-input
-              v-model="codeMap.routes"
-              type="textarea"
-              :rows="10"
-              readonly
-              class="code-textarea"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
+            </el-tab-pane>
 
-        <el-tab-pane label="API请求文件" name="api">
-          <div class="code-container" v-if="form.tableCode || codeMap.api">
-            <div class="code-header">
-              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Api.js') : 'api.js' }}</span>
-              <el-button type="primary" size="small" @click="handleGenerate('api')" :disabled="!form.tableCode" :tooltip="'刷新当前标签页的API请求文件代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('api')">复制</el-button>
-              <el-button type="info" size="small" @click="handleDownload('api', 'api.js')">下载</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.api"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成API请求文件代码"
-            />
-          </div>
-          <div v-else style="text-align: center; padding: 40px; color: #909399;">
-            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
-          </div>
-        </el-tab-pane>
+            <el-tab-pane label="Controller" name="controller">
+              <div class="code-container" v-if="form.tableCode || codeMap.controller">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Controller.java') : 'Controller.java' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('controller')" :tooltip="'刷新当前标签页的Controller代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('controller')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.controller"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
 
-        <el-tab-pane label="请求工具类" name="requestJs">
-          <div class="code-container">
-            <div class="code-header">
-              <span>request.js</span>
-              <el-button type="primary" size="small" @click="handleGenerate('requestJs')" :tooltip="'刷新当前标签页的请求工具类代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('requestJs')">复制</el-button>
-              <el-button type="info" size="small" @click="handleDownload('requestJs', 'request.js')">下载</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.requestJs"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成请求工具类代码"
-            />
-          </div>
-        </el-tab-pane>
+            <el-tab-pane label="Service" name="service">
+              <div class="code-container" v-if="form.tableCode || codeMap.service">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Service.java') : 'Service.java' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('service')" :tooltip="'刷新当前标签页的Service代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('service')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.service"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
 
-        <el-tab-pane label="认证API文件" name="auth">
-          <div class="code-container">
-            <div class="code-header">
-              <span>auth.js</span>
-              <el-button type="primary" size="small" @click="handleGenerate('auth')" :tooltip="'刷新当前标签页的认证API文件代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('auth')">复制</el-button>
-              <el-button type="info" size="small" @click="handleDownload('auth', 'auth.js')">下载</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.auth"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成认证API文件代码"
-            />
-          </div>
-        </el-tab-pane>
+            <el-tab-pane label="Mapper接口" name="mapper">
+              <div class="code-container" v-if="form.tableCode || codeMap.mapper">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Mapper.java') : 'Mapper.java' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('mapper')" :tooltip="'刷新当前标签页的Mapper接口代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('mapper')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.mapper"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
 
-        <el-tab-pane label=".env配置" name="env">
-          <div class="code-container">
-            <div class="code-header">
-              <span>.env</span>
-              <el-button type="primary" size="small" @click="handleGenerate('env')" :tooltip="'刷新当前标签页的环境配置代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('env')">复制</el-button>
-              <el-button type="info" size="small" @click="handleDownload('env', '.env')">下载</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.env"
-              type="textarea"
-              :rows="10"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成环境配置代码"
-            />
-          </div>
-        </el-tab-pane>
+            <el-tab-pane label="Mapper.xml" name="mapperxml">
+              <div class="code-container" v-if="form.tableCode || codeMap.mapperxml">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Mapper.xml') : 'Mapper.xml' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('mapperxml')" :tooltip="'刷新当前标签页的Mapper XML代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('mapperxml')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.mapperxml"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
 
-        <el-tab-pane label="Result类" name="result">
-          <div class="code-container">
-            <div class="code-header">
-              <span>Result.java</span>
-              <el-button type="primary" size="small" @click="handleGenerate('result')" :tooltip="'刷新当前标签页的Result类代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('result')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.result"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成Result类代码"
-            />
-          </div>
-        </el-tab-pane>
+            <el-tab-pane label="启动类" name="application">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>Application.java</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('application')" :tooltip="'刷新当前标签页的启动类代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('application')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.application"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成启动类代码"
+                />
+              </div>
+            </el-tab-pane>
 
-        <el-tab-pane label="PageRequest类" name="pageRequest">
-          <div class="code-container">
-            <div class="code-header">
-              <span>PageRequest.java</span>
-              <el-button type="primary" size="small" @click="handleGenerate('pageRequest')" :tooltip="'刷新当前标签页的PageRequest类代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('pageRequest')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.pageRequest"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成PageRequest类代码"
-            />
-          </div>
-        </el-tab-pane>
+            <el-tab-pane label="CORS配置" name="corsConfig">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>CorsConfig.java</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('corsConfig')" :tooltip="'刷新当前标签页的CORS配置代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('corsConfig')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.corsConfig"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成CORS配置代码"
+                />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </el-collapse-item>
 
-        <el-tab-pane label="PageResult类" name="pageResult">
-          <div class="code-container">
-            <div class="code-header">
-              <span>PageResult.java</span>
-              <el-button type="primary" size="small" @click="handleGenerate('pageResult')" :tooltip="'刷新当前标签页的PageResult类代码'">刷新</el-button>
-              <el-button type="success" size="small" @click="handleCopy('pageResult')">复制</el-button>
-            </div>
-            <el-input
-              v-model="codeMap.pageResult"
-              type="textarea"
-              :rows="15"
-              readonly
-              class="code-textarea"
-              placeholder="请点击'生成'按钮生成PageResult类代码"
-            />
-          </div>
-        </el-tab-pane>
+        <!-- 前端相关 -->
+        <el-collapse-item title="前端相关" name="frontend">
+          <el-tabs v-model="activeTab" type="border-card" class="nested-tabs">
+            <el-tab-pane label="Vue列表页" name="vueList">
+              <div class="code-container" v-if="form.tableCode || codeMap.vueList">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'List.vue') : 'List.vue' }}</span>
+                  <div>
+                    <el-button type="primary" size="small" @click="handleGenerate('vueList')" :tooltip="'刷新当前标签页的Vue列表页代码'">刷新</el-button>
+                    <el-button type="success" size="small" @click="handleCopy('vueList')">复制</el-button>
+                    <el-button
+                      type="warning"
+                      size="small"
+                      @click="handlePreviewList"
+                      :disabled="!form.tableCode"
+                    >
+                      预览样式
+                    </el-button>
+                  </div>
+                </div>
+                <el-input
+                  v-model="codeMap.vueList"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
 
-      </el-tabs>
+            <el-tab-pane label="Vue表单页" name="vueForm">
+              <div class="code-container" v-if="form.tableCode || codeMap.vueForm">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Form.vue') : 'Form.vue' }}</span>
+                  <div>
+                    <el-button type="primary" size="small" @click="handleGenerate('vueForm')" :tooltip="'刷新当前标签页的Vue表单页代码'">刷新</el-button>
+                    <el-button type="success" size="small" @click="handleCopy('vueForm')">复制</el-button>
+                    <el-button
+                      type="warning"
+                      size="small"
+                      @click="handlePreviewForm"
+                      :disabled="!form.tableCode"
+                    >
+                      预览样式
+                    </el-button>
+                  </div>
+                </div>
+                <el-input
+                  v-model="codeMap.vueForm"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="登录页" name="login">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>Login.vue</span>
+                  <div>
+                    <el-button type="primary" size="small" @click="handleGenerate('login')" :disabled="!form.businessCode" :tooltip="'刷新当前标签页的登录页代码'">刷新</el-button>
+                    <el-button type="success" size="small" @click="handleCopy('login')">复制</el-button>
+                    <el-button type="info" size="small" @click="handleDownload('login', 'Login.vue')">下载</el-button>
+                  </div>
+                </div>
+                <el-input
+                  v-model="codeMap.login"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成登录页代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="Routes" name="routes">
+              <div class="code-container" v-if="form.tableCode || codeMap.routes || form.businessCode">
+                <div class="code-header">
+                  <span>routes.js</span>
+                  <div>
+                    <el-button type="primary" size="small" @click="handleGenerate('routes')" :disabled="!form.tableCode" :tooltip="'刷新当前标签页的路由配置代码'">刷新</el-button>
+                    <el-button type="warning" size="small" @click="handleGenerate('integratedRoutes')" :disabled="!form.businessCode">生成整合路由</el-button>
+                    <el-button type="success" size="small" @click="handleCopy('routes')">复制</el-button>
+                    <el-button type="info" size="small" @click="handleDownload('routes', 'routes.js')">下载</el-button>
+                  </div>
+                </div>
+                <el-input
+                  v-model="codeMap.routes"
+                  type="textarea"
+                  :rows="10"
+                  readonly
+                  class="code-textarea"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="API请求文件" name="api">
+              <div class="code-container" v-if="form.tableCode || codeMap.api">
+                <div class="code-header">
+                  <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Api.js') : 'api.js' }}</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('api')" :disabled="!form.tableCode" :tooltip="'刷新当前标签页的API请求文件代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('api')">复制</el-button>
+                  <el-button type="info" size="small" @click="handleDownload('api', 'api.js')">下载</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.api"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成API请求文件代码"
+                />
+              </div>
+              <div v-else style="text-align: center; padding: 40px; color: #909399;">
+                <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="请求工具类" name="requestJs">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>request.js</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('requestJs')" :tooltip="'刷新当前标签页的请求工具类代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('requestJs')">复制</el-button>
+                  <el-button type="info" size="small" @click="handleDownload('requestJs', 'request.js')">下载</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.requestJs"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成请求工具类代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="认证API文件" name="auth">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>auth.js</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('auth')" :tooltip="'刷新当前标签页的认证API文件代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('auth')">复制</el-button>
+                  <el-button type="info" size="small" @click="handleDownload('auth', 'auth.js')">下载</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.auth"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成认证API文件代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label=".env配置" name="env">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>.env</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('env')" :tooltip="'刷新当前标签页的环境配置代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('env')">复制</el-button>
+                  <el-button type="info" size="small" @click="handleDownload('env', '.env')">下载</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.env"
+                  type="textarea"
+                  :rows="10"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成环境配置代码"
+                />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </el-collapse-item>
+
+        <!-- 工具相关 -->
+        <el-collapse-item title="工具相关" name="tools">
+          <el-tabs v-model="activeTab" type="border-card" class="nested-tabs">
+            <el-tab-pane label="配置文件" name="applicationYml">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>application.yml</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('applicationYml')" :tooltip="'刷新当前标签页的配置文件代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('applicationYml')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.applicationYml"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成配置文件代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="MyBatis配置" name="mybatisConfig">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>MyBatisConfig.java</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('mybatisConfig')" :tooltip="'刷新当前标签页的MyBatis配置代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('mybatisConfig')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.mybatisConfig"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成MyBatis配置代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="pom.xml" name="pomXml">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>pom.xml</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('pomXml')" :tooltip="'刷新当前标签页的pom.xml代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('pomXml')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.pomXml"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成pom.xml代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="Result类" name="result">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>Result.java</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('result')" :tooltip="'刷新当前标签页的Result类代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('result')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.result"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成Result类代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="PageRequest类" name="pageRequest">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>PageRequest.java</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('pageRequest')" :tooltip="'刷新当前标签页的PageRequest类代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('pageRequest')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.pageRequest"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成PageRequest类代码"
+                />
+              </div>
+            </el-tab-pane>
+
+            <el-tab-pane label="PageResult类" name="pageResult">
+              <div class="code-container">
+                <div class="code-header">
+                  <span>PageResult.java</span>
+                  <el-button type="primary" size="small" @click="handleGenerate('pageResult')" :tooltip="'刷新当前标签页的PageResult类代码'">刷新</el-button>
+                  <el-button type="success" size="small" @click="handleCopy('pageResult')">复制</el-button>
+                </div>
+                <el-input
+                  v-model="codeMap.pageResult"
+                  type="textarea"
+                  :rows="15"
+                  readonly
+                  class="code-textarea"
+                  placeholder="请点击'生成'按钮生成PageResult类代码"
+                />
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+        </el-collapse-item>
+      </el-collapse>
 
       <!-- 测试结果卡片 -->
       <el-card class="test-card" v-if="testResult" style="margin-top: 20px">
@@ -1147,7 +1162,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Check, Close, ArrowUp, ArrowDown, Loading } from '@element-plus/icons-vue'
 import {
@@ -1190,6 +1205,7 @@ export default {
     const tables = ref([])
     const businessSystems = ref([])
     const activeTab = ref('sql')
+    const activeCollapse = ref([]) // 用于跟踪当前展开的父菜单
     const form = reactive({
       businessCode: '',
       tableCode: '',
@@ -2444,8 +2460,31 @@ export default {
       formPreviewRef.value?.resetFields()
     }
 
+    // 从localStorage读取保存的包名
+    const loadSavedPackageName = () => {
+      const saved = localStorage.getItem('codeGeneratorPackageName')
+      if (saved) {
+        form.packageName = saved
+      }
+    }
+
+    // 保存包名到localStorage
+    const savePackageName = (value) => {
+      localStorage.setItem('codeGeneratorPackageName', value)
+    }
+
+    // 监听包名变化，保存到localStorage
+    watch(
+      () => form.packageName,
+      (newValue) => {
+        savePackageName(newValue)
+      }
+    )
+
     onMounted(async () => {
       await loadBusinessSystems()
+      // 加载保存的包名
+      loadSavedPackageName()
       // 不自动加载表，只在选择业务系统后加载
     })
 
@@ -2453,6 +2492,7 @@ export default {
       tables,
       businessSystems,
       activeTab,
+      activeCollapse,
       form,
       codeMap,
       testResult,
@@ -2621,6 +2661,15 @@ export default {
   overflow: visible;
 }
 
+/* 嵌套标签页样式 */
+.nested-tabs {
+  margin-top: 10px;
+}
+
+.nested-tabs :deep(.el-tabs__header) {
+  margin-bottom: 10px;
+}
+
 :deep(.el-tabs__nav-wrap) {
   overflow: visible;
 }
@@ -2729,6 +2778,32 @@ export default {
 
 .common-problems strong {
   color: #409eff;
+}
+
+/* 折叠面板样式 */
+:deep(.el-collapse-item__header) {
+  background-color: #f5f7fa;
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+
+:deep(.el-collapse-item__header:hover) {
+  background-color: #ecf5ff;
+}
+
+:deep(.el-collapse-item__content) {
+  padding: 0;
+  border: none;
+  margin-bottom: 15px;
+}
+
+/* 折叠面板内容区样式 */
+:deep(.el-collapse-item__content > .el-tabs) {
+  border: 1px solid #ebeef5;
+  border-radius: 4px;
+  overflow: hidden;
 }
 </style>
 

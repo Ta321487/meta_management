@@ -285,9 +285,9 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                     System.out.println("  主键表: " + pkTableName);
                     System.out.println("  主键字段: " + pkColumnName);
                     
-                    // 只有当外键名称与关联编码匹配时，才返回该外键名称
-                    if (columnName.equalsIgnoreCase(fkColumnName) && relationCode.equals(fkName)) {
-                        System.out.println("外键字段和名称都匹配，返回外键名称: " + fkName);
+                    // 只要字段名匹配，就返回外键名称，不再严格要求外键名称与关联编码相等
+                    if (columnName.equalsIgnoreCase(fkColumnName)) {
+                        System.out.println("外键字段匹配，返回外键名称: " + fkName);
                         return fkName;
                     }
                 }
@@ -307,8 +307,8 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         String checkFkSql = String.format(
             "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE " +
             "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = '%s' AND COLUMN_NAME = '%s' " +
-            "AND CONSTRAINT_NAME = '%s'",
-            tableName, columnName, relationCode
+            "AND CONSTRAINT_NAME IS NOT NULL AND CONSTRAINT_NAME != 'PRIMARY'",
+            tableName, columnName
         );
         System.out.println("执行SQL: " + checkFkSql);
         
@@ -319,7 +319,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             List<Map<String, Object>> data = (List<Map<String, Object>>) checkResult.get("data");
             if (data != null && !data.isEmpty()) {
                 System.out.println("SQL查询找到匹配的外键: " + data);
-                return relationCode;
+                return (String) data.get(0).get("CONSTRAINT_NAME");
             } else {
                 System.out.println("SQL查询未找到匹配的外键");
             }

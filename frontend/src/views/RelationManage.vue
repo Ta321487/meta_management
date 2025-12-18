@@ -82,6 +82,16 @@
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
+        <el-form-item label="业务系统" prop="businessCode">
+          <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%" @change="handleBusinessCodeChange">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="关联编码" prop="relationCode" v-if="!form.id">
           <el-input v-model="form.relationCode" placeholder="如：RELATION_001" />
         </el-form-item>
@@ -175,6 +185,7 @@ export default {
     })
     const form = reactive({
       id: null,
+      businessCode: '',
       relationCode: '',
       relationName: '',
       description: '',
@@ -186,6 +197,7 @@ export default {
       createForeignKey: false
     })
     const rules = {
+      businessCode: [{ required: true, message: '请选择业务系统', trigger: 'change' }],
       relationCode: [{ required: true, message: '请输入关联编码', trigger: 'blur' }],
       relationName: [{ required: true, message: '请输入关联名称', trigger: 'blur' }],
       mainTableCode: [{ required: true, message: '请选择主表', trigger: 'change' }],
@@ -195,24 +207,54 @@ export default {
       relationType: [{ required: true, message: '请选择关联类型', trigger: 'change' }]
     }
 
-    const loadTables = async () => {
+    const loadTables = async (businessCode) => {
       try {
+        // 使用传入的业务系统编码或表单中的业务系统编码
+        const currentBusinessCode = businessCode || form.businessCode
         // 只有选择了业务系统，才加载表列表
-        if (selectedBusinessCode.value) {
+        if (currentBusinessCode) {
+          console.log('开始加载表列表，业务系统编码：', currentBusinessCode)
           const res = await getTableList({
-            businessCode: selectedBusinessCode.value
+            businessCode: currentBusinessCode,
+            current: null, // 明确不使用分页
+            size: null     // 明确不使用分页
           })
+          console.log('加载表列表返回结果：', res)
           if (res.code === 200) {
+            let tableList = []
+            // 检查返回的数据格式，处理分页和非分页情况
+            if (res.data && Array.isArray(res.data)) {
+              // 非分页数据
+              tableList = res.data
+            } else if (res.data && res.data.records && Array.isArray(res.data.records)) {
+              // 分页数据，取records字段
+              tableList = res.data.records
+            }
             // 过滤掉禁用状态的表
-            tables.value = res.data.filter(table => table.isEnabled === 1)
+            tables.value = tableList.filter(table => table.isEnabled === 1)
+            console.log('过滤后表列表：', tables.value)
           }
         } else {
           // 未选择业务系统时，清空表列表
           tables.value = []
         }
       } catch (error) {
+        console.error('加载表列表失败：', error)
         ElMessage.error('加载表列表失败')
       }
+    }
+
+    // 处理业务系统选择变化
+    const handleBusinessCodeChange = () => {
+      // 清空之前选择的表和字段
+      form.mainTableCode = ''
+      form.slaveTableCode = ''
+      form.mainFieldCode = ''
+      form.slaveFieldCode = ''
+      mainTableFields.value = []
+      slaveTableFields.value = []
+      // 加载对应业务系统下的表
+      loadTables(form.businessCode)
     }
 
     // 加载业务系统列表
@@ -313,6 +355,7 @@ export default {
       dialogTitle.value = '新增关联'
       Object.assign(form, {
         id: null,
+        businessCode: '',
         relationCode: '',
         relationName: '',
         description: '',
@@ -323,6 +366,10 @@ export default {
         relationType: 'ONE_TO_MANY',
         createForeignKey: false
       })
+      // 清空表列表和字段列表
+      tables.value = []
+      mainTableFields.value = []
+      slaveTableFields.value = []
       dialogVisible.value = true
     }
 
@@ -330,6 +377,7 @@ export default {
       dialogTitle.value = '编辑关联'
       Object.assign(form, {
         id: row.id,
+        businessCode: row.businessCode,
         relationCode: row.relationCode,
         relationName: row.relationName,
         description: row.description || '',
@@ -339,6 +387,9 @@ export default {
         slaveFieldCode: row.slaveFieldCode,
         relationType: row.relationType
       })
+      // 加载对应业务系统下的表
+      loadTables(row.businessCode)
+      // 加载主表和从表的字段
       handleMainTableChange(row.mainTableCode)
       handleSlaveTableChange(row.slaveTableCode)
       dialogVisible.value = true
@@ -395,6 +446,7 @@ export default {
 
     const handleDialogClose = () => {
       formRef.value?.resetFields()
+      tables.value = []
       mainTableFields.value = []
       slaveTableFields.value = []
     }
@@ -446,6 +498,7 @@ export default {
       pagination,
       form,
       rules,
+      handleBusinessCodeChange,
       handleMainTableChange,
       handleSlaveTableChange,
       handleSizeChange,
