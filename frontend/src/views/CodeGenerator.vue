@@ -36,6 +36,7 @@
             生成代码
           </el-button>
           <el-button type="success" @click="runTest" :disabled="!form.tableCode">测试代码</el-button>
+          <el-button type="info" @click="deploymentGuideVisible = true">部署指南</el-button>
         </el-form-item>
       </el-form>
 
@@ -194,6 +195,24 @@
           </div>
         </el-tab-pane>
 
+        <el-tab-pane label="CORS配置" name="corsConfig">
+          <div class="code-container">
+            <div class="code-header">
+              <span>CorsConfig.java</span>
+              <el-button type="primary" size="small" @click="handleGenerate('corsConfig')" :tooltip="'刷新当前标签页的CORS配置代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('corsConfig')">复制</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.corsConfig"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成CORS配置代码"
+            />
+          </div>
+        </el-tab-pane>
+
         <el-tab-pane label="pom.xml" name="pomXml">
           <div class="code-container">
             <div class="code-header">
@@ -291,6 +310,26 @@
             <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
           </div>
         </el-tab-pane>
+        <el-tab-pane label="登录页" name="login">
+          <div class="code-container">
+            <div class="code-header">
+              <span>Login.vue</span>
+              <div>
+                <el-button type="primary" size="small" @click="handleGenerate('login')" :disabled="!form.businessCode" :tooltip="'刷新当前标签页的登录页代码'">刷新</el-button>
+                <el-button type="success" size="small" @click="handleCopy('login')">复制</el-button>
+                <el-button type="info" size="small" @click="handleDownload('login', 'Login.vue')">下载</el-button>
+              </div>
+            </div>
+            <el-input
+              v-model="codeMap.login"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成登录页代码"
+            />
+          </div>
+        </el-tab-pane>
 
         <el-tab-pane label="Routes" name="routes">
           <div class="code-container" v-if="form.tableCode || codeMap.routes || form.businessCode">
@@ -313,6 +352,85 @@
           </div>
           <div v-else style="text-align: center; padding: 40px; color: #909399;">
             <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="API请求文件" name="api">
+          <div class="code-container" v-if="form.tableCode || codeMap.api">
+            <div class="code-header">
+              <span>{{ form.tableCode ? (form.tableCode.replace('_TABLE', '') + 'Api.js') : 'api.js' }}</span>
+              <el-button type="primary" size="small" @click="handleGenerate('api')" :disabled="!form.tableCode" :tooltip="'刷新当前标签页的API请求文件代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('api')">复制</el-button>
+              <el-button type="info" size="small" @click="handleDownload('api', 'api.js')">下载</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.api"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成API请求文件代码"
+            />
+          </div>
+          <div v-else style="text-align: center; padding: 40px; color: #909399;">
+            <p>请先选择业务系统和表。如不选择表，将只生成SQL.</p>
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="请求工具类" name="requestJs">
+          <div class="code-container">
+            <div class="code-header">
+              <span>request.js</span>
+              <el-button type="primary" size="small" @click="handleGenerate('requestJs')" :tooltip="'刷新当前标签页的请求工具类代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('requestJs')">复制</el-button>
+              <el-button type="info" size="small" @click="handleDownload('requestJs', 'request.js')">下载</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.requestJs"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成请求工具类代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="认证API文件" name="auth">
+          <div class="code-container">
+            <div class="code-header">
+              <span>auth.js</span>
+              <el-button type="primary" size="small" @click="handleGenerate('auth')" :tooltip="'刷新当前标签页的认证API文件代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('auth')">复制</el-button>
+              <el-button type="info" size="small" @click="handleDownload('auth', 'auth.js')">下载</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.auth"
+              type="textarea"
+              :rows="15"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成认证API文件代码"
+            />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label=".env配置" name="env">
+          <div class="code-container">
+            <div class="code-header">
+              <span>.env</span>
+              <el-button type="primary" size="small" @click="handleGenerate('env')" :tooltip="'刷新当前标签页的环境配置代码'">刷新</el-button>
+              <el-button type="success" size="small" @click="handleCopy('env')">复制</el-button>
+              <el-button type="info" size="small" @click="handleDownload('env', '.env')">下载</el-button>
+            </div>
+            <el-input
+              v-model="codeMap.env"
+              type="textarea"
+              :rows="10"
+              readonly
+              class="code-textarea"
+              placeholder="请点击'生成'按钮生成环境配置代码"
+            />
           </div>
         </el-tab-pane>
 
@@ -754,6 +872,276 @@
           <el-button @click="formPreviewVisible = false">关闭</el-button>
         </template>
       </el-dialog>
+
+      <!-- 部署指南对话框 -->
+      <el-dialog
+        v-model="deploymentGuideVisible"
+        title="代码部署指南"
+        width="1000px"
+        :close-on-click-modal="true"
+        :close-on-press-escape="true"
+      >
+        <el-tabs v-model="activeGuideTab" type="border-card">
+          <!-- 后端部署指南 -->
+          <el-tab-pane label="后端部署" name="backend">
+            <div class="deployment-guide">
+              <h3>1. 项目结构创建</h3>
+              <div class="file-tree">
+                <pre>
+项目根目录/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/
+│   │   │       └── example/          <!-- 你的包名 -->
+│   │   │           ├── common/       <!-- 通用工具类 -->
+│   │   │           ├── config/        <!-- 配置类 -->
+│   │   │           ├── controller/    <!-- 控制器 -->
+│   │   │           ├── entity/        <!-- 实体类 -->
+│   │   │           ├── mapper/        <!-- Mapper接口 -->
+│   │   │           ├── service/       <!-- 服务类 -->
+│   │   │           └── Application.java  <!-- 启动类 -->
+│   │   └── resources/
+│   │       ├── mapper/               <!-- Mapper XML文件 -->
+│   │       └── application.yml       <!-- 配置文件 -->
+│   └── test/                          <!-- 测试目录 -->
+└── pom.xml                           <!-- Maven依赖配置 -->
+                </pre>
+              </div>
+
+              <h3>2. 文件放置位置</h3>
+              <table class="file-placement-table">
+                <thead>
+                  <tr>
+                    <th>生成的文件</th>
+                    <th>目标位置</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Entity.java</td>
+                    <td>src/main/java/your/package/entity/</td>
+                    <td>数据实体类</td>
+                  </tr>
+                  <tr>
+                    <td>Controller.java</td>
+                    <td>src/main/java/your/package/controller/</td>
+                    <td>API控制器</td>
+                  </tr>
+                  <tr>
+                    <td>Service.java</td>
+                    <td>src/main/java/your/package/service/</td>
+                    <td>业务逻辑层</td>
+                  </tr>
+                  <tr>
+                    <td>Mapper.java</td>
+                    <td>src/main/java/your/package/mapper/</td>
+                    <td>数据访问接口</td>
+                  </tr>
+                  <tr>
+                    <td>Mapper.xml</td>
+                    <td>src/main/resources/mapper/</td>
+                    <td>MyBatis映射文件</td>
+                  </tr>
+                  <tr>
+                    <td>Application.java</td>
+                    <td>src/main/java/your/package/</td>
+                    <td>Spring Boot启动类</td>
+                  </tr>
+                  <tr>
+                    <td>Result.java</td>
+                    <td>src/main/java/your/package/common/</td>
+                    <td>统一返回结果类</td>
+                  </tr>
+                  <tr>
+                    <td>PageRequest.java</td>
+                    <td>src/main/java/your/package/common/</td>
+                    <td>分页请求类</td>
+                  </tr>
+                  <tr>
+                    <td>PageResult.java</td>
+                    <td>src/main/java/your/package/common/</td>
+                    <td>分页结果类</td>
+                  </tr>
+                  <tr>
+                    <td>MyBatisConfig.java</td>
+                    <td>src/main/java/your/package/config/</td>
+                    <td>MyBatis配置类</td>
+                  </tr>
+                  <tr>
+                    <td>application.yml</td>
+                    <td>src/main/resources/application.yml</td>
+                    <td>应用配置文件</td>
+                  </tr>
+                  <tr>
+                    <td>pom.xml</td>
+                    <td>pom.xml</td>
+                    <td>Maven依赖配置</td>
+                  </tr>
+                </tbody>
+              </table>
+
+              <h3>3. 配置和运行</h3>
+              <ol>
+                <li>配置数据库连接：
+                  <ul>
+                    <li>修改application.yml中的数据库连接信息</li>
+                    <li>确保数据库已创建，且用户名密码正确</li>
+                  </ul>
+                </li>
+                <li>执行SQL脚本：
+                  <ul>
+                    <li>复制生成的SQL建表语句</li>
+                    <li>在MySQL客户端中执行，创建数据库表</li>
+                  </ul>
+                </li>
+                <li>运行后端项目：
+                  <ul>
+                    <li>找到Application.java文件</li>
+                    <li>右键点击，选择"Run 'Application'"</li>
+                    <li>等待项目启动成功</li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          </el-tab-pane>
+
+          <!-- 前端部署指南 -->
+          <el-tab-pane label="前端部署" name="frontend">
+            <div class="deployment-guide">
+              <h3>1. 项目结构创建</h3>
+              <p>推荐在项目根目录下创建frontend目录作为前端项目根目录：</p>
+              <div class="file-tree">
+                <pre>
+后端项目根目录/
+├── frontend/                          <!-- 前端项目根目录 -->
+│   ├── public/                        <!-- 静态资源 -->
+│   ├── src/
+│   │   ├── api/                       <!-- API请求 -->
+│   │   ├── assets/                    <!-- 资源文件 -->
+│   │   ├── components/                <!-- 组件 -->
+│   │   ├── router/                    <!-- 路由配置 -->
+│   │   ├── store/                     <!-- 状态管理 -->
+│   │   ├── styles/                    <!-- 样式文件 -->
+│   │   ├── utils/                     <!-- 工具函数 -->
+│   │   ├── views/                     <!-- 页面组件 -->
+│   │   ├── App.vue                    <!-- 根组件 -->
+│   │   └── main.js                    <!-- 入口文件 -->
+│   ├── .env                           <!-- 环境配置 -->
+│   ├── .gitignore                     <!-- Git忽略文件 -->
+│   ├── babel.config.js                <!-- Babel配置 -->
+│   ├── package.json                   <!-- npm依赖 -->
+│   ├── README.md                      <!-- 项目说明 -->
+│   └── vue.config.js                  <!-- Vue配置 -->
+└── 后端代码文件...
+                </pre>
+              </div>
+
+              <h3>2. 文件放置位置</h3>
+              <table class="file-placement-table">
+                <thead>
+                  <tr>
+                    <th>生成的文件</th>
+                    <th>目标位置</th>
+                    <th>说明</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+          <td>List.vue</td>
+          <td>frontend/src/views/</td>
+          <td>列表页面组件</td>
+        </tr>
+        <tr>
+          <td>Form.vue</td>
+          <td>frontend/src/views/</td>
+          <td>表单页面组件</td>
+        </tr>
+        <tr>
+          <td>Login.vue</td>
+          <td>frontend/src/views/</td>
+          <td>登录页面组件</td>
+        </tr>
+        <tr>
+          <td>routes.js</td>
+          <td>frontend/src/router/</td>
+          <td>路由配置</td>
+        </tr>
+        <tr>
+          <td>auth.js</td>
+          <td>frontend/src/api/</td>
+          <td>认证相关API</td>
+        </tr>
+        <tr>
+          <td>api.js</td>
+          <td>frontend/src/api/</td>
+          <td>业务模块API请求文件</td>
+        </tr>
+        <tr>
+          <td>request.js</td>
+          <td>frontend/src/utils/</td>
+          <td>请求工具类，用于发送API请求</td>
+        </tr>
+        <tr>
+          <td>index.js</td>
+          <td>frontend/src/api/</td>
+          <td>API统一导出文件，方便组件导入</td>
+        </tr>
+                </tbody>
+              </table>
+
+              <h3>3. 配置和运行</h3>
+              <ol>
+                <li>在项目根目录创建frontend目录</li>
+                <li>进入frontend目录，初始化Vue项目：
+                  <ul>
+                    <li>执行命令：npm init vue@latest .</li>
+                    <li>按照提示选择需要的功能</li>
+                  </ul>
+                </li>
+                <li>安装前端依赖：
+                  <ul>
+                    <li>执行命令：npm install</li>
+                  </ul>
+                </li>
+                <li>创建API工具类：
+                  <ul>
+                    <li>在frontend/src/api/目录下创建对应模块的API文件</li>
+                    <li>配置API请求的baseURL和拦截器</li>
+                  </ul>
+                </li>
+                <li>集成路由：
+                  <ul>
+                    <li>将生成的routes.js内容合并到frontend/src/router/目录下的路由配置中</li>
+                    <li>确保路由路径与后端API路径匹配</li>
+                  </ul>
+                </li>
+                <li>运行前端项目：
+                  <ul>
+                    <li>进入frontend目录</li>
+                    <li>启动开发服务器：npm run serve</li>
+                    <li>构建生产版本：npm run build</li>
+                  </ul>
+                </li>
+              </ol>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+        
+        <h3>3. 常见问题解决</h3>
+        <ul class="common-problems">
+          <li><strong>找不到类或包：</strong>检查包名是否正确，确保所有依赖已添加</li>
+          <li><strong>数据库连接失败：</strong>检查application.yml中的数据库配置，确保数据库服务已启动</li>
+          <li><strong>SQL语法错误：</strong>检查生成的SQL语句，确保与你的数据库版本兼容</li>
+          <li><strong>前端访问后端API跨域：</strong>在后端添加CORS配置，或在前端使用代理</li>
+          <li><strong>前端路由404：</strong>检查路由配置是否正确，确保组件路径存在</li>
+        </ul>
+        
+        <template #footer>
+          <el-button @click="deploymentGuideVisible = false">关闭</el-button>
+        </template>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -772,6 +1160,11 @@ import {
   generateMapperXml,
   generateVueList,
   generateVueForm,
+  generateLoginPage,
+  generateApi,
+  generateRequestJs,
+  generateEnvFile,
+  generateCorsConfig,
   generateAll,
   generateRoutes,
   generateIntegratedRoutes,
@@ -787,7 +1180,8 @@ import {
   generateApplication,
   generateApplicationYml,
   generateMyBatisConfig,
-  generatePomXml
+  generatePomXml,
+  generateAuth
 } from '../api'
 
 export default {
@@ -811,10 +1205,16 @@ export default {
       application: '',
       applicationYml: '',
       mybatisConfig: '',
+      corsConfig: '',
       pomXml: '',
       vueList: '',
       vueForm: '',
+      login: '',
       routes: '',
+      api: '',
+      requestJs: '',
+      auth: '',
+      env: '',
       result: '',
       pageRequest: '',
       pageResult: ''
@@ -856,6 +1256,10 @@ export default {
     const formPreviewRules = reactive({})
     const formPreviewRef = ref(null)
     const formPreviewTableName = ref('')
+
+    // 部署指南对话框相关
+    const deploymentGuideVisible = ref(false)
+    const activeGuideTab = ref('backend')
 
     const loadBusinessSystems = async () => {
       try {
@@ -1039,6 +1443,48 @@ export default {
               codeMap.pomXml = resPomXml.data
             }
             break
+          case 'corsConfig':
+            // 生成CORS配置类，不需要选择表
+            let resCorsConfig = await generateCorsConfig(form.packageName)
+            if (resCorsConfig.code === 200) {
+              codeMap.corsConfig = resCorsConfig.data
+            }
+            break
+          case 'api':
+            // 生成前端API请求文件
+            res = await generateApi(form.tableCode, form.businessCode)
+            if (res.code === 200) {
+              codeMap.api = res.data
+            }
+            break
+          case 'requestJs':
+            // 生成前端请求工具类
+            let resRequestJs = await generateRequestJs()
+            if (resRequestJs.code === 200) {
+              codeMap.requestJs = resRequestJs.data
+            }
+            break
+          case 'auth':
+            // 生成前端认证API文件
+            let resAuth = await generateAuth()
+            if (resAuth.code === 200) {
+              codeMap.auth = resAuth.data
+            }
+            break
+          case 'env':
+            // 生成前端环境配置文件
+            let resEnv = await generateEnvFile()
+            if (resEnv.code === 200) {
+              codeMap.env = resEnv.data
+            }
+            break
+          case 'login':
+            // 生成登录页
+            res = await generateLoginPage(form.businessCode)
+            if (res.code === 200) {
+              codeMap.login = res.data
+            }
+            break
         }
         ElMessage.success('生成成功')
       } catch (error) {
@@ -1065,10 +1511,15 @@ export default {
           codeMap.application = data['Application.java'] || ''
           codeMap.applicationYml = data['application.yml'] || ''
           codeMap.mybatisConfig = data['MyBatisConfig.java'] || ''
+          codeMap.corsConfig = data['CorsConfig.java'] || ''
           codeMap.mapperxml = data['Mapper.xml'] || ''
           codeMap.vueList = data['List.vue'] || ''
           codeMap.vueForm = data['Form.vue'] || ''
+          codeMap.login = data['Login.vue'] || ''
           codeMap.routes = data['routes.js'] || data['routes'] || ''
+          codeMap.api = data['api.js'] || ''
+          codeMap.requestJs = data['request.js'] || ''
+          codeMap.env = data['.env'] || ''
           codeMap.result = data['Result.java'] || ''
           codeMap.pageRequest = data['PageRequest.java'] || ''
           codeMap.pageResult = data['PageResult.java'] || ''
@@ -2062,7 +2513,9 @@ export default {
       handlePreviewForm,
       getFormFieldPropName,
       getFormFieldOptions,
-      handleFormPreviewReset
+      handleFormPreviewReset,
+      deploymentGuideVisible,
+      activeGuideTab
     }
   }
 }
@@ -2160,6 +2613,122 @@ export default {
 .code-header > div {
   display: flex;
   gap: 8px;
+}
+
+/* 标签页样式 - 允许换行 */
+:deep(.el-tabs__header) {
+  flex-wrap: wrap;
+  overflow: visible;
+}
+
+:deep(.el-tabs__nav-wrap) {
+  overflow: visible;
+}
+
+:deep(.el-tabs__nav-scroll) {
+  overflow: visible;
+}
+
+:deep(.el-tabs__nav) {
+  flex-wrap: wrap;
+  overflow: visible;
+  width: auto;
+}
+
+:deep(.el-tabs__item) {
+  margin-bottom: 10px;
+}
+
+/* 部署指南样式 */
+.deployment-guide {
+  padding: 10px;
+}
+
+.deployment-guide h3 {
+  margin: 20px 0 15px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.deployment-guide ol {
+  margin-left: 20px;
+  padding-left: 10px;
+}
+
+.deployment-guide li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.deployment-guide ul {
+  margin-left: 20px;
+  padding-left: 10px;
+}
+
+/* 文件树样式 */
+.file-tree {
+  background-color: #f5f7fa;
+  padding: 15px;
+  border-radius: 4px;
+  margin: 15px 0;
+  overflow-x: auto;
+}
+
+.file-tree pre {
+  margin: 0;
+  font-family: 'Monaco', 'Consolas', 'Courier New', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #303133;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+/* 文件放置表格样式 */
+.file-placement-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 15px 0;
+  font-size: 14px;
+}
+
+.file-placement-table th,
+.file-placement-table td {
+  padding: 10px;
+  border: 1px solid #e4e7ed;
+  text-align: left;
+}
+
+.file-placement-table th {
+  background-color: #f5f7fa;
+  font-weight: bold;
+  color: #303133;
+}
+
+.file-placement-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
+.file-placement-table tr:hover {
+  background-color: #ecf5ff;
+}
+
+/* 常见问题样式 */
+.common-problems {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.common-problems li {
+  margin-bottom: 10px;
+  line-height: 1.6;
+}
+
+.common-problems strong {
+  color: #409eff;
 }
 </style>
 

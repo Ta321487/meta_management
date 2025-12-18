@@ -169,6 +169,22 @@ public class CodeGeneratorController {
             return Result.error(e.getMessage());
         }
     }
+    
+    /**
+     * 生成登录页
+     */
+    @GetMapping("/vue/login")
+    @Operation(summary = "生成登录页")
+    public Result<String> generateLoginPage(
+            @Parameter(description = "业务系统编码")
+            @RequestParam(required = false) String businessCode) {
+        try {
+            String code = codeGeneratorService.generateLoginPage(businessCode);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 
     /**
      * 生成所有代码
@@ -298,6 +314,82 @@ public class CodeGeneratorController {
             @RequestParam(defaultValue = "com.example.common") String packageName) {
         try {
             String code = codeGeneratorService.generatePageResult(packageName);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成API请求文件
+     */
+    @GetMapping("/api/{tableCode}")
+    @Operation(summary = "生成API请求文件")
+    public Result<String> generateApi(
+            @Parameter(description = "表编码")
+            @PathVariable String tableCode,
+            @Parameter(description = "业务系统编码")
+            @RequestParam(required = false) String businessCode) {
+        try {
+            String code = codeGeneratorService.generateApi(tableCode, businessCode);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成request.js工具类
+     */
+    @GetMapping("/common/requestJs")
+    @Operation(summary = "生成request.js工具类")
+    public Result<String> generateRequestJs() {
+        try {
+            String code = codeGeneratorService.generateRequestJs();
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成认证API文件
+     */
+    @GetMapping("/common/auth")
+    @Operation(summary = "生成认证API文件")
+    public Result<String> generateAuth() {
+        try {
+            String code = codeGeneratorService.generateAuth();
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成.env环境配置文件
+     */
+    @GetMapping("/common/env")
+    @Operation(summary = "生成.env环境配置文件")
+    public Result<String> generateEnvFile() {
+        try {
+            String code = codeGeneratorService.generateEnvFile();
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成CORS配置类
+     */
+    @GetMapping("/common/corsConfig")
+    @Operation(summary = "生成CORS配置类")
+    public Result<String> generateCorsConfig(
+            @Parameter(description = "包名")
+            @RequestParam(defaultValue = "com.example.config") String packageName) {
+        try {
+            String code = codeGeneratorService.generateCorsConfig(packageName);
             return Result.success(code);
         } catch (Exception e) {
             return Result.error(e.getMessage());

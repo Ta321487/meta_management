@@ -222,6 +222,36 @@ public interface CodeGeneratorService {
     String generateMyBatisConfig(String packageName) throws Exception;
     
     /**
+     * 生成CORS配置类
+     */
+    String generateCorsConfig(String packageName) throws Exception;
+    
+    /**
+     * 生成前端request.js工具类
+     */
+    String generateRequestJs() throws Exception;
+    
+    /**
+     * 生成前端.env环境配置文件
+     */
+    String generateEnvFile() throws Exception;
+    
+    /**
+     * 生成登录页
+     */
+    String generateLoginPage(String businessCode) throws Exception;
+    
+    /**
+     * 生成前端API请求文件
+     */
+    String generateApi(String tableCode, String businessCode) throws Exception;
+    
+    /**
+     * 生成前端认证API文件
+     */
+    String generateAuth() throws Exception;
+    
+    /**
      * 生成pom.xml配置文件
      */
     String generatePomXml(String groupId, String artifactId, String name, String description) throws Exception;
