@@ -5,6 +5,7 @@ import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.entity.MetadataTable;
+import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.service.MetadataBusinessRuleService;
 import com.metadata.service.MetadataBusinessSystemService;
@@ -64,6 +65,12 @@ public class JavaCodeGenerator {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
         
+        // 优先使用业务系统的包名
+        MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+        if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+            packageName = businessSystem.getPackageName();
+        }
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
@@ -102,6 +109,12 @@ public class JavaCodeGenerator {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
         
+        // 优先使用业务系统的包名
+        com.metadata.entity.MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+        if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+            packageName = businessSystem.getPackageName();
+        }
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
@@ -133,6 +146,12 @@ public class JavaCodeGenerator {
     public String generateService(String tableCode, String packageName, String businessCode) throws CodeGenException {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
+        // 优先使用业务系统的包名
+        com.metadata.entity.MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+        if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+            packageName = businessSystem.getPackageName();
+        }
         
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
@@ -169,6 +188,12 @@ public class JavaCodeGenerator {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
         
+        // 优先使用业务系统的包名
+        com.metadata.entity.MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+        if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+            packageName = businessSystem.getPackageName();
+        }
+        
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {
             throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
@@ -201,6 +226,12 @@ public class JavaCodeGenerator {
     public String generateMapperXml(String tableCode, String packageName, String businessCode) throws CodeGenException {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
+        // 优先使用业务系统的包名
+        com.metadata.entity.MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+        if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+            packageName = businessSystem.getPackageName();
+        }
         
         MetadataTable table = tableService.getByCode(tableCode);
         if (table == null) {

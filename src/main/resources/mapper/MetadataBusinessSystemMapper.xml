@@ -8,6 +8,7 @@
         <result column="business_name" property="businessName" />
         <result column="description" property="description" />
         <result column="is_default" property="isDefault" />
+        <result column="package_name" property="packageName" />
         <result column="create_time" property="createTime" />
         <result column="update_time" property="updateTime" />
     </resultMap>
@@ -26,9 +27,9 @@
     
     <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessSystem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_business_system (
-            business_code, business_name, description, is_default
+            business_code, business_name, description, is_default, package_name
         ) VALUES (
-            #{businessCode}, #{businessName}, #{description}, #{isDefault}
+            #{businessCode}, #{businessName}, #{description}, #{isDefault}, #{packageName}
         )
     </insert>
     
@@ -36,7 +37,8 @@
         UPDATE metadata_business_system SET
             business_name = #{businessName},
             description = #{description},
-            is_default = #{isDefault}
+            is_default = #{isDefault},
+            package_name = #{packageName}
         WHERE id = #{id}
     </update>
     

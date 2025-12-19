@@ -29,7 +29,14 @@
           </el-select>
         </el-form-item>
         <el-form-item label="包名">
-          <el-input v-model="form.packageName" placeholder="如：com.example" style="width: 300px" />
+          <div style="display: flex; align-items: center; width: 300px;">
+            <el-input v-model="form.packageName" placeholder="如：com.example" style="width: 270px" readonly />
+            <el-tooltip placement="top" content="如需修改请到业务系统配置模块进行修改">
+              <el-icon class="info-icon" style="margin-left: 5px; cursor: pointer; color: #909399;">
+                <InfoFilled />
+              </el-icon>
+            </el-tooltip>
+          </div>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="form.tableCode ? handleGenerateCurrentTable() : handleGenerateAllTables()" :tooltip="'生成所有类型的代码'">
@@ -1164,7 +1171,7 @@
 <script>
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Check, Close, ArrowUp, ArrowDown, Loading } from '@element-plus/icons-vue'
+import { Check, Close, ArrowUp, ArrowDown, Loading, InfoFilled } from '@element-plus/icons-vue'
 import {
   getTableList,
   generateSQL,
@@ -1322,6 +1329,13 @@ export default {
       })
       // 根据业务系统加载表
       loadTables(form.businessCode)
+      // 自动填充包名
+      const selectedSystem = businessSystems.value.find(system => system.businessCode === form.businessCode)
+      if (selectedSystem && selectedSystem.packageName) {
+        form.packageName = selectedSystem.packageName
+      } else {
+        form.packageName = 'com.example'
+      }
     }
 
     // 切换表时更新代码显示
@@ -2460,31 +2474,8 @@ export default {
       formPreviewRef.value?.resetFields()
     }
 
-    // 从localStorage读取保存的包名
-    const loadSavedPackageName = () => {
-      const saved = localStorage.getItem('codeGeneratorPackageName')
-      if (saved) {
-        form.packageName = saved
-      }
-    }
-
-    // 保存包名到localStorage
-    const savePackageName = (value) => {
-      localStorage.setItem('codeGeneratorPackageName', value)
-    }
-
-    // 监听包名变化，保存到localStorage
-    watch(
-      () => form.packageName,
-      (newValue) => {
-        savePackageName(newValue)
-      }
-    )
-
     onMounted(async () => {
       await loadBusinessSystems()
-      // 加载保存的包名
-      loadSavedPackageName()
       // 不自动加载表，只在选择业务系统后加载
     })
 

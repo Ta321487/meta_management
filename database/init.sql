@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS `metadata_business_system` (
   `business_name` varchar(100) NOT NULL COMMENT '业务系统名称',
   `description` varchar(500) DEFAULT NULL COMMENT '描述',
   `is_default` tinyint NOT NULL DEFAULT 0 COMMENT '是否默认系统：1-是，0-否',
+  `package_name` varchar(255) DEFAULT NULL COMMENT '包名',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

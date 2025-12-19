@@ -24,6 +24,7 @@
         <el-table-column type="selection" width="55" />
         <el-table-column prop="businessCode" label="业务编码" width="150" />
         <el-table-column prop="businessName" label="业务系统名称" />
+        <el-table-column prop="packageName" label="包名" show-overflow-tooltip />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="isDefault" label="是否默认" width="120">
           <template #default="{ row }">
@@ -74,6 +75,9 @@
         </el-form-item>
         <el-form-item label="业务系统名称" prop="businessName">
           <el-input v-model="form.businessName" placeholder="请输入业务系统名称" />
+        </el-form-item>
+        <el-form-item label="包名" prop="packageName">
+          <el-input v-model="form.packageName" placeholder="如：com.example" />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入业务系统描述" />
@@ -171,6 +175,7 @@ export default {
       id: null,
       businessCode: '',
       businessName: '',
+      packageName: '',
       description: '',
       isDefault: 0
     })
@@ -235,6 +240,7 @@ export default {
       form.id = null
       form.businessCode = ''
       form.businessName = ''
+      form.packageName = ''
       form.description = ''
       form.isDefault = 0
     }
@@ -246,6 +252,7 @@ export default {
       form.id = row.id
       form.businessCode = row.businessCode
       form.businessName = row.businessName
+      form.packageName = row.packageName || ''
       form.description = row.description
       form.isDefault = row.isDefault
     }

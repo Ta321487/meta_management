@@ -13,6 +13,7 @@ public class MetadataBusinessSystem {
     private String businessName;
     private String description;
     private Integer isDefault;
+    private String packageName;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }
