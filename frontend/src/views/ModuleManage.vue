@@ -13,10 +13,10 @@
 
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="模块名称">
-          <el-input v-model="searchForm.moduleName" placeholder="请输入模块名称" clearable />
+          <el-input v-model="searchForm.moduleName" placeholder="请输入模块名称" clearable @input="handleSearch" />
         </el-form-item>
         <el-form-item label="模块类型">
-          <el-select v-model="searchForm.moduleType" placeholder="请选择" clearable style="width: 200px">
+          <el-select v-model="searchForm.moduleType" placeholder="请选择" clearable style="width: 200px" @change="handleSearch">
             <el-option
               v-for="type in moduleTypes"
               :key="type.typeCode"
@@ -26,7 +26,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="业务系统">
-          <el-select v-model="searchForm.businessCode" placeholder="请选择" clearable style="width: 200px">
+          <el-select v-model="searchForm.businessCode" placeholder="请选择" clearable style="width: 200px" @change="handleSearch">
             <el-option
               v-for="system in businessSystems"
               :key="system.businessCode"
@@ -36,14 +36,10 @@
           </el-select>
         </el-form-item>
         <el-form-item label="状态">
-          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 200px">
+          <el-select v-model="searchForm.status" placeholder="请选择" clearable style="width: 200px" @change="handleSearch">
             <el-option label="启用" :value="1" />
             <el-option label="禁用" :value="0" />
           </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
 

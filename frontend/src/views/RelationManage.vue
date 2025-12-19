@@ -17,6 +17,7 @@
           v-model="selectedBusinessCode" 
           placeholder="请选择业务系统" 
           style="width: 200px; margin-right: 10px;"
+          @change="handleFilter"
         >
           <el-option label="全部" value="" />
           <el-option 
@@ -26,8 +27,6 @@
             :value="system.businessCode" 
           />
         </el-select>
-        <el-button type="primary" @click="handleFilter">查询</el-button>
-        <el-button @click="handleReset">重置</el-button>
       </div>
 
       <el-table :data="relationData" border style="width: 100%">

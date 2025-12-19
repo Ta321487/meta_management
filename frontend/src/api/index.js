@@ -107,7 +107,7 @@ export const executeSql = (data) => request.post('/sql/execute', data)
 export const executeMultipleSql = (data) => request.post('/sql/executeMultiple', data)
 
 // 业务系统相关
-export const getBusinessSystemList = () => request.get('/businessSystem/list')
+export const getBusinessSystemList = (params) => request.get('/businessSystem/list', { params })
 export const getBusinessSystemByCode = (businessCode) => request.get(`/businessSystem/${businessCode}`)
 export const getDefaultBusinessSystem = () => request.get('/businessSystem/default')
 export const addBusinessSystem = (data) => request.post('/businessSystem/add', data)

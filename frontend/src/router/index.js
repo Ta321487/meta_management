@@ -12,6 +12,7 @@ import RelationManage from '../views/RelationManage.vue'
 import OperationLog from '../views/OperationLog.vue'
 import CodeGenerator from '../views/CodeGenerator.vue'
 import SqlExecute from '../views/SqlExecute.vue'
+import Welcome from '../views/Welcome.vue'
 
 const routes = [
   {
@@ -22,8 +23,13 @@ const routes = [
   {
     path: '/',
     component: Layout,
-    redirect: '/module',
+    redirect: '/welcome',
     children: [
+      {
+        path: '/welcome',
+        name: 'Welcome',
+        component: Welcome
+      },
       {
         path: '/business-system',
         name: 'BusinessSystemManage',

@@ -12,11 +12,7 @@
       </template>
         <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="业务系统名称">
-          <el-input v-model="searchForm.businessName" placeholder="请输入业务系统名称" clearable />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-input v-model="searchForm.businessName" placeholder="请输入业务系统名称" clearable @input="handleSearch" />
         </el-form-item>
       </el-form>
 
@@ -192,8 +188,15 @@ export default {
       try {
         const res = await getBusinessSystemList()
         if (res.code === 200) {
-          tableData.value = res.data
-          pagination.total = res.data.length
+          // 在前端根据搜索条件过滤数据
+          let filteredData = res.data
+          if (searchForm.businessName) {
+            filteredData = filteredData.filter(item => 
+              item.businessName.toLowerCase().includes(searchForm.businessName.toLowerCase())
+            )
+          }
+          tableData.value = filteredData
+          pagination.total = filteredData.length
         }
       } catch (error) {
         ElMessage.error('加载失败: ' + (error.message || '未知错误'))

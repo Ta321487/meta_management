@@ -13,10 +13,10 @@
 
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="表名称">
-          <el-input v-model="searchForm.tableName" placeholder="请输入表名称" clearable />
+          <el-input v-model="searchForm.tableName" placeholder="请输入表名称" clearable @input="handleSearch" />
         </el-form-item>
         <el-form-item label="业务系统">
-          <el-select v-model="searchForm.businessCode" placeholder="请选择" clearable style="width: 200px">
+          <el-select v-model="searchForm.businessCode" placeholder="请选择" clearable style="width: 200px" @change="handleSearch">
             <el-option
               v-for="system in businessSystems"
               :key="system.businessCode"
@@ -24,10 +24,6 @@
               :value="system.businessCode"
             />
           </el-select>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">查询</el-button>
-          <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
 

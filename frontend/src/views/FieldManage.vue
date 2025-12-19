@@ -6,7 +6,6 @@
           <span>字段管理</span>
           <div>
             <el-select v-model="selectedBusinessCode" placeholder="请选择业务系统" style="width: 200px; margin-right: 10px">
-              <el-option label="全部" value="" />
               <el-option
                 v-for="system in businessSystems"
                 :key="system.businessCode"
@@ -1049,4 +1048,3 @@ export default {
   margin-left: 0 !important;
 }
 </style>
-

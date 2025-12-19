@@ -1,27 +1,23 @@
 <template>
-  <el-container class="layout-container">
-    <!-- 侧边栏 -->
+  <el-container class="layout-container" @click="hideContextMenu">
     <el-aside :width="isCollapse ? '64px' : '200px'" class="sidebar">
-      <!-- Logo 区域 -->
       <div class="logo-wrapper">
-        <div class="logo" :class="{ 'collapsed': isCollapse }">
+        <div class="logo">
           <span v-show="!isCollapse">元数据管理</span>
           <span v-show="isCollapse">元</span>
         </div>
       </div>
 
-      <!-- 菜单区域 -->
       <el-menu
-          :default-active="activeMenu"
-          router
-          background-color="#304156"
-          text-color="#bfcbd9"
-          active-text-color="#409EFF"
-          :collapse="isCollapse"
-          :collapse-transition="false"
-          class="sidebar-menu"
+        :default-active="activeMenu"
+        router
+        background-color="#304156"
+        text-color="#bfcbd9"
+        active-text-color="#409EFF"
+        :collapse="isCollapse"
+        :collapse-transition="false"
+        class="sidebar-menu"
       >
-        <!-- ... 菜单项保持不变 ... -->
         <el-menu-item index="/business-system">
           <el-icon><Setting /></el-icon>
           <template #title>业务系统管理</template>
@@ -68,7 +64,6 @@
         </el-menu-item>
       </el-menu>
 
-      <!-- 底部折叠按钮 (优化核心) -->
       <div class="collapse-btn" @click="toggleCollapse">
         <el-icon :size="20">
           <component :is="isCollapse ? 'Expand' : 'Fold'" />
@@ -77,32 +72,88 @@
     </el-aside>
 
     <el-container>
-      <el-header class="header">
-        <div class="header-right">
-          <el-dropdown @command="handleCommand">
-            <span class="user-info">
-              <el-icon><User /></el-icon>
-              admin
-              <el-icon><ArrowDown /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item command="changePassword">修改密码</el-dropdown-item>
-                <el-dropdown-item command="logout">退出登录</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
+      <el-header height="auto" class="header-wrapper">
+        <div class="navbar">
+          <div class="header-right">
+            <el-dropdown @command="handleCommand">
+              <span class="user-info">
+                <el-icon><User /></el-icon>
+                admin
+                <el-icon><ArrowDown /></el-icon>
+              </span>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="changePassword">修改密码</el-dropdown-item>
+                  <el-dropdown-item command="logout">退出登录</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </div>
+
+        <div class="tags-view-container">
+          <el-tabs
+            v-model="activeTab"
+            type="card"
+            closable
+            @tab-remove="handleTabRemove"
+            @tab-click="handleTabClick"
+            class="menu-tabs"
+          >
+            <el-tab-pane
+              v-for="tab in tabs"
+              :key="tab.path"
+              :name="tab.path"
+            >
+              <template #label>
+                <span
+                  class="tab-label"
+                  @contextmenu.prevent.stop="onTabContextMenu($event, tab)"
+                >
+                  {{ tab.title }}
+                </span>
+              </template>
+            </el-tab-pane>
+          </el-tabs>
+          <div
+            v-if="contextMenuVisible"
+            class="tab-context-menu"
+            :style="contextMenuStyle"
+            @click.stop
+          >
+            <ul>
+              <li @click="closeCurrentTab">关闭</li>
+              <li @click="closeOtherTabs">关闭其他</li>
+              <li @click="closeAllTabs">全部关闭</li>
+            </ul>
+          </div>
         </div>
       </el-header>
-      <el-main>
-        <router-view />
+
+      <el-main class="app-main">
+        <router-view v-slot="{ Component, route }">
+          <transition name="fade" mode="out-in">
+            <keep-alive :include="cachedViews">
+              <component :is="Component" :key="route.fullPath" />
+            </keep-alive>
+          </transition>
+        </router-view>
       </el-main>
     </el-container>
 
-    <!-- 修改密码对话框保持不变 -->
-    <el-dialog v-model="passwordDialogVisible" title="修改密码" width="400px" close-on-click-modal="false" close-on-press-escape="false">
-      <!-- 表单内容保持不变 -->
-      <el-form :model="passwordForm" :rules="passwordRules" ref="passwordFormRef" label-width="100px">
+    <el-dialog
+      v-model="passwordDialogVisible"
+      title="修改密码"
+      width="400px"
+      close-on-click-modal="false"
+      close-on-press-escape="false"
+    >
+      <el-form
+        :model="passwordForm"
+        :rules="passwordRules"
+        ref="passwordFormRef"
+        label-width="100px"
+      >
         <el-form-item label="原密码" prop="oldPassword">
           <el-input v-model="passwordForm.oldPassword" type="password" show-password />
         </el-form-item>
@@ -122,25 +173,43 @@
 </template>
 
 <script>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { logout, changePassword } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
-// 引入 Fold 和 Expand 图标，更符合折叠语义
 import {
-  Setting, Document, Grid, Menu, Connection, List, Edit, User, ArrowDown,
-  Fold, Expand
+  Setting,
+  Document,
+  Grid,
+  Menu,
+  Connection,
+  List,
+  Edit,
+  User,
+  ArrowDown,
+  Fold,
+  Expand
 } from '@element-plus/icons-vue'
 
 export default {
   name: 'Layout',
   components: {
-    // 注册图标组件以便动态使用
-    Fold, Expand
+    Setting,
+    Document,
+    Grid,
+    Menu,
+    Connection,
+    List,
+    Edit,
+    User,
+    ArrowDown,
+    Fold,
+    Expand
   },
   setup() {
     const router = useRouter()
     const route = useRoute()
+
     const passwordDialogVisible = ref(false)
     const passwordFormRef = ref(null)
     const passwordForm = ref({
@@ -148,9 +217,159 @@ export default {
       newPassword: '',
       confirmPassword: ''
     })
+
     const isCollapse = ref(false)
 
+    const menuTitleMap = {
+      '/business-system': '业务系统管理',
+      '/module-type': '模块类型管理',
+      '/module': '模块管理',
+      '/table': '表管理',
+      '/field': '字段管理',
+      '/node': '功能节点',
+      '/relation': '表关联',
+      '/rule': '业务规则',
+      '/log': '操作日志',
+      '/codegen': '代码生成',
+      '/sql': 'SQL执行'
+    }
+
     const activeMenu = computed(() => route.path)
+
+    const tabs = ref([])
+    const activeTab = ref(route.path === '/welcome' ? '' : route.path)
+    const cachedViews = ref([])
+    const contextMenuVisible = ref(false)
+    const contextMenuStyle = ref({ left: '0px', top: '0px' })
+    const contextMenuTabPath = ref('')
+
+    const addTab = currentRoute => {
+      const path = currentRoute.path
+      if (path === '/welcome') {
+        activeTab.value = ''
+        return
+      }
+
+      const title =
+        menuTitleMap[path] || currentRoute.meta?.title || currentRoute.name || path
+
+      const matched = currentRoute.matched[currentRoute.matched.length - 1]
+      const componentName = matched?.components?.default?.name
+
+      const existing = tabs.value.find(tab => tab.path === path)
+      if (!existing) {
+        tabs.value.push({
+          path,
+          title,
+          name: componentName
+        })
+      }
+
+      if (componentName && !cachedViews.value.includes(componentName)) {
+        cachedViews.value.push(componentName)
+      }
+
+      activeTab.value = path
+    }
+
+    const handleTabRemove = path => {
+      const index = tabs.value.findIndex(tab => tab.path === path)
+      if (index === -1) {
+        return
+      }
+
+      const removedTab = tabs.value[index]
+
+      if (removedTab.name) {
+        const cacheIndex = cachedViews.value.indexOf(removedTab.name)
+        if (cacheIndex > -1) {
+          cachedViews.value.splice(cacheIndex, 1)
+        }
+      }
+
+      tabs.value.splice(index, 1)
+
+      if (activeTab.value === path) {
+        if (tabs.value.length > 0) {
+          const newIndex = index > 0 ? index - 1 : 0
+          const newPath = tabs.value[newIndex].path
+          activeTab.value = newPath
+          router.push(newPath)
+        } else {
+          activeTab.value = ''
+          router.push('/welcome')
+        }
+      }
+    }
+
+    const handleTabClick = pane => {
+      if (pane?.props?.name) {
+        activeTab.value = pane.props.name
+      }
+    }
+
+    const onTabContextMenu = (event, tab) => {
+      contextMenuTabPath.value = tab.path
+      contextMenuStyle.value = {
+        left: `${event.clientX}px`,
+        top: `${event.clientY}px`
+      }
+      contextMenuVisible.value = true
+    }
+
+    const hideContextMenu = () => {
+      contextMenuVisible.value = false
+    }
+
+    const closeCurrentTab = () => {
+      if (!contextMenuTabPath.value) {
+        return
+      }
+      handleTabRemove(contextMenuTabPath.value)
+      contextMenuVisible.value = false
+    }
+
+    const closeOtherTabs = () => {
+      if (!contextMenuTabPath.value) {
+        return
+      }
+      const target = tabs.value.find(tab => tab.path === contextMenuTabPath.value)
+      if (!target) {
+        contextMenuVisible.value = false
+        return
+      }
+      tabs.value = [target]
+      cachedViews.value = target.name ? [target.name] : []
+      activeTab.value = target.path
+      router.push(target.path)
+      contextMenuVisible.value = false
+    }
+
+    const closeAllTabs = () => {
+      tabs.value = []
+      cachedViews.value = []
+      activeTab.value = ''
+      router.push('/welcome')
+      contextMenuVisible.value = false
+    }
+
+    watch(
+      () => route.fullPath,
+      () => {
+        addTab(route)
+      },
+      { immediate: true }
+    )
+
+    watch(
+      () => activeTab.value,
+      newPath => {
+        if (!newPath || newPath === route.path) {
+          return
+        }
+        router.push(newPath)
+      }
+    )
 
     const toggleCollapse = () => {
       isCollapse.value = !isCollapse.value
@@ -174,17 +393,19 @@ export default {
       ]
     }
 
-    const handleCommand = (command) => {
+    const handleCommand = command => {
       if (command === 'logout') {
         ElMessageBox.confirm('确定要退出登录吗？', '提示', {
           confirmButtonText: '确定',
           cancelButtonText: '取消',
           type: 'warning'
-        }).then(async () => {
-          await logout()
-          sessionStorage.removeItem('admin')
-          router.push('/login')
-        }).catch(() => {})
+        })
+          .then(async () => {
+            await logout()
+            sessionStorage.removeItem('admin')
+            router.push('/login')
+          })
+          .catch(() => {})
       } else if (command === 'changePassword') {
         passwordDialogVisible.value = true
         passwordForm.value = { oldPassword: '', newPassword: '', confirmPassword: '' }
@@ -192,7 +413,7 @@ export default {
     }
 
     const handleChangePassword = async () => {
-      await passwordFormRef.value.validate(async (valid) => {
+      await passwordFormRef.value.validate(async valid => {
         if (valid) {
           try {
             await changePassword({
@@ -217,7 +438,19 @@ export default {
       handleCommand,
       handleChangePassword,
       isCollapse,
-      toggleCollapse
+      toggleCollapse,
+      tabs,
+      activeTab,
+      cachedViews,
+      handleTabRemove,
+      handleTabClick,
+      contextMenuVisible,
+      contextMenuStyle,
+      onTabContextMenu,
+      hideContextMenu,
+      closeCurrentTab,
+      closeOtherTabs,
+      closeAllTabs
     }
   }
 }
@@ -228,23 +461,21 @@ export default {
   height: 100vh;
 }
 
-/* 侧边栏整体布局优化：使用 Flex 纵向布局 */
 .sidebar {
   background-color: #304156;
   height: 100%;
   display: flex;
   flex-direction: column;
   transition: width 0.3s;
-  overflow: hidden; /* 防止折叠时内容溢出 */
-  box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35); /* 增加右侧阴影，更有层次感 */
+  overflow: hidden;
+  box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35);
   z-index: 10;
 }
 
-/* Logo 区域优化 */
 .logo-wrapper {
   height: 60px;
   line-height: 60px;
-  background-color: #2b2f3a; /* 比侧边栏稍深，突出 Logo */
+  background-color: #2b2f3a;
   text-align: center;
   overflow: hidden;
 }
@@ -253,19 +484,17 @@ export default {
   color: white;
   font-size: 18px;
   font-weight: bold;
-  white-space: nowrap; /* 防止文字换行 */
+  white-space: nowrap;
   transition: all 0.3s;
 }
 
-/* 菜单区域优化：自动填满剩余空间，去掉右侧边框 */
 .sidebar-menu {
   flex: 1;
-  border-right: none !important; /* 去掉 Element Menu 默认的右边框 */
-  overflow-y: auto; /* 菜单过多时允许滚动 */
+  border-right: none !important;
+  overflow-y: auto;
   overflow-x: hidden;
 }
 
-/* 滚动条样式微调 (Webkit内核) */
 .sidebar-menu::-webkit-scrollbar {
   width: 6px;
 }
@@ -277,17 +506,16 @@ export default {
   background: transparent;
 }
 
-/* 底部折叠按钮优化：改为底部通栏样式 */
 .collapse-btn {
   height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #263445; /* 底部深色背景 */
+  background-color: #263445;
   cursor: pointer;
   color: #bfcbd9;
   transition: all 0.3s;
-  border-top: 1px solid rgba(255, 255, 255, 0.05); /* 顶部微弱分割线 */
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .collapse-btn:hover {
@@ -295,16 +523,23 @@ export default {
   color: #409EFF;
 }
 
-/* Header 样式 */
-.header {
+.header-wrapper {
+  padding: 0;
   background-color: #fff;
-  border-bottom: 1px solid #e4e7ed;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  z-index: 9;
+}
+
+.navbar {
+  height: 50px;
+  overflow: hidden;
+  position: relative;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
   display: flex;
   align-items: center;
   justify-content: flex-end;
   padding: 0 20px;
-  height: 60px;
-  box-shadow: 0 1px 4px rgba(0,21,41,.08); /* 头部增加轻微阴影 */
 }
 
 .user-info {
@@ -319,8 +554,102 @@ export default {
   color: #409EFF;
 }
 
-.el-main {
+.tags-view-container {
+  height: 34px;
+  width: 100%;
+  background: #fff;
+  border-bottom: 1px solid #d8dce5;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.12), 0 0 3px 0 rgba(0, 0, 0, 0.04);
+}
+
+.menu-tabs {
+  height: 34px;
+}
+
+.tags-view-container :deep(.el-tabs__header) {
+  margin: 0;
+  border-bottom: none;
+}
+
+.tags-view-container :deep(.el-tabs__nav) {
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+.tags-view-container :deep(.el-tabs__item) {
+  height: 34px;
+  line-height: 34px;
+  border: none !important;
+  border-right: 1px solid #d8dce5 !important;
+  color: #495060;
+  background: #fff;
+  padding: 0 15px !important;
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.tags-view-container :deep(.el-tabs__item.is-active) {
+  color: #409EFF;
+  background-color: #eaf4ff;
+  border-bottom: 2px solid #409EFF !important;
+}
+
+.tags-view-container :deep(.el-tabs__item:hover) {
+  color: #409EFF;
+  background-color: #f6f8fa;
+}
+
+.tab-label {
+  display: inline-block;
+  width: 100%;
+}
+
+.tab-context-menu {
+  position: fixed;
+  z-index: 9999;
+  background-color: #fff;
+  border: 1px solid #dcdfe6;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #606266;
+}
+
+.tab-context-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tab-context-menu li {
+  padding: 6px 16px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab-context-menu li:hover {
+  background-color: #f5f7fa;
+  color: #409EFF;
+}
+
+.app-main {
+  min-height: calc(100vh - 84px);
+  width: 100%;
+  position: relative;
+  overflow: auto;
   background-color: #f0f2f5;
   padding: 20px;
+  box-sizing: border-box;
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>
