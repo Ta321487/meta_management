@@ -131,6 +131,21 @@ public class MetadataModuleController {
             return Result.error(e.getMessage());
         }
     }
+    
+    /**
+     * 批量更新模块状态
+     */
+    @PostMapping("/batchUpdateStatus")
+    @Operation(summary = "批量更新模块状态", description = "批量更新模块的启用/禁用状态")
+    public Result<?> batchUpdateStatus(@Parameter(description = "包含ids列表和status的参数") @RequestBody BatchDeleteRequest request, 
+                                      @Parameter(description = "目标状态，1-启用，0-禁用") @RequestParam Integer status) {
+        try {
+            moduleService.batchUpdateStatus(request.getIds(), status);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 
     /**
      * 重建模块功能节点

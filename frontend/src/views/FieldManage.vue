@@ -22,6 +22,20 @@
               />
             </el-select>
             <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode">批量删除</el-button>
+            <el-button 
+              :type="selectedRows.every(row => row.isEnabled === 1) ? 'warning' : 'success'" 
+              @click="handleBatchToggleEnable(0)" 
+              :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode || selectedRows.every(row => row.isEnabled === 0)"
+            >
+              批量禁用
+            </el-button>
+            <el-button 
+              type="success" 
+              @click="handleBatchToggleEnable(1)" 
+              :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode || selectedRows.every(row => row.isEnabled === 1)"
+            >
+              批量启用
+            </el-button>
             <el-button type="primary" @click="handleAdd" :disabled="!selectedTableCode">新增字段</el-button>
             <el-button type="info" @click="handleViewConstraints" :disabled="!selectedTableCode">查看约束</el-button>
           </div>
@@ -247,7 +261,7 @@
 <script>
 import { ref, reactive, onMounted, watch, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField, getConstraintList, deleteConstraint, getBusinessSystemList } from '../api'
+import { getTableList, getFieldList, addField, updateField, deleteField, batchDeleteField, batchUpdateFieldStatus, getConstraintList, deleteConstraint, getBusinessSystemList } from '../api'
 import JsonEditor from '../components/JsonEditor'
 
 export default {
@@ -933,7 +947,47 @@ export default {
         // 处理用户取消操作
       })
     }
-
+    
+    // 批量启用/禁用
+    const handleBatchToggleEnable = async (status) => {
+      if (!selectedRows.value || selectedRows.value.length === 0) {
+        ElMessage.warning('请选择要操作的字段')
+        return
+      }
+      
+      // 检查是否包含主键字段且要禁用
+      if (status === 0) {
+        const hasPrimaryKey = selectedRows.value.some(row => isPrimaryKey(row))
+        if (hasPrimaryKey) {
+          ElMessage.error('选中的字段中包含主键字段，主键字段不允许禁用')
+          return
+        }
+      }
+      
+      const actionText = status === 1 ? '启用' : '禁用'
+      
+      try {
+        await ElMessageBox.confirm(`确定要${actionText}选中的 ${selectedRows.value.length} 个字段吗？`, '提示', {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning'
+        })
+        
+        const ids = selectedRows.value.map(row => row.id)
+        await batchUpdateFieldStatus(ids, status)
+        ElMessage.success(`批量${actionText}成功`)
+        loadFields()
+        // 清空选中状态
+        selectedRows.value = []
+      } catch (error) {
+        if (error.name === 'cancel' || error.toString().includes('取消')) {
+          // 处理用户取消操作，不做任何处理
+          return
+        }
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || `批量${actionText}失败`)
+      }
+    }
+    
     // 解码十六进制编码的中文字符
     const decodeHexChinese = (str) => {
       if (!str) return str;
@@ -1050,6 +1104,7 @@ export default {
       handleDialogClose,
       handleSelectionChange,
       handleBatchDelete,
+      handleBatchToggleEnable,
       handleTableChange,
       // 约束相关方法
       handleViewConstraints,

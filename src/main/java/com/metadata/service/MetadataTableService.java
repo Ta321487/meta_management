@@ -78,4 +78,11 @@ public interface MetadataTableService {
      * @return 表列表
      */
     List<MetadataTable> getTablesByCodes(List<String> tableCodes);
+    
+    /**
+     * 批量更新表状态
+     * @param ids 表ID列表
+     * @param status 目标状态，1-启用，0-禁用
+     */
+    void batchUpdateStatus(List<Long> ids, Integer status);
 }

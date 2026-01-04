@@ -52,6 +52,11 @@ public interface MetadataModuleService {
     void updateStatus(Long id, Integer status);
     
     /**
+     * 批量启用/禁用模块
+     */
+    void batchUpdateStatus(List<Long> ids, Integer status);
+    
+    /**
      * 更新模块的业务系统
      * @param moduleCode 模块编码
      * @param businessCode 业务系统编码

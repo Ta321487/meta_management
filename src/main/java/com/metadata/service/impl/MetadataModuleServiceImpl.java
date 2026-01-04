@@ -219,6 +219,34 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         logService.logSuccess("admin", "EDIT", "更新模块状态：" + module.getModuleCode() + " -> " + status + ", 同步更新功能节点数：" + (nodes != null ? nodes.size() : 0));
     }
 
+    @Override
+    @Transactional
+    public void batchUpdateStatus(List<Long> ids, Integer status) {
+        if (ids == null || ids.isEmpty() || status == null) {
+            throw new RuntimeException("参数不能为空");
+        }
+        int totalNodesUpdated = 0;
+        for (Long id : ids) {
+            MetadataModule module = moduleMapper.selectById(id);
+            if (module != null) {
+                // 更新模块状态
+                module.setStatus(status);
+                moduleMapper.update(module);
+                
+                // 同步更新模块下所有功能节点的状态
+                List<MetadataFunctionNode> nodes = functionNodeMapper.selectByModuleCode(module.getModuleCode(), module.getBusinessCode());
+                if (nodes != null && !nodes.isEmpty()) {
+                    for (MetadataFunctionNode node : nodes) {
+                        node.setIsEnabled(status);
+                        functionNodeMapper.update(node);
+                    }
+                    totalNodesUpdated += nodes.size();
+                }
+            }
+        }
+        logService.logSuccess("admin", "BATCH_EDIT", "批量更新模块状态：ids=" + ids + ", status=" + status + ", 同步更新功能节点数：" + totalNodesUpdated);
+    }
+    
     /**
      * 更新模块的业务系统
      */

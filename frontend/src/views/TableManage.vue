@@ -6,6 +6,20 @@
           <span>表管理</span>
           <div>
             <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0">批量删除</el-button>
+            <el-button 
+              :type="selectedRows.every(row => row.isEnabled === 1) ? 'warning' : 'success'" 
+              @click="handleBatchToggleEnable(0)" 
+              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.isEnabled === 0)"
+            >
+              批量禁用
+            </el-button>
+            <el-button 
+              type="success" 
+              @click="handleBatchToggleEnable(1)" 
+              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.isEnabled === 1)"
+            >
+              批量启用
+            </el-button>
             <el-button type="primary" @click="handleAdd">新增表</el-button>
           </div>
         </div>
@@ -122,7 +136,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, getBusinessSystemList } from '../api'
+import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList } from '../api'
 
 export default {
   name: 'TableManage',
@@ -360,6 +374,36 @@ export default {
         // 处理用户取消操作，不做任何处理
       })
     }
+    
+    // 批量启用/禁用
+    const handleBatchToggleEnable = (status) => {
+      if (selectedRows.value.length === 0) {
+        ElMessage.warning('请选择要操作的表')
+        return
+      }
+      
+      const actionText = status === 1 ? '启用' : '禁用'
+      
+      ElMessageBox.confirm(`确定要${actionText}选中的 ${selectedRows.value.length} 个表吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const ids = selectedRows.value.map(row => row.id)
+          await batchUpdateTableStatus(ids, status)
+          ElMessage.success(`批量${actionText}成功`)
+          loadData()
+          // 清空选中状态
+          selectedRows.value = []
+        } catch (error) {
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || `批量${actionText}失败`)
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
+    }
 
     const handleDialogClose = () => {
       formRef.value?.resetFields()
@@ -392,6 +436,7 @@ export default {
       handleToggleEnable,
       handleDelete,
       handleBatchDelete,
+      handleBatchToggleEnable,
       handleSelectionChange,
       handleDialogClose
     }

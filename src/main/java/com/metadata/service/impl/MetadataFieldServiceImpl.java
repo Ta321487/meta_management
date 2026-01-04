@@ -800,4 +800,30 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         fieldMapper.batchUpdateFieldsBusinessSystem(tableCodes, businessCode);
         logService.logSuccess("admin", "EDIT", "批量更新表字段业务系统：" + tableCodes + " -> " + businessCode);
     }
+    
+    /**
+     * 批量更新字段状态
+     */
+    @Override
+    @Transactional
+    public void batchUpdateStatus(List<Long> ids, Integer status) {
+        if (ids == null || ids.isEmpty() || status == null) {
+            throw new RuntimeException("参数不能为空");
+        }
+        for (Long id : ids) {
+            MetadataField field = fieldMapper.selectById(id);
+            if (field != null) {
+                // 检查是否为主键字段
+                if ("primary_key".equals(field.getFormComponent()) || "id".equals(field.getFieldName()) || "uuid".equals(field.getFieldName())) {
+                    if (status == 0) {
+                        throw new RuntimeException("主键字段不允许禁用");
+                    }
+                }
+                // 更新字段状态
+                field.setIsEnabled(status);
+                fieldMapper.update(field);
+            }
+        }
+        logService.logSuccess("admin", "BATCH_EDIT", "批量更新字段状态：ids=" + ids + ", status=" + status);
+    }
 }

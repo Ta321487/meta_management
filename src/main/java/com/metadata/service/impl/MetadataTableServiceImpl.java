@@ -393,7 +393,27 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         }
         return tableMapper.selectByCodes(tableCodes);
     }
-
+    
+    /**
+     * 批量更新表状态
+     */
+    @Override
+    @Transactional
+    public void batchUpdateStatus(List<Long> ids, Integer status) {
+        if (ids == null || ids.isEmpty() || status == null) {
+            throw new RuntimeException("参数不能为空");
+        }
+        for (Long id : ids) {
+            MetadataTable table = tableMapper.selectById(id);
+            if (table != null) {
+                // 更新表状态
+                table.setIsEnabled(status);
+                tableMapper.update(table);
+            }
+        }
+        logService.logSuccess("admin", "BATCH_EDIT", "批量更新表状态：ids=" + ids + ", status=" + status);
+    }
+    
     /**
      * 工具方法：转换为表名（下划线）
      */
@@ -401,7 +421,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 将 TABLE_CODE 转换为 table_code
         return code.toLowerCase().replace("_TABLE", "");
     }
-
+    
     /**
      * 工具方法：转义SQL字符串中的单引号
      */

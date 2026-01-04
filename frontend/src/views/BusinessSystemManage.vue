@@ -29,8 +29,16 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="180" />
-        <el-table-column prop="updateTime" label="更新时间" width="180" />
+        <el-table-column prop="createTime" label="创建时间" width="120">
+          <template #default="{ row }">
+            {{ formatDate(row.createTime) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="updateTime" label="更新时间" width="120">
+          <template #default="{ row }">
+            {{ formatDate(row.updateTime) }}
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-space>
@@ -133,6 +141,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getBusinessSystemList, addBusinessSystem, updateBusinessSystem, deleteBusinessSystem, getModuleList, getAssociatedModules, associateModulesToBusinessSystem } from '../api'
+import dayjs from 'dayjs'
 
 export default {
   name: 'BusinessSystemManage',
@@ -405,6 +414,12 @@ export default {
       }
     }
     
+    // 格式化日期
+    const formatDate = (date) => {
+      if (!date) return ''
+      return dayjs(date).format('YYYY-MM-DD')
+    }
+    
     // 初始化
     onMounted(() => {
       loadData()
@@ -423,6 +438,7 @@ export default {
       pagination,
       form,
       rules,
+      formatDate,
       handleSearch,
       handleReset,
       handleSizeChange,

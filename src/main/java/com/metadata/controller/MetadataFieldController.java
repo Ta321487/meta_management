@@ -146,5 +146,20 @@ public class MetadataFieldController {
             return Result.error(e.getMessage());
         }
     }
+    
+    /**
+     * 批量更新字段状态
+     */
+    @PostMapping("/batchUpdateStatus")
+    @Operation(summary = "批量更新字段状态", description = "批量更新字段的启用/禁用状态")
+    public Result<?> batchUpdateStatus(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request, 
+                                  @Parameter(description = "目标状态，1-启用，0-禁用") @RequestParam Integer status) {
+        try {
+            fieldService.batchUpdateStatus(request.getIds(), status);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
 }
 

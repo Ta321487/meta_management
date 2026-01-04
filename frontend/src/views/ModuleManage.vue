@@ -6,6 +6,20 @@
           <span>模块管理</span>
           <div>
             <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0">批量删除</el-button>
+            <el-button 
+              :type="selectedRows.every(row => row.status === 1) ? 'warning' : 'success'" 
+              @click="handleBatchToggleStatus(0)" 
+              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.status === 0)"
+            >
+              批量禁用
+            </el-button>
+            <el-button 
+              type="success" 
+              @click="handleBatchToggleStatus(1)" 
+              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.status === 1)"
+            >
+              批量启用
+            </el-button>
             <el-button type="primary" @click="handleAdd">新增模块</el-button>
           </div>
         </div>
@@ -206,6 +220,7 @@ import {
   deleteModule,
   batchDeleteModule,
   updateModuleStatus,
+  batchUpdateModuleStatus,
   rebuildNodes,
   getModuleTypeList,
   getTableList,
@@ -498,6 +513,36 @@ export default {
         // 处理用户取消操作，不做任何处理
       })
     }
+    
+    // 批量启用/禁用
+    const handleBatchToggleStatus = (status) => {
+      if (selectedRows.value.length === 0) {
+        ElMessage.warning('请选择要操作的模块')
+        return
+      }
+      
+      const actionText = status === 1 ? '启用' : '禁用'
+      
+      ElMessageBox.confirm(`确定要${actionText}选中的 ${selectedRows.value.length} 个模块吗？`, '提示', {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }).then(async () => {
+        try {
+          const ids = selectedRows.value.map(row => row.id)
+          await batchUpdateModuleStatus(ids, status)
+          ElMessage.success(`批量${actionText}成功`)
+          loadData()
+          // 清空选中状态
+          selectedRows.value = []
+        } catch (error) {
+          // 显示后端返回的具体错误信息，适配多种错误格式
+          ElMessage.error(error.response?.data?.message || error.data?.message || error.message || `批量${actionText}失败`)
+        }
+      }).catch(() => {
+        // 处理用户取消操作，不做任何处理
+      })
+    }
 
     const handleToggleStatus = async (row) => {
       ElMessageBox.confirm(`确定要${row.status === 1 ? '禁用' : '启用'}该模块吗？`, '提示', {
@@ -556,6 +601,7 @@ export default {
       handleDelete,
       handleRebuildNodes,
       handleBatchDelete,
+      handleBatchToggleStatus,
       handleToggleStatus,
       handleDialogClose,
       handleSelectionChange,

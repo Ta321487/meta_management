@@ -70,4 +70,11 @@ public interface MetadataFieldService {
      * @param businessCode 业务系统编码
      */
     void batchUpdateFieldsBusinessSystem(List<String> tableCodes, String businessCode);
+    
+    /**
+     * 批量更新字段状态
+     * @param ids 字段ID列表
+     * @param status 目标状态，1-启用，0-禁用
+     */
+    void batchUpdateStatus(List<Long> ids, Integer status);
 }

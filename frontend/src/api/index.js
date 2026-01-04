@@ -13,6 +13,7 @@ export const updateModule = (data) => request.post('/module/update', data)
 export const deleteModule = (id) => request.delete(`/module/delete/${id}`)
 export const batchDeleteModule = (data) => request.post('/module/batchDelete', data)
 export const updateModuleStatus = (data) => request.post('/module/updateStatus', data)
+export const batchUpdateModuleStatus = (ids, status) => request.post('/module/batchUpdateStatus', { ids }, { params: { status } })
 export const rebuildNodes = (moduleCode) => request.post(`/module/rebuildNodes/${moduleCode}`)
 
 // 表相关
@@ -22,6 +23,7 @@ export const addTable = (data) => request.post('/table/add', data)
 export const updateTable = (data) => request.post('/table/update', data)
 export const deleteTable = (id) => request.delete(`/table/delete/${id}`)
 export const batchDeleteTable = (data) => request.post('/table/batchDelete', data)
+export const batchUpdateTableStatus = (ids, status) => request.post('/table/batchUpdateStatus', { ids }, { params: { status } })
 export const getTablesByModule = (moduleCode, params) => request.get(`/table/listByModule/${moduleCode}`, { params })
 
 // 字段相关
@@ -30,6 +32,7 @@ export const addField = (data) => request.post('/field/add', data)
 export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (id) => request.delete(`/field/delete/${id}`)
 export const batchDeleteField = (data) => request.post('/field/batchDelete', data)
+export const batchUpdateFieldStatus = (ids, status) => request.post('/field/batchUpdateStatus', { ids }, { params: { status } })
 export const getConstraintList = (tableCode) => request.get(`/field/constraint/list/${tableCode}`)
 export const deleteConstraint = (data) => request.post('/field/constraint/delete', data)
 
