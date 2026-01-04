@@ -24,7 +24,7 @@
       <!-- 搜索表单 -->
       <el-form :model="searchForm" :inline="true" class="search-form">
 <#list fields as field>
-        <#if field.field.formComponent != "primary_key" && (field.field.formComponent == "input" || field.field.formComponent == "select")>
+        <#if field.field.formComponent != "primary_key" && field.field.formComponent != "textarea" && (field.field.formComponent == "input" || field.field.formComponent == "select" || field.field.formComponent == "datepicker" || field.field.formComponent == "date" || field.field.formComponent == "number")>
         <el-form-item label="${field.field.label}">
           <#if field.field.formComponent == "select">
           <el-select v-model="searchForm.${field.camelCaseName}" placeholder="请选择${field.field.label}" clearable style="width: 180px">
@@ -40,6 +40,10 @@
               </#if>
             </#if>
           </el-select>
+          <#elseif field.field.formComponent == "datepicker" || field.field.formComponent == "date">
+          <el-date-picker v-model="searchForm.${field.camelCaseName}" type="date" placeholder="请选择${field.field.label}" clearable style="width: 180px" />
+          <#elseif field.field.formComponent == "number">
+          <el-input-number v-model="searchForm.${field.camelCaseName}" placeholder="请输入${field.field.label}" clearable style="width: 180px" />
           <#else>
           <el-input v-model="searchForm.${field.camelCaseName}" placeholder="请输入${field.field.label}" clearable style="width: 180px" />
           </#if>
@@ -162,7 +166,7 @@ export default {
     })
     const searchForm = reactive({
 <#list fields as field>
-      <#if field.field.fieldName != "id" && (field.field.formComponent == "input" || field.field.formComponent == "select")>
+      <#if field.field.fieldName != "id" && field.field.formComponent != "textarea" && (field.field.formComponent == "input" || field.field.formComponent == "select" || field.field.formComponent == "datepicker" || field.field.formComponent == "date" || field.field.formComponent == "number")>
       ${field.camelCaseName}: '',
       </#if>
 </#list>

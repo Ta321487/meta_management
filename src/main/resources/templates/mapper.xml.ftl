@@ -27,7 +27,7 @@
                 </#if>
             </#list>
         ) VALUES (
-            #{id}
+            <#noparse>#{id}</#noparse>
             <#list fields as field>
                 <#if field.field.fieldName != 'id'>
                     ,${"#{" + field.camelCaseName + "}"}

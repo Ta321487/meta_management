@@ -99,6 +99,7 @@
             @tab-remove="handleTabRemove"
             @tab-click="handleTabClick"
             class="menu-tabs"
+            ref="tabsRef"
           >
             <el-tab-pane
               v-for="tab in tabs"
@@ -110,6 +111,7 @@
                   class="tab-label"
                   @contextmenu.prevent.stop="onTabContextMenu($event, tab)"
                 >
+                  <el-icon><List /></el-icon>
                   {{ tab.title }}
                 </span>
               </template>
@@ -173,8 +175,9 @@
 </template>
 
 <script>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import Sortable from 'sortablejs'
 import { logout, changePassword } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
@@ -219,6 +222,7 @@ export default {
     })
 
     const isCollapse = ref(false)
+    const tabsRef = ref(null)
 
     const menuTitleMap = {
       '/business-system': '业务系统管理',
@@ -375,6 +379,27 @@ export default {
       isCollapse.value = !isCollapse.value
     }
 
+    // 初始化标签页拖拽排序
+    onMounted(() => {
+      if (tabsRef.value) {
+        const tabsNav = tabsRef.value.$el.querySelector('.el-tabs__nav')
+        if (tabsNav) {
+          Sortable.create(tabsNav, {
+            animation: 150,
+            ghostClass: 'sortable-ghost',
+            onEnd: (evt) => {
+              if (evt.oldIndex === evt.newIndex) {
+                return
+              }
+              // 更新 tabs 数组顺序
+              const movedTab = tabs.value.splice(evt.oldIndex, 1)[0]
+              tabs.value.splice(evt.newIndex, 0, movedTab)
+            }
+          })
+        }
+      }
+    })
+
     const passwordRules = {
       oldPassword: [{ required: true, message: '请输入原密码', trigger: 'blur' }],
       newPassword: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
@@ -450,7 +475,8 @@ export default {
       hideContextMenu,
       closeCurrentTab,
       closeOtherTabs,
-      closeAllTabs
+      closeAllTabs,
+      tabsRef
     }
   }
 }
@@ -600,8 +626,15 @@ export default {
 }
 
 .tab-label {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
   width: 100%;
+}
+
+.tab-label .el-icon {
+  margin-right: 5px;
+  font-size: 12px;
+  vertical-align: middle;
 }
 
 .tab-context-menu {
@@ -631,6 +664,13 @@ export default {
 .tab-context-menu li:hover {
   background-color: #f5f7fa;
   color: #409EFF;
+}
+
+/* 拖拽时的幽灵元素样式 */
+.sortable-ghost {
+  opacity: 0.5;
+  background-color: #eaf4ff !important;
+  border: 1px dashed #409EFF !important;
 }
 
 .app-main {

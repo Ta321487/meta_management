@@ -318,6 +318,40 @@ export default {
       { label: 'BOOLEAN', value: 'BOOLEAN' }
     ])
 
+    // 字段类型与表单组件的映射关系
+    const fieldTypeToFormComponentMap = {
+      // 数字类型
+      'INT': 'number',
+      'BIGINT': 'number',
+      'TINYINT': 'number',
+      'DECIMAL': 'number',
+      'NUMERIC': 'number',
+      // 日期时间类型
+      'DATE': 'datepicker',
+      'DATETIME': 'datepicker',
+      'TIMESTAMP': 'datepicker',
+      // 长文本类型
+      'TEXT': 'textarea',
+      'LONGTEXT': 'textarea',
+      // 枚举类型
+      'ENUM': 'select',
+      // 布尔类型
+      'BOOLEAN': 'select',
+      // 默认类型
+      'DEFAULT': 'input'
+    }
+
+    // 根据字段类型获取合适的表单组件
+    const getRecommendedFormComponent = (fieldType) => {
+      // 首先尝试精确匹配
+      if (fieldTypeToFormComponentMap[fieldType]) {
+        return fieldTypeToFormComponentMap[fieldType]
+      }
+      
+      // 然后尝试匹配类型前缀（如VARCHAR匹配不到，使用DEFAULT）
+      return fieldTypeToFormComponentMap['DEFAULT']
+    }
+
     // 需要参数的字段类型
     const typesWithParams = ['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC', 'ENUM']
 
@@ -427,6 +461,21 @@ export default {
         typeParams.length = length
         typeParams.precision = precision
         typeParams.scale = scale
+        
+        // 如果不是主键字段，根据字段类型自动更新表单组件
+        if (form.formComponent !== 'primary_key' && form.fieldName !== 'id' && form.fieldName !== 'uuid') {
+          form.formComponent = getRecommendedFormComponent(baseType)
+        }
+      }
+    })
+    
+    // 监听基础字段类型变化（用于新增和编辑场景）
+    watch(() => form.baseFieldType, (newValue) => {
+      if (newValue) {
+        // 如果不是主键字段，根据字段类型自动更新表单组件
+        if (form.formComponent !== 'primary_key' && form.fieldName !== 'id' && form.fieldName !== 'uuid') {
+          form.formComponent = getRecommendedFormComponent(newValue)
+        }
       }
     })
 
@@ -766,7 +815,7 @@ export default {
       const isPrimaryKey = row.formComponent === 'primary_key' || row.fieldName === 'id' || row.fieldName === 'uuid'
       
       // 检查是否为表中最后一个字段
-      const isLastField = fieldData.value.length <= 1
+      const isLastField = pagination.total <= 1
       
       if (isPrimaryKey) {
         ElMessage.error('主键字段不允许删除')

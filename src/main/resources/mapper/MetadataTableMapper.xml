@@ -97,7 +97,7 @@
     <select id="selectByModuleCode" resultMap="BaseResultMap">
         SELECT t.* FROM metadata_table t
         INNER JOIN metadata_module_table mt ON t.table_code = mt.table_code
-        WHERE mt.module_code = #{moduleCode}
+        WHERE t.is_enabled = 1 AND mt.module_code = #{moduleCode}
         <if test="businessCode != null and businessCode != ''">
             AND t.business_code = #{businessCode}
         </if>
@@ -106,7 +106,7 @@
 
     <select id="selectByCodes" resultMap="BaseResultMap">
         SELECT * FROM metadata_table
-        WHERE table_code IN
+        WHERE is_enabled = 1 AND table_code IN
         <foreach collection="tableCodes" item="tableCode" open="(" separator="," close=")">
             #{tableCode}
         </foreach>

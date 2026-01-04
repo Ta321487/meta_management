@@ -6,10 +6,7 @@ import com.alibaba.fastjson2.JSONObject;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.entity.MetadataField;
 import com.metadata.service.MetadataBusinessSystemService;
-import com.metadata.service.exception.CodeGenException;
-
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * 代码生成工具类，包含公共方法和工具函数
@@ -22,7 +19,7 @@ public class CodeGenUtils {
     private static final Map<String, String> BUILT_IN_REGEX_MAP = new HashMap<String, String>() {
         {
             put("email", "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-            put("url", "^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$");
+            put("url", "^(https?:\\/\\/)?(?:(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}|(?:\\d{1,3}\\.){3}\\d{1,3})(?:[/\\w .-]*)*\\/?$");
             put("number", "^-?\\d+(\\.\\d+)?$");
             put("integer", "^-?\\d+$");
         }

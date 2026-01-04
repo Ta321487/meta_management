@@ -152,6 +152,17 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 检查业务系统是否变更
         boolean businessSystemChanged = table.getBusinessCode() != null && !table.getBusinessCode().equals(existing.getBusinessCode());
         
+        // 检查表是否被禁用
+        boolean isDisabled = table.getIsEnabled() != null && table.getIsEnabled() == 0 && existing.getIsEnabled() == 1;
+        if (isDisabled) {
+            // 查询关联的模块
+            List<String> moduleCodes = moduleTableMapper.selectModuleCodesByTableCode(table.getTableCode());
+            if (moduleCodes != null && !moduleCodes.isEmpty()) {
+                // 记录日志，表被禁用且有关联模块
+                logService.log("admin", "EDIT", "表被禁用且有关联模块: " + table.getTableCode() + ", 关联模块: " + String.join(",", moduleCodes), 0, "");
+            }
+        }
+        
         // 更新元数据记录
         tableMapper.update(table);
         

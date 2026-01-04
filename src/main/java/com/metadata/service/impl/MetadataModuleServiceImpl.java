@@ -196,14 +196,27 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
      * 启用/禁用模块
      */
     @Override
+    @Transactional
     public void updateStatus(Long id, Integer status) {
         MetadataModule module = moduleMapper.selectById(id);
         if (module == null) {
             throw new RuntimeException("模块不存在");
         }
+        
+        // 更新模块状态
         module.setStatus(status);
         moduleMapper.update(module);
-        logService.logSuccess("admin", "EDIT", "更新模块状态：" + module.getModuleCode() + " -> " + status);
+        
+        // 同步更新模块下所有功能节点的状态
+        List<MetadataFunctionNode> nodes = functionNodeMapper.selectByModuleCode(module.getModuleCode(), module.getBusinessCode());
+        if (nodes != null && !nodes.isEmpty()) {
+            for (MetadataFunctionNode node : nodes) {
+                node.setIsEnabled(status);
+                functionNodeMapper.update(node);
+            }
+        }
+        
+        logService.logSuccess("admin", "EDIT", "更新模块状态：" + module.getModuleCode() + " -> " + status + ", 同步更新功能节点数：" + (nodes != null ? nodes.size() : 0));
     }
 
     /**
@@ -395,13 +408,27 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
 
                         if (nodeType.toUpperCase().contains("LIST")) {
                             node.setJumpRelation("/" + pathBase + "/list");
+                            // 列表页默认在菜单中显示
+                            node.setIsMenuVisible(1);
                         } else if (nodeType != null && nodeType.toUpperCase().contains("FORM")) {
                             node.setJumpRelation("/" + pathBase + "/form/:id?");
+                            // 表单页默认不在菜单中显示
+                            node.setIsMenuVisible(0);
                         } else if (nodeType != null && nodeType.toUpperCase().contains("DETAIL")) {
                             node.setJumpRelation("/" + pathBase + "/detail/:id?");
+                            // 详情页默认不在菜单中显示
+                            node.setIsMenuVisible(0);
+                        } else if (nodeType != null && nodeType.toUpperCase().contains("REPORT")) {
+                            // 报表页默认在菜单中显示
+                            node.setIsMenuVisible(1);
+                        } else if (nodeType != null && (nodeType.toUpperCase().contains("BATCH_IMPORT") || nodeType.toUpperCase().contains("BATCH_EXPORT"))) {
+                            // 批量导入/导出页默认在菜单中显示
+                            node.setIsMenuVisible(1);
                         } else {
                             // 其它类型不默认设置跳转关系
                             node.setJumpRelation("");
+                            // 其他类型节点默认不在菜单中显示
+                            node.setIsMenuVisible(0);
                         }
                         node.setSort(sort++);
                         node.setIsEnabled(1);

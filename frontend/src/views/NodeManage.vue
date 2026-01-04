@@ -187,7 +187,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getModuleList, getNodeList, addNode, updateNode, deleteNode, batchDeleteNode, getTablesByModule, getBusinessSystemList } from '../api'
 import IconSelector from '../components/IconSelector.vue'
@@ -495,6 +495,13 @@ export default {
     onMounted(() => {
       loadModules()
       loadBusinessSystems()
+    })
+
+    // 组件激活时刷新数据（从其他页面切换回来时）
+    onActivated(() => {
+      if (selectedModuleCode.value) {
+        loadNodes()
+      }
     })
 
     // 监听模块变化，自动刷新节点列表

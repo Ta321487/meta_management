@@ -173,7 +173,7 @@ export default {
     // 内置正则表达式映射表，根据type值提供相应的正则表达式
     const builtInRegexMap = {
       email: '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$',
-      url: '^(https?:\\/\\/)?([\\da-z.-]+)\\.([a-z.]{2,6})([/\\w .-]*)*\\/?$',
+      url: '^(https?:\\/\\/)?(?:(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,}|(?:\\d{1,3}\\.){3}\\d{1,3})(?:[/\\w .-]*)*\\/?$',
       number: '^-?\\d+(\\.\\d+)?$',
       integer: '^-?\\d+$'
     }
@@ -700,11 +700,24 @@ export default {
             // 获取解析后的pattern
             rawRegex = parsed.pattern
             
+            // 对正则表达式进行归一化处理，确保反斜杠被正确解释
+            const normalizedRegex = typeof rawRegex === 'string' ? rawRegex.replace(/\\/g, '\\') : rawRegex
+            
             // 直接使用JSON解析后的pattern值
             rawRegexpFromJson.value = rawRegex
-            testRegexp.value = rawRegex
+            
+            // 检测是否为URL相关的pattern，如果是，使用builtInRegexMap.url
+            if (rawRegex.includes('https?') || rawRegex.includes('http?')) {
+                console.log('  检测到URL pattern，使用builtInRegexMap.url')
+                testRegexp.value = builtInRegexMap.url
+            } else {
+                testRegexp.value = normalizedRegex
+            }
+            
             console.log('  原始JSON:', jsonContent)
             console.log('  解析后的pattern:', rawRegex)
+            console.log('  归一化后的正则:', normalizedRegex)
+            console.log('  使用的测试正则:', testRegexp.value)
             
             // 调试：显示rawRegex的字符编码，便于理解转义情况
             console.log('  字符编码:', JSON.stringify(rawRegex))

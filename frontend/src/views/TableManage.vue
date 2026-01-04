@@ -265,10 +265,11 @@ export default {
         // 提交表单
         if (form.id) {
           await updateTable(form)
+          ElMessage.success('操作成功')
         } else {
           await addTable(form)
+          ElMessage.success('表创建成功，可前往模块管理关联该表')
         }
-        ElMessage.success('操作成功')
         dialogVisible.value = false
         loadData()
       } catch (error) {

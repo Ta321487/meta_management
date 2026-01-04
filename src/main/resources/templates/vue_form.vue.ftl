@@ -69,18 +69,18 @@ export default {
     const formRef = ref(null)
     const form = reactive({
 <#list fields as field>
-      ${field.camelCaseName}: <#if field.field.fieldType?contains("int")>null<#elseif field.field.fieldType?contains("date")>null<#else>''</#if>,
+      ${field.camelCaseName}: <#if field.field.fieldType?lower_case?contains("int")>null<#elseif field.field.fieldType?lower_case?contains("date")>null<#else>''</#if>,
 </#list>
     })
     
     const rules = {
 <#list fields as field>
-      <#if field.field.formComponent != "primary_key" && (field.field.isRequired == 1 || (field.validationRules?? && (field.validationRules.hasPattern!false || field.validationRules.hasLength!false || field.validationRules.hasRange!false)) || field.field.fieldType?contains("int") || field.field.fieldType?contains("decimal") || field.field.fieldType?contains("double") || field.field.fieldType?contains("float"))>
+      <#if field.field.formComponent != "primary_key" && (field.field.isRequired == 1 || (field.validationRules?? && (field.validationRules.hasPattern!false || field.validationRules.hasLength!false || field.validationRules.hasRange!false)) || field.field.fieldType?lower_case?contains("int") || field.field.fieldType?lower_case?contains("decimal") || field.field.fieldType?lower_case?contains("double") || field.field.fieldType?lower_case?contains("float"))>
       ${field.camelCaseName}: [
         <#if field.field.isRequired == 1>
         { required: true, message: '请输入${field.field.label}', trigger: 'blur' },
         </#if>
-        <#if field.field.fieldType?contains("int") || field.field.fieldType?contains("decimal") || field.field.fieldType?contains("double") || field.field.fieldType?contains("float")>
+        <#if field.field.fieldType?lower_case?contains("int") || field.field.fieldType?lower_case?contains("decimal") || field.field.fieldType?lower_case?contains("double") || field.field.fieldType?lower_case?contains("float")>
         { type: 'number', message: '请输入有效的数字', trigger: 'blur' },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasPattern!false)>
@@ -99,6 +99,7 @@ export default {
         },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasRange!false)>
+        <!-- hasRange: ${field.validationRules.hasRange?c}, min: ${field.validationRules.min!''}, max: ${field.validationRules.max!''} -->
         { 
           type: 'number',
           <#if field.validationRules?exists && field.validationRules.min?exists>min: ${field.validationRules.min!-99999999}, </#if>

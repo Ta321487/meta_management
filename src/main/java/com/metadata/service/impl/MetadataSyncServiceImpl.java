@@ -320,8 +320,9 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         // 获取现有字段
         List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode);
         Map<String, MetadataField> existingFieldMap = new HashMap<>();
-        for (MetadataField field : existingFields) {
-            existingFieldMap.put(field.getFieldCode(), field);
+            for (MetadataField field : existingFields) {
+            // 将现有字段的fieldCode转换为大写，确保统一的大小写规则
+            existingFieldMap.put(field.getFieldCode().toUpperCase(), field);
         }
         
         // 1. 更新或添加字段
@@ -421,7 +422,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         // 2. 删除物理表中不存在的字段
         // 注意：仅删除已启用的字段，避免删除刚刚插入的未启用字段
         for (MetadataField existingField : existingFields) {
-            String fieldCode = existingField.getFieldCode();
+            String fieldCode = existingField.getFieldCode().toUpperCase();
             if (!physicalFields.containsKey(fieldCode)) {
                 // 物理表中不存在该字段，删除元数据中的字段
                 fieldMapper.deleteById(existingField.getId());

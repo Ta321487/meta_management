@@ -162,6 +162,9 @@
               :value="table.tableCode"
             />
           </el-select>
+          <div class="el-form-item__help" style="color: #67c23a; margin-top: 8px;">
+            提示：关联表可后续在表管理创建后回到此处关联，以保证功能正常。
+          </div>
         </el-form-item>
         <el-form-item label="排序号" prop="sort">
           <el-input-number v-model="form.sort" :min="1" :step="1" placeholder="请输入排序号" />
@@ -310,7 +313,8 @@ export default {
       try {
         const res = await getTableList({ businessCode })
         if (res.code === 200) {
-          allTables.value = res.data
+          // 过滤只显示启用的表
+          allTables.value = res.data.filter(table => table.isEnabled === 1)
         }
       } catch (error) {
         ElMessage.error('加载表列表失败')
@@ -343,7 +347,7 @@ export default {
       loadData()
     }
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
       dialogTitle.value = '新增模块'
       
       // 自动计算排序号：获取当前表格中最大的排序号并加1
@@ -365,10 +369,12 @@ export default {
         componentPath: '',
         tableCodes: []
       })
+      // 刷新模块类型列表，确保显示最新的模块类型
+      await loadModuleTypes()
       dialogVisible.value = true
     }
 
-    const handleEdit = (row) => {
+    const handleEdit = async (row) => {
       dialogTitle.value = '编辑模块'
       Object.assign(form, {
         id: row.id,
@@ -383,6 +389,8 @@ export default {
         componentPath: row.componentPath || '',
         tableCodes: []
       })
+      // 刷新模块类型列表，确保显示最新的模块类型
+      await loadModuleTypes()
       // 加载当前业务系统的表数据
       loadTables(form.businessCode)
       // 加载关联的表

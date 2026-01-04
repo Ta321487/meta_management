@@ -117,13 +117,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         if (!CodeValidator.isValidCode(field.getFieldCode())) {
             throw new RuntimeException("字段编码格式不正确");
         }
-        if (fieldMapper.countByCode(field.getTableCode(), field.getFieldCode()) > 0) {
-            throw new RuntimeException("字段编码已存在");
-        }
-        // 设置isEnabled默认值
-        if (field.getIsEnabled() == null) {
-            field.setIsEnabled(1);
-        }
+        
+        // 元数据操作使用大写的字段编码
+        field.setFieldCode(field.getFieldCode().toUpperCase());
+        
         // 确保businessCode不为null，如果没有提供则从表中获取
         if (field.getBusinessCode() == null || field.getBusinessCode().isEmpty()) {
             // 从表中获取业务系统编码
@@ -140,6 +137,14 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 // 如果没有现有字段，使用默认业务系统编码
                 field.setBusinessCode("DEFAULT");
             }
+        }
+        // 检查字段编码是否已存在，传递业务系统编码
+        if (fieldMapper.countByCode(field.getTableCode(), field.getFieldCode(), field.getBusinessCode()) > 0) {
+            throw new RuntimeException("字段编码已存在");
+        }
+        // 设置isEnabled默认值
+        if (field.getIsEnabled() == null) {
+            field.setIsEnabled(1);
         }
 
         // 保存原始校验规则的message字段
@@ -161,8 +166,8 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             throw new RuntimeException("执行ALTER TABLE ADD COLUMN失败: " + e.getMessage());
         }
 
-        // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息）
-        MetadataField latestField = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode());
+        // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息），传递业务系统编码
+        MetadataField latestField = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode(), field.getBusinessCode());
 
         // 合并message字段到最新的校验规则中
         mergeMessageIntoValidateRule(field, latestField, originalMessage);
@@ -174,7 +179,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Override
     @Transactional
     public void update(MetadataField field) {
-        MetadataField existing = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode());
+        // 元数据操作使用大写的字段编码进行查询
+        String upperFieldCode = field.getFieldCode().toUpperCase();
+        MetadataField existing = fieldMapper.selectByCode(field.getTableCode(), upperFieldCode);
         if (existing == null) {
             throw new RuntimeException("字段不存在");
         }
