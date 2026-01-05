@@ -25,37 +25,38 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 
     @Autowired
     private MetadataFunctionNodeMapper nodeMapper;
-    
+
     @Autowired
     private MetadataBusinessSystemService businessSystemService;
-    
+
     @Autowired
     private MetadataBusinessRuleService businessRuleService;
-    
+
     // 各个生成器模块
-    private SqlGenerator sqlGenerator;
-    private JavaCodeGenerator javaCodeGenerator;
-    private VueCodeGenerator vueCodeGenerator;
-    private ConfigGenerator configGenerator;
+    private final SqlGenerator sqlGenerator;
+    private final JavaCodeGenerator javaCodeGenerator;
+    private final VueCodeGenerator vueCodeGenerator;
+    private final ConfigGenerator configGenerator;
 
     @Autowired
     public CodeGeneratorServiceImpl(MetadataFieldService fieldService,
-                                   MetadataTableService tableService,
-                                   MetadataBusinessSystemService businessSystemService,
-                                   MetadataFunctionNodeMapper nodeMapper,
-                                   MetadataBusinessRuleService businessRuleService) {
+                                    MetadataTableService tableService,
+                                    MetadataBusinessSystemService businessSystemService,
+                                    MetadataFunctionNodeMapper nodeMapper,
+                                    MetadataBusinessRuleService businessRuleService) {
         this.fieldService = fieldService;
         this.tableService = tableService;
         this.businessSystemService = businessSystemService;
         this.nodeMapper = nodeMapper;
         this.businessRuleService = businessRuleService;
-        
+
         // 初始化各个生成器模块
         this.sqlGenerator = new SqlGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService);
         this.javaCodeGenerator = new JavaCodeGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService);
         this.vueCodeGenerator = new VueCodeGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService);
         this.configGenerator = new ConfigGenerator();
     }
+
     /**
      * 生成数据库建表SQL
      */
@@ -63,15 +64,6 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateCreateTableSQL(String tableCode, String businessCode) throws Exception {
         return sqlGenerator.generateCreateTableSQL(tableCode, businessCode);
     }
-    
-
-
-
-    
-
-
-
-    
 
 
     /**
@@ -94,8 +86,24 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成Service
      */
     @Override
-    public String generateService(String tableCode, String packageName, String businessCode) throws Exception {
-        return javaCodeGenerator.generateService(tableCode, packageName, businessCode);
+    public String generateService(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception {
+        return javaCodeGenerator.generateService(tableCode, packageName, businessCode, useInterface);
+    }
+
+    /**
+     * 生成Service接口
+     */
+    @Override
+    public String generateServiceInterface(String tableCode, String packageName, String businessCode) throws Exception {
+        return javaCodeGenerator.generateServiceInterface(tableCode, packageName, businessCode);
+    }
+
+    /**
+     * 生成Service实现类
+     */
+    @Override
+    public String generateServiceImpl(String tableCode, String packageName, String businessCode) throws Exception {
+        return javaCodeGenerator.generateServiceImpl(tableCode, packageName, businessCode);
     }
 
     /**
@@ -137,14 +145,14 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateRoutes(String tableCode, String businessCode) throws Exception {
         return vueCodeGenerator.generateRoutes(tableCode, businessCode);
     }
-    
+
     /**
      * 生成前端API请求文件
      */
     public String generateApi(String tableCode, String businessCode) throws Exception {
         return vueCodeGenerator.generateApi(tableCode, businessCode);
     }
-    
+
     /**
      * 生成前端认证API文件
      */
@@ -152,7 +160,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateAuth() throws Exception {
         return vueCodeGenerator.generateAuth();
     }
-    
+
     /**
      * 生成前端request.js工具类
      */
@@ -160,7 +168,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateRequestJs() throws Exception {
         return vueCodeGenerator.generateRequestJs();
     }
-    
+
     /**
      * 生成登录页
      */
@@ -168,7 +176,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateLoginPage(String businessCode) throws Exception {
         return vueCodeGenerator.generateLoginPage(businessCode);
     }
-    
+
     /**
      * 生成前端.env环境配置文件
      */
@@ -176,9 +184,8 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateEnvFile() throws Exception {
         return vueCodeGenerator.generateEnvFile();
     }
-    
 
-    
+
     /**
      * 生成业务系统下所有表的整合路由配置（routes.js）
      */
@@ -191,10 +198,10 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成完整的代码包（包含所有文件）
      */
     @Override
-    public Map<String, String> generateAll(String tableCode, String packageName, String businessCode) throws Exception {
+    public Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
-        
+
         Map<String, String> codeMap = new HashMap<>();
 
         // 生成SQL
@@ -203,7 +210,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         // 生成Java代码
         codeMap.put("Entity.java", javaCodeGenerator.generateEntity(tableCode, packageName, businessCode));
         codeMap.put("Controller.java", javaCodeGenerator.generateController(tableCode, packageName, businessCode));
-        codeMap.put("Service.java", javaCodeGenerator.generateService(tableCode, packageName, businessCode));
+        codeMap.put("Service.java", javaCodeGenerator.generateService(tableCode, packageName, businessCode, useInterface));
+        codeMap.put("ServiceInterface.java", javaCodeGenerator.generateServiceInterface(tableCode, packageName, businessCode));
+        codeMap.put("ServiceImpl.java", javaCodeGenerator.generateServiceImpl(tableCode, packageName, businessCode));
         codeMap.put("Mapper.java", javaCodeGenerator.generateMapper(tableCode, packageName, businessCode));
         codeMap.put("Mapper.xml", javaCodeGenerator.generateMapperXml(tableCode, packageName, businessCode));
 
@@ -274,38 +283,38 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
 
         return codeMap;
     }
-    
+
     /**
      * 生成业务系统下所有表的完整代码包
      */
     @Override
-    public Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName) throws Exception {
+    public Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName, boolean useInterface) throws Exception {
         Map<String, Map<String, String>> allCodeMap = new HashMap<>();
-        
+
         // 获取业务系统下所有表
         List<MetadataTable> tables = tableService.list(null, businessCode);
-        
+
         // 为每个表生成代码
         for (MetadataTable table : tables) {
             if (table.getIsEnabled() == 1) { // 只处理启用的表
-                Map<String, String> codeMap = generateAll(table.getTableCode(), packageName, businessCode);
+                Map<String, String> codeMap = generateAll(table.getTableCode(), packageName, businessCode, useInterface);
                 allCodeMap.put(table.getTableCode(), codeMap);
             }
         }
-        
+
         return allCodeMap;
     }
-    
+
     /**
      * 生成业务系统下所有表的建表SQL
      */
     @Override
     public Map<String, String> generateAllSQLByBusinessSystem(String businessCode) throws Exception {
         Map<String, String> sqlMap = new HashMap<>();
-        
+
         // 获取业务系统下所有表
         List<MetadataTable> tables = tableService.list(null, businessCode);
-        
+
         // 为每个表生成SQL
         for (MetadataTable table : tables) {
             if (table.getIsEnabled() == 1) { // 只处理启用的表
@@ -313,7 +322,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                 sqlMap.put(table.getTableCode() + ".sql", sql);
             }
         }
-        
+
         return sqlMap;
     }
 
@@ -348,7 +357,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public boolean hasDecimal(List<MetadataField> fields) {
         return CodeGenUtils.hasDecimal(fields);
     }
-    
+
     /**
      * 生成CHECK约束
      */
@@ -372,7 +381,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateAlterTableModifyColumnSQL(String tableCode, MetadataField field) throws Exception {
         return sqlGenerator.generateAlterTableModifyColumnSQL(tableCode, field);
     }
-    
+
     /**
      * 生成修改字段名称和属性的ALTER TABLE语句
      */
@@ -428,7 +437,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateApplicationConfig(String packageName) throws Exception {
         return configGenerator.generateApplicationConfig(packageName);
     }
-    
+
     /**
      * 生成MyBatis配置类
      */
@@ -436,7 +445,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateMyBatisConfig(String packageName) throws Exception {
         return configGenerator.generateMyBatisConfig(packageName);
     }
-    
+
     /**
      * 生成CORS配置类
      */
@@ -444,7 +453,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     public String generateCorsConfig(String packageName) throws Exception {
         return configGenerator.generateCorsConfig(packageName);
     }
-    
+
     /**
      * 生成pom.xml配置文件
      */

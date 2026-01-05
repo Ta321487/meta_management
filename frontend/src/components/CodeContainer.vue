@@ -148,6 +148,10 @@ const fileName = computed(() => {
 
 // 是否可以预览
 const canPreview = computed(() => {
+  // 登录页预览不需要tableCode，其他页面需要
+  if (props.codeType === 'login') {
+    return true;
+  }
   return !!props.tableCode;
 });
 

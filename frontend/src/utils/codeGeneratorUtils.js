@@ -79,6 +79,8 @@ export function getFileName(codeType, tableCode) {
     entity: tableCode ? `${baseName}Entity.java` : 'Entity.java',
     controller: tableCode ? `${baseName}Controller.java` : 'Controller.java',
     service: tableCode ? `${baseName}Service.java` : 'Service.java',
+    'service-interface': tableCode ? `${baseName}Service.java` : 'Service.java',
+    'service-impl': tableCode ? `${baseName}ServiceImpl.java` : 'ServiceImpl.java',
     mapper: tableCode ? `${baseName}Mapper.java` : 'Mapper.java',
     mapperxml: tableCode ? `${baseName}Mapper.xml` : 'Mapper.xml',
     application: 'Application.java',

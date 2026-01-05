@@ -6,6 +6,7 @@
         v-model="localActiveTab"
         :code-map="codeMap"
         :table-code="tableCode"
+        :use-interface="useInterface"
         @refresh="handleRefresh"
         @copy="handleCopy"
       />
@@ -70,6 +71,11 @@ const props = defineProps({
   businessCode: {
     type: String,
     default: ''
+  },
+  // Service生成模式
+  useInterface: {
+    type: Boolean,
+    default: false
   }
 });
 

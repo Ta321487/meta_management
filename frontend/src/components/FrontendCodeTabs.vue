@@ -34,10 +34,12 @@
         :disabled="!businessCode"
         :refresh-tooltip="'刷新当前标签页的登录页代码'"
         :show-download="true"
+        :show-preview="true"
         placeholder="请点击'生成'按钮生成登录页代码"
         @refresh="handleRefresh"
         @copy="handleCopy"
         @download="handleDownload"
+        @preview="handlePreview"
       />
     </el-tab-pane>
 

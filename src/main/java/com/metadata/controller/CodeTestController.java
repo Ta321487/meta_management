@@ -35,7 +35,7 @@ public class CodeTestController {
             @RequestParam(required = false) String businessCode) {
         try {
             // 生成所有代码
-            Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode);
+            Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, false);
 
             // 构造测试结果
             Map<String, Object> result = new HashMap<>();

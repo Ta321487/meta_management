@@ -78,6 +78,44 @@ public class CodeGeneratorController {
     }
 
     /**
+     * 生成Service接口
+     */
+    @GetMapping("/service-interface/{tableCode}")
+    @Operation(summary = "生成Service接口")
+    public Result<String> generateServiceInterface(
+            @Parameter(description = "表编码")
+            @PathVariable String tableCode,
+            @RequestParam(defaultValue = "com.example") String packageName,
+            @Parameter(description = "业务系统编码")
+            @RequestParam(required = false) String businessCode) {
+        try {
+            String code = codeGeneratorService.generateServiceInterface(tableCode, packageName, businessCode);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 生成Service实现类
+     */
+    @GetMapping("/service-impl/{tableCode}")
+    @Operation(summary = "生成Service实现类")
+    public Result<String> generateServiceImpl(
+            @Parameter(description = "表编码")
+            @PathVariable String tableCode,
+            @RequestParam(defaultValue = "com.example") String packageName,
+            @Parameter(description = "业务系统编码")
+            @RequestParam(required = false) String businessCode) {
+        try {
+            String code = codeGeneratorService.generateServiceImpl(tableCode, packageName, businessCode);
+            return Result.success(code);
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
      * 生成Service
      */
     @GetMapping("/service/{tableCode}")
@@ -87,9 +125,11 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
+            @RequestParam(required = false) String businessCode,
+            @Parameter(description = "是否使用接口，true:生成接口+实现类，false:生成传统Service类")
+            @RequestParam(defaultValue = "false") boolean useInterface) {
         try {
-            String code = codeGeneratorService.generateService(tableCode, packageName, businessCode);
+            String code = codeGeneratorService.generateService(tableCode, packageName, businessCode, useInterface);
             return Result.success(code);
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -196,9 +236,11 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
+            @RequestParam(required = false) String businessCode,
+            @Parameter(description = "是否使用接口模式生成Service")
+            @RequestParam(defaultValue = "false") boolean useInterface) {
         try {
-            Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode);
+            Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface);
             return Result.success(codeMap);
         } catch (Exception e) {
             return Result.error(e.getMessage());
@@ -247,9 +289,11 @@ public class CodeGeneratorController {
     public Result<Map<String, Map<String, String>>> generateAllByBusinessSystem(
             @Parameter(description = "业务系统编码")
             @PathVariable String businessCode,
-            @RequestParam(defaultValue = "com.example") String packageName) {
+            @RequestParam(defaultValue = "com.example") String packageName,
+            @Parameter(description = "是否使用接口模式生成Service")
+            @RequestParam(defaultValue = "false") boolean useInterface) {
         try {
-            Map<String, Map<String, String>> codeMap = codeGeneratorService.generateAllByBusinessSystem(businessCode, packageName);
+            Map<String, Map<String, String>> codeMap = codeGeneratorService.generateAllByBusinessSystem(businessCode, packageName, useInterface);
             return Result.success(codeMap);
         } catch (Exception e) {
             return Result.error(e.getMessage());

@@ -33,7 +33,9 @@
       />
     </el-tab-pane>
 
-    <el-tab-pane label="Service" name="service">
+    <!-- 根据Service生成模式显示不同的标签页 -->
+    <!-- 传统Service类模式 -->
+    <el-tab-pane v-if="!useInterface" label="Service" name="service">
       <CodeContainer
         code-type="service"
         :code="codeMap.service"
@@ -43,6 +45,31 @@
         @copy="handleCopy"
       />
     </el-tab-pane>
+
+    <!-- 接口+实现类模式 -->
+    <template v-else>
+      <el-tab-pane label="Service接口" name="service-interface">
+        <CodeContainer
+          code-type="service-interface"
+          :code="codeMap.serviceInterface"
+          :table-code="tableCode"
+          :is-visible="!!tableCode || !!codeMap.serviceInterface"
+          @refresh="handleRefresh"
+          @copy="handleCopy"
+        />
+      </el-tab-pane>
+
+      <el-tab-pane label="Service实现类" name="service-impl">
+        <CodeContainer
+          code-type="service-impl"
+          :code="codeMap.serviceImpl"
+          :table-code="tableCode"
+          :is-visible="!!tableCode || !!codeMap.serviceImpl"
+          @refresh="handleRefresh"
+          @copy="handleCopy"
+        />
+      </el-tab-pane>
+    </template>
 
     <el-tab-pane label="Mapper接口" name="mapper">
       <CodeContainer
@@ -91,6 +118,7 @@
 <script setup>
 import { ref, watch } from 'vue';
 import CodeContainer from './CodeContainer.vue';
+import { ArrowUp, ArrowDown } from '@element-plus/icons-vue';
 
 // Props
 const props = defineProps({
@@ -108,6 +136,11 @@ const props = defineProps({
   tableCode: {
     type: String,
     default: ''
+  },
+  // Service生成模式
+  useInterface: {
+    type: Boolean,
+    default: false
   }
 });
 

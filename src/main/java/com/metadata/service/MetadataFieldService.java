@@ -36,7 +36,7 @@ public interface MetadataFieldService {
      * 查询表的所有字段
      */
     List<MetadataField> listByTableCode(String tableCode);
-    
+
     /**
      * 查询表的所有字段（按业务系统）
      */
@@ -56,24 +56,27 @@ public interface MetadataFieldService {
      * 删除约束
      */
     void deleteConstraint(Map<String, Object> params);
-    
+
     /**
      * 更新字段的业务系统
-     * @param tableCode 表编码
+     *
+     * @param tableCode    表编码
      * @param businessCode 业务系统编码
      */
     void updateFieldsBusinessSystemByTable(String tableCode, String businessCode);
-    
+
     /**
      * 批量更新字段的业务系统
-     * @param tableCodes 表编码列表
+     *
+     * @param tableCodes   表编码列表
      * @param businessCode 业务系统编码
      */
     void batchUpdateFieldsBusinessSystem(List<String> tableCodes, String businessCode);
-    
+
     /**
      * 批量更新字段状态
-     * @param ids 字段ID列表
+     *
+     * @param ids    字段ID列表
      * @param status 目标状态，1-启用，0-禁用
      */
     void batchUpdateStatus(List<Long> ids, Integer status);

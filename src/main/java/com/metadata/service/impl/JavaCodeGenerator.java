@@ -136,14 +136,52 @@ public class JavaCodeGenerator {
     }
     
     /**
-     * 生成Service
+     * 生成Service接口
      * @param tableCode 表编码
      * @param packageName 包名
      * @param businessCode 业务系统编码
-     * @return Service代码
+     * @return Service接口代码
      * @throws CodeGenException 代码生成异常
      */
-    public String generateService(String tableCode, String packageName, String businessCode) throws CodeGenException {
+    public String generateServiceInterface(String tableCode, String packageName, String businessCode) throws CodeGenException {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
+        // 优先使用业务系统的包名
+        com.metadata.entity.MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+        if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+            packageName = businessSystem.getPackageName();
+        }
+        
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+        }
+
+        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("table", table);
+        data.put("fields", fieldList);
+        data.put("packageName", packageName);
+        data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
+        data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+
+        return templateManager.processTemplate("service-interface.java.ftl", data);
+    }
+    
+    /**
+     * 生成Service实现类
+     * @param tableCode 表编码
+     * @param packageName 包名
+     * @param businessCode 业务系统编码
+     * @return Service实现类代码
+     * @throws CodeGenException 代码生成异常
+     */
+    public String generateServiceImpl(String tableCode, String packageName, String businessCode) throws CodeGenException {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
         
@@ -173,7 +211,59 @@ public class JavaCodeGenerator {
         data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
         data.put("businessRules", businessRules);
 
-        return templateManager.processTemplate("service.java.ftl", data);
+        return templateManager.processTemplate("service-impl.java.ftl", data);
+    }
+    
+    /**
+     * 生成Service
+     * @param tableCode 表编码
+     * @param packageName 包名
+     * @param businessCode 业务系统编码
+     * @param useInterface 是否使用接口
+     * @return Service代码
+     * @throws CodeGenException 代码生成异常
+     */
+    public String generateService(String tableCode, String packageName, String businessCode, boolean useInterface) throws CodeGenException {
+        // 为businessCode设置默认值，避免null值传递给模板
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        
+        if (useInterface) {
+            // 如果使用接口，生成接口+实现类
+            StringBuilder serviceCode = new StringBuilder();
+            serviceCode.append(generateServiceInterface(tableCode, packageName, businessCode));
+            serviceCode.append("\n\n");
+            serviceCode.append(generateServiceImpl(tableCode, packageName, businessCode));
+            return serviceCode.toString();
+        } else {
+            // 否则生成传统的Service类
+            // 优先使用业务系统的包名
+            com.metadata.entity.MetadataBusinessSystem businessSystem = businessSystemService.getByCode(businessCode);
+            if (businessSystem != null && businessSystem.getPackageName() != null && !businessSystem.getPackageName().isEmpty()) {
+                packageName = businessSystem.getPackageName();
+            }
+            
+            MetadataTable table = tableService.getByCode(tableCode);
+            if (table == null) {
+                throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+            }
+
+            List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+            List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+            // 获取表相关的业务规则
+            List<Map<String, Object>> businessRules = getTableBusinessRules(tableCode, businessCode);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("table", table);
+            data.put("fields", fieldList);
+            data.put("packageName", packageName);
+            data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
+            data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
+            data.put("businessCode", businessCode);
+            data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+            data.put("businessRules", businessRules);
+
+            return templateManager.processTemplate("service.java.ftl", data);
+        }
     }
     
     /**

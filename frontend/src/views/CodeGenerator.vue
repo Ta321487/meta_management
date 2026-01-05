@@ -27,6 +27,7 @@
         :code-map="codeMap"
         :table-code="form.tableCode"
         :business-code="form.businessCode"
+        :use-interface="form.useInterface"
         @refresh="handleGenerate"
         @copy="handleCopy"
         @download="handleDownload"
@@ -61,6 +62,12 @@
     <!-- 部署指南 -->
     <DeploymentGuide
       v-model:visible="deploymentGuideVisible"
+    />
+    
+    <!-- 登录页预览 -->
+    <LoginPreview
+      v-model:visible="loginPreviewVisible"
+      :login-code="codeMap.login"
     />
   </div>
 </template>
@@ -109,6 +116,7 @@ import CodeTabsContainer from '../components/CodeTabsContainer.vue'
 import TestResult from '../components/TestResult.vue'
 import ListPreview from '../components/ListPreview.vue'
 import FormPreview from '../components/FormPreview.vue'
+import LoginPreview from '../components/LoginPreview.vue'
 import DeploymentGuide from '../components/DeploymentGuide.vue'
 
 // 更新表单数据
@@ -120,7 +128,8 @@ const updateForm = (newForm) => {
 const form = reactive({
   businessCode: '',
   tableCode: '',
-  packageName: 'com.example'
+  packageName: 'com.example',
+  useInterface: false
 });
 
 // 业务系统列表
@@ -137,6 +146,8 @@ const codeMap = reactive({
   entity: '',
   controller: '',
   service: '',
+  serviceInterface: '',
+  serviceImpl: '',
   mapper: '',
   mapperxml: '',
   application: '',
@@ -174,6 +185,9 @@ const formPreviewTableName = ref('')
 
 // 部署指南
 const deploymentGuideVisible = ref(false)
+
+// 登录页预览相关
+const loginPreviewVisible = ref(false)
 
 // 加载业务系统列表
 const loadBusinessSystems = async () => {
@@ -292,7 +306,14 @@ const handlePreview = (codeType) => {
     handlePreviewList()
   } else if (codeType === 'vueForm') {
     handlePreviewForm()
+  } else if (codeType === 'login') {
+    handlePreviewLogin()
   }
+}
+
+// 预览登录页
+const handlePreviewLogin = () => {
+  loginPreviewVisible.value = true
 }
 
 // 生成整合路由
@@ -329,9 +350,21 @@ const handleGenerate = async (type) => {
         }
         break
       case 'service':
-        res = await generateService(form.tableCode, form.packageName, form.businessCode)
+        res = await generateService(form.tableCode, form.packageName, form.businessCode, form.useInterface)
         if (res.code === 200) {
           codeMap.service = res.data
+        }
+        break
+      case 'service-interface':
+        res = await generateServiceInterface(form.tableCode, form.packageName, form.businessCode)
+        if (res.code === 200) {
+          codeMap.serviceInterface = res.data
+        }
+        break
+      case 'service-impl':
+        res = await generateServiceImpl(form.tableCode, form.packageName, form.businessCode)
+        if (res.code === 200) {
+          codeMap.serviceImpl = res.data
         }
         break
       case 'mapper':
@@ -470,13 +503,15 @@ const handleGenerateCurrentTable = async () => {
   }
 
   try {
-    const res = await generateAll(form.tableCode, form.packageName, form.businessCode)
+    const res = await generateAll(form.tableCode, form.packageName, form.businessCode, form.useInterface)
     if (res.code === 200 && res.data) {
       const data = res.data
       codeMap.sql = data['create_table.sql'] || ''
       codeMap.entity = data['Entity.java'] || ''
       codeMap.controller = data['Controller.java'] || ''
       codeMap.service = data['Service.java'] || ''
+      codeMap.serviceInterface = data['ServiceInterface.java'] || ''
+      codeMap.serviceImpl = data['ServiceImpl.java'] || ''
       codeMap.mapper = data['Mapper.java'] || ''
       codeMap.application = data['Application.java'] || ''
       codeMap.applicationYml = data['application.yml'] || ''
@@ -539,7 +574,7 @@ const handleGenerateAllTables = async () => {
     
     // 只有选择了表，才生成其他代码
     if (form.tableCode) {
-      const allCodeRes = await generateAllByBusinessSystem(form.businessCode, form.packageName)
+      const allCodeRes = await generateAllByBusinessSystem(form.businessCode, form.packageName, form.useInterface)
       if (allCodeRes.code === 200 && allCodeRes.data) {
         const tableCodes = Object.keys(allCodeRes.data)
         const targetTableCode = form.tableCode
@@ -549,6 +584,8 @@ const handleGenerateAllTables = async () => {
           codeMap.entity = tableCodeMap['Entity.java'] || ''
           codeMap.controller = tableCodeMap['Controller.java'] || ''
           codeMap.service = tableCodeMap['Service.java'] || ''
+          codeMap.serviceInterface = tableCodeMap['ServiceInterface.java'] || ''
+          codeMap.serviceImpl = tableCodeMap['ServiceImpl.java'] || ''
           codeMap.mapper = tableCodeMap['Mapper.java'] || ''
           codeMap.application = tableCodeMap['Application.java'] || ''
           codeMap.applicationYml = tableCodeMap['application.yml'] || ''

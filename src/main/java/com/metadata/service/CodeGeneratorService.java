@@ -15,7 +15,7 @@ public interface CodeGeneratorService {
      * 生成数据库建表SQL
      */
     String generateCreateTableSQL(String tableCode, String businessCode) throws Exception;
-    
+
     /**
      * 生成数据库建表SQL（默认业务系统）
      */
@@ -27,7 +27,7 @@ public interface CodeGeneratorService {
      * 生成Java实体类
      */
     String generateEntity(String tableCode, String packageName, String businessCode) throws Exception;
-    
+
     /**
      * 生成Java实体类（默认业务系统）
      */
@@ -39,7 +39,7 @@ public interface CodeGeneratorService {
      * 生成Controller
      */
     String generateController(String tableCode, String packageName, String businessCode) throws Exception;
-    
+
     /**
      * 生成Controller（默认业务系统）
      */
@@ -50,20 +50,51 @@ public interface CodeGeneratorService {
     /**
      * 生成Service
      */
-    String generateService(String tableCode, String packageName, String businessCode) throws Exception;
-    
+    String generateService(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception;
+
     /**
      * 生成Service（默认业务系统）
      */
     default String generateService(String tableCode, String packageName) throws Exception {
-        return generateService(tableCode, packageName, "DEFAULT");
+        return generateService(tableCode, packageName, "DEFAULT", false);
+    }
+
+    /**
+     * 生成Service（默认业务系统，指定是否使用接口）
+     */
+    default String generateService(String tableCode, String packageName, boolean useInterface) throws Exception {
+        return generateService(tableCode, packageName, "DEFAULT", useInterface);
+    }
+
+    /**
+     * 生成Service接口
+     */
+    String generateServiceInterface(String tableCode, String packageName, String businessCode) throws Exception;
+
+    /**
+     * 生成Service接口（默认业务系统）
+     */
+    default String generateServiceInterface(String tableCode, String packageName) throws Exception {
+        return generateServiceInterface(tableCode, packageName, "DEFAULT");
+    }
+
+    /**
+     * 生成Service实现类
+     */
+    String generateServiceImpl(String tableCode, String packageName, String businessCode) throws Exception;
+
+    /**
+     * 生成Service实现类（默认业务系统）
+     */
+    default String generateServiceImpl(String tableCode, String packageName) throws Exception {
+        return generateServiceImpl(tableCode, packageName, "DEFAULT");
     }
 
     /**
      * 生成Mapper接口
      */
     String generateMapper(String tableCode, String packageName, String businessCode) throws Exception;
-    
+
     /**
      * 生成Mapper接口（默认业务系统）
      */
@@ -75,7 +106,7 @@ public interface CodeGeneratorService {
      * 生成Mapper XML
      */
     String generateMapperXml(String tableCode, String packageName, String businessCode) throws Exception;
-    
+
     /**
      * 生成Mapper XML（默认业务系统）
      */
@@ -87,7 +118,7 @@ public interface CodeGeneratorService {
      * 生成Vue列表页面
      */
     String generateVueList(String tableCode, String businessCode) throws Exception;
-    
+
     /**
      * 生成Vue列表页面（默认业务系统）
      */
@@ -99,7 +130,7 @@ public interface CodeGeneratorService {
      * 生成Vue表单页面
      */
     String generateVueForm(String tableCode, String businessCode) throws Exception;
-    
+
     /**
      * 生成Vue表单页面（默认业务系统）
      */
@@ -111,7 +142,7 @@ public interface CodeGeneratorService {
      * 生成前端路由配置（routes.js）
      */
     String generateRoutes(String tableCode, String businessCode) throws Exception;
-    
+
     /**
      * 生成前端路由配置（routes.js）（默认业务系统）
      */
@@ -127,20 +158,34 @@ public interface CodeGeneratorService {
     /**
      * 生成完整的代码包（包含所有文件）
      */
-    Map<String, String> generateAll(String tableCode, String packageName, String businessCode) throws Exception;
-    
+    Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception;
+
     /**
      * 生成完整的代码包（包含所有文件）（默认业务系统）
      */
     default Map<String, String> generateAll(String tableCode, String packageName) throws Exception {
-        return generateAll(tableCode, packageName, "DEFAULT");
+        return generateAll(tableCode, packageName, "DEFAULT", false);
     }
-    
+
+    /**
+     * 生成完整的代码包（包含所有文件）（默认业务系统，指定是否使用接口）
+     */
+    default Map<String, String> generateAll(String tableCode, String packageName, boolean useInterface) throws Exception {
+        return generateAll(tableCode, packageName, "DEFAULT", useInterface);
+    }
+
     /**
      * 生成业务系统下所有表的完整代码包
      */
-    Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName) throws Exception;
-    
+    Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName, boolean useInterface) throws Exception;
+
+    /**
+     * 生成业务系统下所有表的完整代码包（默认不使用接口）
+     */
+    default Map<String, Map<String, String>> generateAllByBusinessSystem(String businessCode, String packageName) throws Exception {
+        return generateAllByBusinessSystem(businessCode, packageName, false);
+    }
+
     /**
      * 生成业务系统下所有表的建表SQL
      */
@@ -165,7 +210,7 @@ public interface CodeGeneratorService {
      * 检查字段列表中是否有Decimal类型
      */
     boolean hasDecimal(List<MetadataField> fields);
-    
+
     /**
      * 生成CHECK约束
      */
@@ -180,7 +225,7 @@ public interface CodeGeneratorService {
      * 生成修改字段的ALTER TABLE语句
      */
     String generateAlterTableModifyColumnSQL(String tableCode, MetadataField field) throws Exception;
-    
+
     /**
      * 生成修改字段名称和属性的ALTER TABLE语句
      */
@@ -215,42 +260,42 @@ public interface CodeGeneratorService {
      * 生成application.yml配置文件
      */
     String generateApplicationConfig(String packageName) throws Exception;
-    
+
     /**
      * 生成MyBatis配置类
      */
     String generateMyBatisConfig(String packageName) throws Exception;
-    
+
     /**
      * 生成CORS配置类
      */
     String generateCorsConfig(String packageName) throws Exception;
-    
+
     /**
      * 生成前端request.js工具类
      */
     String generateRequestJs() throws Exception;
-    
+
     /**
      * 生成前端.env环境配置文件
      */
     String generateEnvFile() throws Exception;
-    
+
     /**
      * 生成登录页
      */
     String generateLoginPage(String businessCode) throws Exception;
-    
+
     /**
      * 生成前端API请求文件
      */
     String generateApi(String tableCode, String businessCode) throws Exception;
-    
+
     /**
      * 生成前端认证API文件
      */
     String generateAuth() throws Exception;
-    
+
     /**
      * 生成pom.xml配置文件
      */
