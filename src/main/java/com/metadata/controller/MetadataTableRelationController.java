@@ -60,8 +60,8 @@ public class MetadataTableRelationController {
     }
 
     @GetMapping("/listBySlave/{slaveTableCode}")
-    public Result<List<MetadataTableRelation>> listBySlaveTableCode(@PathVariable String slaveTableCode) {
-        List<MetadataTableRelation> list = relationService.listBySlaveTableCode(slaveTableCode);
+    public Result<List<MetadataTableRelation>> listBySlaveTableCode(@PathVariable String slaveTableCode, @RequestParam(required = false) String businessCode) {
+        List<MetadataTableRelation> list = relationService.listBySlaveTableCode(slaveTableCode, businessCode);
         return Result.success(list);
     }
 

@@ -19,7 +19,16 @@
 <#list fields as field>
         <#if field.field.formComponent != "primary_key">
         <el-form-item label="${field.field.label}" prop="${field.camelCaseName}">
-          <#if field.field.formComponent == "input">
+          <#if field.isForeignKey!false>
+          <el-select v-model="form.${field.camelCaseName}" placeholder="请选择${field.field.label}" style="width: 100%" filterable>
+            <el-option
+              v-for="item in ${field.relatedTableCamelCaseName}List"
+              :key="item.id"
+              :label="item.${field.relatedTableFieldName}"
+              :value="item.${field.relatedTableFieldName}"
+            />
+          </el-select>
+          <#elseif field.field.formComponent == "input">
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
           <#elseif field.field.formComponent == "select">
           <el-select v-model="form.${field.camelCaseName}" placeholder="请选择" style="width: 100%">
@@ -60,7 +69,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRoute } from 'vue-router'
-import { ${componentName}Api } from '../api'
+import { ${componentName}Api <#list fields as field><#if field.isForeignKey!false>, ${field.relatedTableClassName}Api</#if></#list> } from '../api'
 
 export default {
   name: '${componentName}Form',
@@ -72,6 +81,13 @@ export default {
       ${field.camelCaseName}: <#if field.field.fieldType?lower_case?contains("int")>null<#elseif field.field.fieldType?lower_case?contains("date")>null<#else>''</#if>,
 </#list>
     })
+    
+    // 关联数据
+    <#list fields as field>
+    <#if field.isForeignKey!false>
+    const ${field.relatedTableCamelCaseName}List = ref([])
+    </#if>
+    </#list>
     
     const rules = {
 <#list fields as field>
@@ -85,7 +101,7 @@ export default {
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasPattern!false)>
         { 
-          pattern: new RegExp('${escapeRegexPattern(field.validationRules.pattern!)}'), 
+          pattern: /${field.validationRules.pattern!}/, 
           message: '${escapeJsString(field.validationRules.patternMessage!"格式不正确")}', 
           trigger: 'blur' 
         },
@@ -102,11 +118,74 @@ export default {
         <!-- hasRange: ${field.validationRules.hasRange?c}, min: ${field.validationRules.min!''}, max: ${field.validationRules.max!''} -->
         { 
           type: 'number',
-          <#if field.validationRules?exists && field.validationRules.min?exists>min: ${field.validationRules.min!-99999999}, </#if>
-          <#if field.validationRules?exists && field.validationRules.max?exists>max: ${field.validationRules.max!99999999}, </#if>
-          message: '${escapeJsString(field.validationRules.rangeMessage!"数值必须在${min}到${max}之间")}', 
+          <#assign minValue = field.validationRules.min!-99999999>
+          <#assign maxValue = field.validationRules.max!99999999>
+          <#if field.validationRules?exists && field.validationRules.min?exists>min: ${minValue}, </#if>
+          <#if field.validationRules?exists && field.validationRules.max?exists>max: ${maxValue}, </#if>
+          <#assign message = field.validationRules.rangeMessage!"数值必须在${minValue}到${maxValue}之间">
+          <#assign message = message?replace("${'$'}{min}", minValue?string)>
+          <#assign message = message?replace("${'$'}{max}", maxValue?string)>
+          message: '${escapeJsString(message)}', 
           trigger: 'blur' 
         }
+        </#if>
+        <#-- 检查是否有跨字段比较规则 -->
+        <#if (field.validationRules?? && field.validationRules.hasCrossField!false)>
+        <#assign crossField2 = field.validationRules.crossField2!''>
+        <#if crossField2 != ''>
+        <#assign compareFieldCamelCase = ''>
+        <#list fields as f>
+          <#if f.field.fieldName == crossField2>
+            <#assign compareFieldCamelCase = f.camelCaseName>
+            <#break>
+          </#if>
+        </#list>
+        <#if compareFieldCamelCase != ''>
+        <#assign crossFieldOperator = field.validationRules.crossFieldOperator!'>='>
+        <#assign crossFieldCondition = field.validationRules.crossFieldCondition!''>
+        <#assign crossFieldMessage = field.validationRules.crossFieldMessage!''>
+        <#-- 确定错误消息：优先使用crossFieldMessage，如果为空或不存在，则使用crossFieldCondition或默认消息 -->
+        <#if crossFieldMessage?has_content && crossFieldMessage?trim?has_content>
+          <#assign finalMessage = crossFieldMessage>
+        <#elseif crossFieldCondition?has_content && crossFieldCondition?trim?has_content>
+          <#assign finalMessage = crossFieldCondition>
+        <#else>
+          <#assign finalMessage = '验证失败: ${field.field.fieldName} ${crossFieldOperator} ${crossField2}'>
+        </#if>
+        { 
+          validator: (rule, value, callback) => {
+            const compareValue = form.${compareFieldCamelCase};
+            // 如果两个值都为空，跳过验证
+            if (!value && !compareValue) {
+              callback();
+              return;
+            }
+            // 比较两个值
+            let isValid = false;
+            <#if crossFieldOperator == '>='>
+            isValid = value >= compareValue;
+            <#elseif crossFieldOperator == '<='>
+            isValid = value <= compareValue;
+            <#elseif crossFieldOperator == '>'>
+            isValid = value > compareValue;
+            <#elseif crossFieldOperator == '<'>
+            isValid = value < compareValue;
+            <#elseif crossFieldOperator == '=' || crossFieldOperator == '=='>
+            isValid = value === compareValue;
+            <#elseif crossFieldOperator == '!=' || crossFieldOperator == '<>'>
+            isValid = value !== compareValue;
+            </#if>
+            if (isValid) {
+              callback();
+            } else {
+              callback(new Error('${escapeJsString(finalMessage)}'));
+            }
+          }, 
+          trigger: 'blur',
+          message: '${escapeJsString(finalMessage)}'
+        },
+        </#if>
+        </#if>
         </#if>
         <#-- 检查是否有针对该字段的唯一性规则 -->
         <#list businessRules as rule>
@@ -159,6 +238,22 @@ export default {
         }
       }
     }
+    
+    // 加载关联数据
+    <#list fields as field>
+    <#if field.isForeignKey!false>
+    const load${field.relatedTableClassName}Data = async () => {
+      try {
+        const res = await ${field.relatedTableClassName}Api.list()
+        if (res.code === 200 && res.data) {
+          ${field.relatedTableCamelCaseName}List.value = res.data
+        }
+      } catch (error) {
+        ElMessage.error('加载${field.relatedTableName}数据失败')
+      }
+    }
+    </#if>
+    </#list>
 
     // 验证组合字段唯一性
     const validateUniqueCombo = async () => {
@@ -220,8 +315,14 @@ export default {
       formRef.value?.resetFields()
     }
 
-    onMounted(() => {
-      loadData()
+    onMounted(async () => {
+      await loadData()
+      // 加载关联数据
+      <#list fields as field>
+      <#if field.isForeignKey!false>
+      await load${field.relatedTableClassName}Data()
+      </#if>
+      </#list>
     })
 
     return {
@@ -230,6 +331,11 @@ export default {
       rules,
       handleSubmit,
       handleReset
+      <#list fields as field>
+      <#if field.isForeignKey!false>
+      , ${field.relatedTableCamelCaseName}List
+      </#if>
+      </#list>
     }
   }
 }

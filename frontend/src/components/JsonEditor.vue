@@ -122,6 +122,7 @@ import { ref, onMounted, watch, onBeforeUnmount, computed } from 'vue'
 import * as monaco from 'monaco-editor'
 import { ElMessage } from 'element-plus'
 import { Check, Close } from '@element-plus/icons-vue'
+import { normalizeRegexPattern } from '../utils/regexUtils'
 
 export default {
   name: 'JsonEditor',
@@ -491,6 +492,10 @@ export default {
             
             try {
               parsed = JSON.parse(value)
+              
+              // JSON解析成功，JSON.stringify会自动处理转义
+              // 确保反斜杠在JSON字符串中被正确转义为\\
+              // 不需要额外处理，JSON.stringify已经能够正确处理
             } catch (error) {
               // JSON解析失败，尝试自动修复
               ElMessage.warning('JSON解析失败，尝试自动修复...')
@@ -503,9 +508,16 @@ export default {
               let processedValue = value
               
               // 改进的正则表达式自动转义逻辑，处理更多可能的字段
-              // 处理pattern, regex, validate等可能包含正则表达式的字段
-              processedValue = processedValue.replace(/"(pattern|regex|validate|format)"\s*:\s*"([^"]+)"/g, (match, field, pattern) => {
-                // 转义pattern中的反斜杠
+              // 使用更精确的正则表达式来匹配JSON字符串值，支持转义字符
+              // 匹配 pattern: "..." 格式，其中 ... 可能包含转义的引号和反斜杠
+              // 注意：这个正则表达式需要能够匹配包含转义字符的JSON字符串值
+              // 使用非贪婪匹配和转义字符处理
+              processedValue = processedValue.replace(/"(pattern|regex|validate|format)"\s*:\s*"((?:[^"\\]|\\.)*)"/g, (match, field, pattern) => {
+                // pattern字符串中，反斜杠需要被转义
+                // 在JSON字符串中，单个反斜杠需要写成 \\
+                // 所以我们需要将 pattern 中的每个反斜杠转义为双反斜杠
+                // 但要注意：如果已经是转义序列（如 \\d），需要保持原样
+                // 实际上，在JSON字符串中，\d 应该写成 \\d
                 const escapedPattern = pattern.replace(/\\/g, '\\\\')
                 return `"${field}": "${escapedPattern}"`
               })
@@ -540,6 +552,7 @@ export default {
             }
             
             // 使用JSON.parse和JSON.stringify进行格式化
+            // JSON.stringify会自动处理转义，确保反斜杠被正确转义为\\
             const formatted = JSON.stringify(parsed, null, 2)
             
             editor.setValue(formatted)
@@ -700,10 +713,16 @@ export default {
             // 获取解析后的pattern
             rawRegex = parsed.pattern
             
-            // 对正则表达式进行归一化处理，确保反斜杠被正确解释
-            const normalizedRegex = typeof rawRegex === 'string' ? rawRegex.replace(/\\/g, '\\') : rawRegex
+            // 使用公共工具函数归一化并修复正则表达式
+            let normalizedRegex;
+            try {
+                normalizedRegex = normalizeRegexPattern(rawRegex, { fixCorrupted: true });
+            } catch (error) {
+                console.error('  正则表达式处理失败:', error);
+                normalizedRegex = rawRegex;
+            }
             
-            // 直接使用JSON解析后的pattern值
+            // 直接使用JSON解析后的pattern值（用于显示）
             rawRegexpFromJson.value = rawRegex
             
             // 检测是否为URL相关的pattern，如果是，使用builtInRegexMap.url
@@ -1035,21 +1054,30 @@ export default {
           console.log('正则表达式测试过程：')
           console.log('  原始pattern:', pattern)
           console.log('  测试输入:', testInputValue)
-          const normalizedPattern = typeof pattern === 'string' ? pattern.replace(/\\\\/g, '\\') : pattern
-          const regex = new RegExp(normalizedPattern, 'i')
-          console.log('  最终正则对象:', regex)
-          console.log('  正则表达式源:', regex.source)
-          const trimmedInput = testInputValue.trim()
-          console.log('  修剪后的测试输入:', trimmedInput)
-          console.log('  修剪后的输入长度:', trimmedInput.length)
-          const match = regex.test(trimmedInput)
-          let message = ''
-          if (!match) {
-            message = parsed.message || ''
+          
+          // 使用公共工具函数归一化并修复正则表达式
+          try {
+            const normalizedPattern = normalizeRegexPattern(pattern, { fixCorrupted: true });
+            const regex = normalizeRegexPattern(normalizedPattern, { createRegExp: true, fixCorrupted: false });
+            
+            console.log('  最终正则对象:', regex)
+            console.log('  正则表达式源:', regex.source)
+            const trimmedInput = testInputValue.trim()
+            console.log('  修剪后的测试输入:', trimmedInput)
+            console.log('  修剪后的输入长度:', trimmedInput.length)
+            const match = regex.test(trimmedInput)
+            let message = ''
+            if (!match) {
+              message = parsed.message || ''
+            }
+            console.log('  匹配结果:', match, ' 消息:', message)
+            testResult.value = { match, message }
+            return
+          } catch (error) {
+            console.error('  正则表达式无效:', pattern, error)
+            testResult.value = { match: false, message: `正则表达式无效: ${error.message}` }
+            return
           }
-          console.log('  匹配结果:', match, ' 消息:', message)
-          testResult.value = { match, message }
-          return
         } else {
           // 其他约束类型，无法测试
           console.log('  无法测试的约束类型:', parsed)

@@ -1,6 +1,5 @@
 package com.metadata.service;
 
-import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.service.constant.SqlConstants;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -111,176 +110,166 @@ public class CheckConstraintParser {
         String constraint = checkConstraint.trim();
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "开始解析CHECK约束: " + constraint);
         
-        // 提取字段名
-        String fieldName = extractFieldNameFromConstraint(constraint);
-        logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "提取到字段名: " + fieldName);
+        JSONObject validationRules = new JSONObject();
         
-        // 1. 正则表达式约束：支持 regexp_like 语法，如 regexp_like(`name`,_utf8mb4'^[A-Za-z]+$')
+        // 1. 正则表达式约束：支持 regexp_like 语法
         Pattern regexPattern = Pattern.compile(
-            "regexp_like\\s*\\(\\s*`?([a-zA-Z0-9_]+)`?\\s*,\\s*(?:_utf8mb4)?'([^']+)'\\)",
+                "regexp_like\\s*\\(\\s*`?[a-zA-Z0-9_]+`?\\s*,\\s*(?:_utf8mb4)?'([^']+)'\\)",
             Pattern.CASE_INSENSITIVE
         );
         Matcher regexMatcher = regexPattern.matcher(constraint);
         if (regexMatcher.find()) {
-            String pattern = regexMatcher.group(2);
+            String pattern = regexMatcher.group(1);
             if (pattern != null) {
-                // 生成正则约束JSON
-                String json = String.format("{\"pattern\":\"%s\",\"message\":\"\"}", 
-                    pattern.replace("\\", "\\\\"));
-                logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为正则约束: " + json);
-                return json;
+                pattern = fixCommonLostBackslashes(pattern);
+                validationRules.put("pattern", pattern.replace("\\", "\\\\"));
             }
         }
         
-        // 2. 支持直接使用 REGEXP 关键字的格式，如 STU_CODE REGEXP '^\\d{10}$'
+        // 2. 支持直接使用 REGEXP 关键字的格式
         Pattern regExpKeywordPattern = Pattern.compile(
-            "`?([a-zA-Z0-9_]+)`?\\s+REGEXP\\s+'([^']+)'",
+                "`?[a-zA-Z0-9_]+`?\\s+REGEXP\\s+'([^']+)'",
             Pattern.CASE_INSENSITIVE
         );
         Matcher regExpKeywordMatcher = regExpKeywordPattern.matcher(constraint);
         if (regExpKeywordMatcher.find()) {
-            String pattern = regExpKeywordMatcher.group(2);
+            String pattern = regExpKeywordMatcher.group(1);
             if (pattern != null) {
-                // 生成正则约束JSON
-                String json = String.format("{\"pattern\":\"%s\",\"message\":\"\"}", 
-                    pattern.replace("\\", "\\\\"));
-                logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为REGEXP关键字正则约束: " + json);
-                return json;
+                pattern = fixCommonLostBackslashes(pattern);
+                validationRules.put("pattern", pattern.replace("\\", "\\\\"));
             }
         }
         
-        // 3. BETWEEN AND约束：支持 ((`age` between 18 and 60)) 格式，匹配小写的between
+        // 3. BETWEEN AND约束
         Pattern betweenPattern = Pattern.compile(
-            "`?([a-zA-Z0-9_]+)`?\\s+between\\s+([0-9]+)\\s+and\\s+([0-9]+)",
+                "between\\s+([0-9]+)\\s+and\\s+([0-9]+)",
             Pattern.CASE_INSENSITIVE
         );
         Matcher betweenMatcher = betweenPattern.matcher(constraint);
         if (betweenMatcher.find()) {
-            String min = betweenMatcher.group(2);
-            String max = betweenMatcher.group(3);
-            // 生成BETWEEN约束JSON
-            String json = String.format("{\"min\":\"%s\",\"max\":\"%s\",\"message\":\"\"}",
-                min, max);
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为BETWEEN约束: " + json);
-            return json;
+            validationRules.put("min", Integer.parseInt(betweenMatcher.group(1)));
+            validationRules.put("max", Integer.parseInt(betweenMatcher.group(2)));
         }
         
-        // 4. IN约束：支持 ((`status` in (_gbk'active',_gbk'inactive',_gbk'pending'))) 格式，匹配小写的in
+        // 4. IN约束
         Pattern inPattern = Pattern.compile(
-            "`?([a-zA-Z0-9_]+)`?\\s+in\\s*\\(([^\\)]+)\\)",
+                "in\\s*\\(([^\\)]+)\\)",
             Pattern.CASE_INSENSITIVE
         );
         Matcher inMatcher = inPattern.matcher(constraint);
         if (inMatcher.find()) {
-            String valuesStr = inMatcher.group(2);
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "提取IN值列表: " + valuesStr);
-            // 解析IN值列表，处理字符集前缀如_gbk'active'
+            String valuesStr = inMatcher.group(1);
             List<String> valuesList = parseInValues(valuesStr);
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析后的值列表: " + valuesList);
             if (!valuesList.isEmpty()) {
-                // 生成IN约束JSON，只包含values字段
-                StringBuilder valuesJson = new StringBuilder();
-                for (int i = 0; i < valuesList.size(); i++) {
-                    if (i > 0) {
-                        valuesJson.append(",");
+                List<String> filteredValues = new ArrayList<>();
+                for (String value : valuesList) {
+                    if (value != null && !value.trim().isEmpty()) {
+                        filteredValues.add(value.trim());
+                        }
                     }
-                    valuesJson.append("\"").append(valuesList.get(i)).append("\"");
+                if (!filteredValues.isEmpty()) {
+                    validationRules.put("operator", "IN");
+                    validationRules.put("values", filteredValues);
                 }
-                String json = String.format("{\"operator\":\"IN\",\"values\":[%s]}",
-                    valuesJson.toString());
-                logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为IN约束: " + json);
-                return json;
             }
         }
         
-        // 5. 数值范围约束：支持 >、<、>=、<=，如 ((`age` >= 18)) 或 ((`salary` < 10000))
+        // 5. 数值范围约束：>、<、>=、<=
         Pattern rangePattern = Pattern.compile(
-            "`?([a-zA-Z0-9_]+)`?\\s*([><]=?|<=?|>=?)\\s*([0-9]+)",
+                "`?[a-zA-Z0-9_]+`?\\s*([><]=?|<=?|>=?)\\s*([0-9]+)",
             Pattern.CASE_INSENSITIVE
         );
         Matcher rangeMatcher = rangePattern.matcher(constraint);
-        if (rangeMatcher.find()) {
-            String operator = rangeMatcher.group(2);
-            String value = rangeMatcher.group(3);
-            JSONObject jsonObj = new JSONObject();
-            jsonObj.put("message", "");
-            
-            int intValue = Integer.parseInt(value);
-            
-            // 处理各种运算符
+        while (rangeMatcher.find()) {
+            String operator = rangeMatcher.group(1);
+            int value = Integer.parseInt(rangeMatcher.group(2));
             switch (operator) {
                 case ">":
-                case ">=" :
-                    jsonObj.put("min", intValue);
+                case ">=":
+                    validationRules.put("min", value);
                     break;
                 case "<":
-                case "<=" :
-                    jsonObj.put("max", intValue);
+                case "<=":
+                    validationRules.put("max", value);
                     break;
-                default:
-                    // 未知运算符，记录日志
-                    logService.logError("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "未知的数值范围运算符", operator);
-                    return null;
             }
-            
-            String json = jsonObj.toJSONString();
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为数值范围约束: " + json);
-            return json;
         }
         
-        // 6. 等于/不等于约束：支持 =、!=，如 ((`status` = 'active')) 或 ((`type` != 'admin'))
+        // 6. 等于/不等于约束
         Pattern equalPattern = Pattern.compile(
-            "`?([a-zA-Z0-9_]+)`?\\s*(!?=)\\s*'?([^']+)'?",
+                "`?[a-zA-Z0-9_]+`?\\s*(!?=)\\s*'?([^']+)'?",
             Pattern.CASE_INSENSITIVE
         );
         Matcher equalMatcher = equalPattern.matcher(constraint);
         if (equalMatcher.find()) {
-            String operator = equalMatcher.group(2);
-            String value = equalMatcher.group(3);
-            JSONObject jsonObj = new JSONObject();
-            jsonObj.put("message", "");
-            
+            String operator = equalMatcher.group(1);
+            String value = equalMatcher.group(2);
             if ("=".equals(operator)) {
-                jsonObj.put("operator", "=");
-                jsonObj.put("value", value);
+                validationRules.put("operator", "=");
+                validationRules.put("value", value);
             } else if ("!=".equals(operator)) {
-                jsonObj.put("operator", "!");
-                jsonObj.put("value", value);
+                validationRules.put("operator", "!");
+                validationRules.put("value", value);
             }
-            
-            String json = jsonObj.toJSONString();
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为等于/不等于约束: " + json);
-            return json;
         }
         
-        // 7. LIKE/RLIKE约束：支持 LIKE 'pattern' 或 RLIKE 'pattern'
+        // 7. LIKE/RLIKE约束
         Pattern likePattern = Pattern.compile(
-            "`?([a-zA-Z0-9_]+)`?\\s+(LIKE|RLIKE)\\s+'([^']+)'",
+                "`?[a-zA-Z0-9_]+`?\\s+(LIKE|RLIKE)\\s+'([^']+)'",
             Pattern.CASE_INSENSITIVE
         );
         Matcher likeMatcher = likePattern.matcher(constraint);
         if (likeMatcher.find()) {
             String likeOperator = likeMatcher.group(2);
             String pattern = likeMatcher.group(3);
-            JSONObject jsonObj = new JSONObject();
-            jsonObj.put("message", "");
-            
             if ("RLIKE".equalsIgnoreCase(likeOperator)) {
-                // RLIKE等价于正则表达式
-                jsonObj.put("pattern", pattern);
+                validationRules.put("pattern", pattern);
             } else if ("LIKE".equalsIgnoreCase(likeOperator)) {
-                // LIKE转换为正则表达式
-                String regexPatternStr = pattern.replace("%", ".*");
-                jsonObj.put("pattern", regexPatternStr);
+                validationRules.put("pattern", pattern.replace("%", ".*"));
             }
-            
-            String json = jsonObj.toJSONString();
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为LIKE/RLIKE约束: " + json);
-            return json;
         }
         
+        // 8. 跨字段比较约束：匹配两个不同字段之间的比较，如 `field2` >= `field1`
+        // 匹配模式：`field1` >= `field2` （其中field1和field2是不同的字段）
+        Pattern crossFieldPattern = Pattern.compile(
+                "`?([a-zA-Z0-9_]+)`?\\s*([><]=?|<=?|>=?|=|!=)\\s*`?([a-zA-Z0-9_]+)`?",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher crossFieldMatcher = crossFieldPattern.matcher(constraint);
+        if (crossFieldMatcher.find() && validationRules.isEmpty()) {
+            String field1 = crossFieldMatcher.group(1); // 第一个字段（比较操作符左侧）
+            String operator = crossFieldMatcher.group(2); // 操作符
+            String field2 = crossFieldMatcher.group(3); // 第二个字段（比较操作符右侧）
+            
+            // 如果field1和field2不同，说明是跨字段比较
+            if (field1 != null && field2 != null && !field1.equalsIgnoreCase(field2)) {
+                validationRules.put("type", "crossField");
+                validationRules.put("field1", field1);
+                validationRules.put("operator", operator);
+                validationRules.put("field2", field2);
+                
+                // 生成条件描述
+                String conditionDesc = field1 + " " + operator + " " + field2;
+                validationRules.put("condition", conditionDesc);
+                
+                logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, 
+                    "解析跨字段比较约束: " + conditionDesc);
+            }
+        }
+        
+        if (validationRules.isEmpty()) {
         logService.logError("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "无法解析CHECK约束", constraint);
         return null;
+        }
+
+        // 确保message字段存在
+        if (!validationRules.containsKey("message")) {
+            validationRules.put("message", "");
+        }
+
+        String json = validationRules.toJSONString();
+        logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析为组合约束: " + json);
+        return json;
     }
     
     /**
@@ -305,7 +294,27 @@ public class CheckConstraintParser {
             return regexpLikeMatcher.group(1);
         }
         
-        // 2. 尝试匹配带括号的字段格式：((`field` between 18 and 60)) 或 ((`field` in (value1, value2)))
+        // 2. 尝试匹配跨字段比较格式：`field1` >= `field2`
+        // 对于跨字段比较，返回第一个字段（比较操作符左侧的字段）作为主字段
+        // 需要优先匹配跨字段比较，避免被带括号的字段格式规则误匹配
+        // 使用更精确的正则表达式，确保匹配到真正的字段比较（避免匹配到 IS NULL 等）
+        Pattern crossFieldPattern = Pattern.compile(
+            "`?([a-zA-Z0-9_]+)`?\\s*([><]=?|<=?|>=?|=|!=)\\s*`?([a-zA-Z0-9_]+)`?",
+            Pattern.CASE_INSENSITIVE
+        );
+        Matcher crossFieldMatcher = crossFieldPattern.matcher(trimmedConstraint);
+        // 查找所有匹配，选择field1和field2不同的匹配（真正的跨字段比较）
+        while (crossFieldMatcher.find()) {
+            String field1 = crossFieldMatcher.group(1);
+            String field2 = crossFieldMatcher.group(3);
+            
+            // 如果field1和field2不同，说明是跨字段比较，返回field1作为主字段
+            if (field1 != null && field2 != null && !field1.equalsIgnoreCase(field2)) {
+                return field1;
+            }
+        }
+        
+        // 3. 尝试匹配带括号的字段格式：((`field` between 18 and 60)) 或 ((`field` in (value1, value2)))
         Pattern parenthesisFieldPattern = Pattern.compile(
             "\\(\\s*\\(\\s*`?([a-zA-Z0-9_]+)`?\\s*",
             Pattern.CASE_INSENSITIVE
@@ -315,7 +324,7 @@ public class CheckConstraintParser {
             return parenthesisFieldMatcher.group(1);
         }
         
-        // 3. 尝试匹配简单字段格式：`field` between 18 and 60 或 `field` in (value1, value2)
+        // 4. 尝试匹配简单字段格式：`field` between 18 and 60 或 `field` in (value1, value2)
         Pattern simpleFieldPattern = Pattern.compile(
             "`?([a-zA-Z0-9_]+)`?\\s+(?:between|in|REGEXP|IN|BETWEEN|=|>|<|>=|<=|!=|LIKE|RLIKE)",
             Pattern.CASE_INSENSITIVE
@@ -327,6 +336,67 @@ public class CheckConstraintParser {
         
         logService.logError("admin", SqlConstants.LOG_MODULE_EXTRACT_FIELD_NAME, "无法从约束中提取字段名", constraint);
         return "";
+    }
+    
+    /**
+     * 修复从 SHOW CREATE TABLE / CHECK 约束反向解析时，常见的反斜杠丢失问题。
+     *
+     * 例如内置 number 正则应为：^-?\\d+(\\.\\d+)?$
+     * 在 SHOW CREATE TABLE 中可能会变成：^-?d+(.d+)?$
+     *
+     * 为避免误伤其它复杂正则，这里尽量做“保守修复”：
+     * - 仅当 pattern 完全不含反斜杠时，才尝试补全 \\d/\\w/\\s/\\. 等常见转义。
+     */
+    private String fixCommonLostBackslashes(String pattern) {
+        if (pattern == null || pattern.isEmpty()) {
+            return pattern;
+        }
+
+        // 兼容：最典型的数字/小数正则（你日志中的 age 就是这个）
+        if ("^-?d+(.d+)?$".equals(pattern)) {
+            return "^-?\\d+(\\.\\d+)?$";
+        }
+
+        // 仅在不包含反斜杠时才尝试修复，避免对本来就正确的表达式重复加工
+        if (!pattern.contains("\\")) {
+            // 1) 修复 d{m,n} / d{n} -> \\d{...}
+            pattern = pattern.replaceAll("(?<!\\\\)d\\{", "\\\\d{");
+
+            // 2) 修复 (19|20)d{2} 这种：紧跟在 ) 后的 d{ -> )\\d{
+            pattern = pattern.replaceAll("\\)d\\{", ")\\\\d{");
+
+            // 3) 修复孤立的 d+ / d* / d?（避免把普通单词里的 d 误伤，限定前面是边界或非字母数字下划线）
+            pattern = pattern.replaceAll("(^|[^A-Za-z0-9_])d([+*?])", "$1\\\\d$2");
+
+            // 4) 修复典型 IP/URL 片段里的点：d{1,3}. -> \\d{1,3}\\\\.
+            // 只针对 "d{...}." 这种明确的形式
+            pattern = pattern.replaceAll("d(\\{[0-9,]+\\}).", "\\\\d$1\\\\.");
+
+            // 5) 字符类 [] 内：补全 w/s/W/S（例如 [/w .-] -> [\\w .-]）
+            Pattern cls = Pattern.compile("\\[([\\w\\s\\W\\S]*)\\]");
+            Matcher cm = cls.matcher(pattern);
+            StringBuffer sb = new StringBuffer();
+            while (cm.find()) {
+                String inner = cm.group(1);
+                inner = inner.replaceAll("(^|[^A-Za-z0-9_])w", "$1\\\\w");
+                inner = inner.replaceAll("(^|[^A-Za-z0-9_])s", "$1\\\\s");
+                inner = inner.replaceAll("(^|[^A-Za-z0-9_])W", "$1\\\\W");
+                inner = inner.replaceAll("(^|[^A-Za-z0-9_])S", "$1\\\\S");
+                cm.appendReplacement(sb, Matcher.quoteReplacement("[" + inner + "]"));
+            }
+            cm.appendTail(sb);
+            pattern = sb.toString();
+
+            // 6) 非字符类场景下的 \\w/\\s：仅在明显是“转义语义”的位置修复
+            // 例如 ^w+$ -> ^\\w+$、(?:/w+) -> (?:/\\w+)
+            pattern = pattern.replaceAll("(^|[^A-Za-z0-9_])w([+*?]|\\{|\\)|\\]|\\b|\\B|$)", "$1\\\\w$2");
+            pattern = pattern.replaceAll("(^|[^A-Za-z0-9_])s([+*?]|\\{|\\)|\\]|\\b|\\B|$)", "$1\\\\s$2");
+
+            // 7) 点号：修复最常见的小数点形态（\\d.\\d -> \\d\\.\\d）
+            pattern = pattern.replaceAll("\\\\d.\\\\d", "\\\\d\\\\.\\\\d");
+        }
+
+        return pattern;
     }
     
     /**
@@ -419,29 +489,45 @@ public class CheckConstraintParser {
     /**
      * 移除字符集前缀，如_utf8mb4文学 -> 文学，_gbk'active' -> active
      * @param value 原始值
-     * @return 移除前缀后的值
+     * @return 移除前缀后的值，如果值本身是字符集前缀（如_utf8mb4），返回空字符串
      */
     private String removeCharsetPrefix(String value) {
         if (value == null || value.isEmpty()) {
             return value;
         }
         
-        // 首先处理带引号的情况：_gbk'active' -> active
-        if (value.contains("'") || value.contains("\"")) {
-            Pattern valuePattern = Pattern.compile("(?:_\\w+)?(['\\\"'])(.*?)\\1");
-            Matcher valueMatcher = valuePattern.matcher(value);
-            if (valueMatcher.find()) {
-                return valueMatcher.group(2);
+        String trimmedValue = value.trim();
+        
+        // 如果值本身就是字符集前缀（如_utf8mb4），返回空字符串
+        if (trimmedValue.matches("^_[a-zA-Z0-9]+$")) {
+            return "";
+        }
+        
+        // 首先处理带引号的情况：_utf8mb4'1' -> 1, _gbk'active' -> active
+        // 匹配格式：_字符集前缀'值' 或 '值'
+        Pattern valuePattern = Pattern.compile("(?:_\\w+)?(['\"])(.*?)\\1");
+        Matcher valueMatcher = valuePattern.matcher(trimmedValue);
+        if (valueMatcher.find()) {
+            String extractedValue = valueMatcher.group(2);
+            // 如果提取的值不为空，返回它；否则继续处理不带引号的情况
+            if (extractedValue != null && !extractedValue.isEmpty()) {
+                return extractedValue;
             }
         }
         
         // 处理不带引号的情况：_utf8mb4文学 -> 文学
-        Pattern charsetPrefixPattern = Pattern.compile("^_\\w+");
-        Matcher charsetPrefixMatcher = charsetPrefixPattern.matcher(value);
+        // 匹配字符集前缀后跟内容的情况
+        Pattern charsetPrefixPattern = Pattern.compile("^_([a-zA-Z0-9]+)(.*)$");
+        Matcher charsetPrefixMatcher = charsetPrefixPattern.matcher(trimmedValue);
         if (charsetPrefixMatcher.find()) {
-            return charsetPrefixMatcher.replaceFirst("");
+            String remainingValue = charsetPrefixMatcher.group(2);
+            // 如果前缀后没有内容，返回空字符串
+            if (remainingValue == null || remainingValue.trim().isEmpty()) {
+                return "";
+            }
+            return remainingValue.trim();
         }
         
-        return value;
+        return trimmedValue;
     }
 }

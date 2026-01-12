@@ -25,6 +25,7 @@ export const deleteTable = (id) => request.delete(`/table/delete/${id}`)
 export const batchDeleteTable = (data) => request.post('/table/batchDelete', data)
 export const batchUpdateTableStatus = (ids, status) => request.post('/table/batchUpdateStatus', { ids }, { params: { status } })
 export const getTablesByModule = (moduleCode, params) => request.get(`/table/listByModule/${moduleCode}`, { params })
+export const batchAssignBusinessSystem = (data) => request.post('/table/batchAssignBusinessSystem', data)
 
 // 字段相关
 export const getFieldList = (tableCode, params) => request.get(`/field/list/${tableCode}`, { params })
@@ -52,7 +53,7 @@ export const deleteRule = (id) => request.delete(`/rule/delete/${id}`)
 
 // 表关联关系相关
 export const getRelationsByMain = (mainTableCode) => request.get(`/relation/listByMain/${mainTableCode}`)
-export const getRelationsBySlave = (slaveTableCode) => request.get(`/relation/listBySlave/${slaveTableCode}`)
+export const getRelationsBySlave = (slaveTableCode, businessCode) => request.get(`/relation/listBySlave/${slaveTableCode}`, { params: { businessCode } })
 export const getAllRelations = (params) => request.get('/relation/list', { params })
 export const addRelation = (data) => request.post('/relation/add', data)
 export const updateRelation = (data) => request.post('/relation/update', data)

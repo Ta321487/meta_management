@@ -76,7 +76,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     public List<MetadataFunctionNode> listByModuleCode(String moduleCode) {
         return nodeMapper.selectByModuleCode(moduleCode);
     }
-    
+
     /**
      * 查询模块的所有节点（支持业务系统）
      */
@@ -94,7 +94,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
         List<MetadataFunctionNode> records = nodeMapper.selectPageByModuleCode(moduleCode, pageRequest);
         return new PageResult<>(total, records);
     }
-    
+
     /**
      * 分页查询模块的节点（支持业务系统）
      */
@@ -113,7 +113,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     public void updateSort(Long id, Integer sort) {
         nodeMapper.updateSort(id, sort);
     }
-    
+
     /**
      * 批量删除节点
      */

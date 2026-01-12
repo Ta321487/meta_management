@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 表控制器
@@ -134,6 +135,22 @@ public class MetadataTableController {
                                       @Parameter(description = "目标状态，1-启用，0-禁用") @RequestParam Integer status) {
         try {
             tableService.batchUpdateStatus(request.getIds(), status);
+            return Result.success();
+        } catch (Exception e) {
+            return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 批量分配业务系统
+     */
+    @PostMapping("/batchAssignBusinessSystem")
+    @Operation(summary = "批量分配业务系统", description = "批量更新表的业务系统")
+    public Result<?> batchAssignBusinessSystem(@Parameter(description = "表编码列表和业务系统编码") @RequestBody Map<String, Object> request) {
+        try {
+            List<String> tableCodes = (List<String>) request.get("tableCodes");
+            String businessCode = (String) request.get("businessCode");
+            tableService.batchUpdateTableBusinessSystem(tableCodes, businessCode);
             return Result.success();
         } catch (Exception e) {
             return Result.error(e.getMessage());

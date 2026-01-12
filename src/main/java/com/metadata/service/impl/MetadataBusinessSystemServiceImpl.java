@@ -103,7 +103,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
         if (moduleCodes == null || moduleCodes.isEmpty()) {
             throw new RuntimeException("模块编码列表不能为空");
         }
-        
+
         // 批量更新模块的业务系统
         MetadataModuleService moduleService = SpringContextUtil.getBean(MetadataModuleService.class);
         moduleService.batchUpdateModuleBusinessSystem(moduleCodes, businessCode);
@@ -118,7 +118,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
         if (moduleCodes == null || moduleCodes.isEmpty()) {
             throw new RuntimeException("模块编码列表不能为空");
         }
-        
+
         // 将模块的业务系统设置为默认值
         MetadataModuleService moduleService = SpringContextUtil.getBean(MetadataModuleService.class);
         moduleService.batchUpdateModuleBusinessSystem(moduleCodes, "DEFAULT");

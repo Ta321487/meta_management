@@ -45,13 +45,13 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
         if (type.getTypeName() == null || type.getTypeName().trim().isEmpty()) {
             throw new RuntimeException("模块类型名称不能为空");
         }
-        
+
         // 验证typeCode唯一性
         MetadataModuleType existing = typeMapper.selectByCode(type.getTypeCode());
         if (existing != null) {
             throw new RuntimeException("模块类型编码已存在");
         }
-        
+
         // 插入数据
         typeMapper.insert(type);
     }
@@ -65,7 +65,7 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
         if (type.getId() == null) {
             throw new RuntimeException("模块类型ID不能为空");
         }
-        
+
         // 验证必填字段
         if (type.getTypeCode() == null || type.getTypeCode().trim().isEmpty()) {
             throw new RuntimeException("模块类型编码不能为空");
@@ -73,13 +73,13 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
         if (type.getTypeName() == null || type.getTypeName().trim().isEmpty()) {
             throw new RuntimeException("模块类型名称不能为空");
         }
-        
+
         // 验证模块类型是否存在
         MetadataModuleType existing = typeMapper.selectByCode(type.getTypeCode());
         if (existing != null && !existing.getId().equals(type.getId())) {
             throw new RuntimeException("模块类型编码已被其他记录使用");
         }
-        
+
         // 更新数据
         typeMapper.update(type);
     }

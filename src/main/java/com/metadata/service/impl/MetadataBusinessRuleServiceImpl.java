@@ -65,19 +65,19 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         if (!"VALIDATION_RULE".equals(rule.getRuleType())) {
             return;
         }
-        
+
         // 解析规则内容
         JSONObject ruleContent = JSONObject.parseObject(rule.getRuleContent());
         if (ruleContent == null) {
             return;
         }
-        
+
         // 检查规则类型是否为unique或unique_combo
         String ruleType = ruleContent.getString("type");
         if (!"unique".equals(ruleType) && !"unique_combo".equals(ruleType)) {
             return;
         }
-        
+
         // 提取字段列表
         List<String> fieldsToValidate = new ArrayList<>();
         if ("unique".equals(ruleType)) {
@@ -98,17 +98,17 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                 }
             }
         }
-        
+
         if (fieldsToValidate.isEmpty()) {
             return;
         }
-        
+
         // 获取模块关联的所有表
         List<MetadataTable> tables = tableService.listByModuleCode(rule.getModuleCode(), rule.getBusinessCode());
         if (tables.isEmpty()) {
             throw new RuntimeException("模块未关联任何表");
         }
-        
+
         // 获取所有表的字段
         Set<String> allFieldNames = new HashSet<>();
         for (MetadataTable table : tables) {
@@ -117,7 +117,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                 allFieldNames.add(field.getFieldName());
             }
         }
-        
+
         // 验证字段是否存在
         for (String fieldName : fieldsToValidate) {
             if (!allFieldNames.contains(fieldName)) {
@@ -125,7 +125,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
             }
         }
     }
-    
+
     /**
      * 生成并执行ALTER TABLE语句来创建唯一索引
      */
@@ -134,19 +134,19 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         if (!"VALIDATION_RULE".equals(rule.getRuleType())) {
             return;
         }
-        
+
         // 解析规则内容
         JSONObject ruleContent = JSONObject.parseObject(rule.getRuleContent());
         if (ruleContent == null) {
             return;
         }
-        
+
         // 检查规则类型是否为unique或unique_combo
         String ruleType = ruleContent.getString("type");
         if (!"unique".equals(ruleType) && !"unique_combo".equals(ruleType)) {
             return;
         }
-        
+
         // 提取字段列表
         List<String> uniqueFields = new ArrayList<>();
         if ("unique".equals(ruleType)) {
@@ -167,31 +167,31 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                 }
             }
         }
-        
+
         if (uniqueFields.isEmpty()) {
             return;
         }
-        
+
         try {
             // 获取规则关联的所有表
             List<MetadataTable> tables = tableService.listByModuleCode(rule.getModuleCode(), rule.getBusinessCode());
             if (tables.isEmpty()) {
                 return;
             }
-            
+
             // 遍历每个表，生成并执行ALTER TABLE语句
             for (MetadataTable table : tables) {
                 String tableCode = table.getTableCode();
                 // 获取表名
                 String tableName = codeGeneratorService.convertToTableName(tableCode);
-                
+
                 // 检查字段是否都存在于当前表中
                 List<MetadataField> tableFields = fieldMapper.selectByTableCode(tableCode, rule.getBusinessCode());
                 Set<String> tableFieldNames = new HashSet<>();
                 for (MetadataField field : tableFields) {
                     tableFieldNames.add(field.getFieldName());
                 }
-                
+
                 boolean allFieldsExist = true;
                 for (String uniqueField : uniqueFields) {
                     if (!tableFieldNames.contains(uniqueField)) {
@@ -199,14 +199,14 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                         break;
                     }
                 }
-                
+
                 if (!allFieldsExist) {
                     continue;
                 }
-                
+
                 // 生成索引名称
                 String indexName = "uk_" + tableName + "_" + String.join("_", uniqueFields);
-                
+
                 // 先检查索引是否已经存在，如果存在则先删除
                 String checkIndexSql = "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' AND index_name = '" + indexName + "'";
                 Map<String, Object> checkResult = sqlExecuteService.executeSql(checkIndexSql, false);
@@ -222,10 +222,10 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                         }
                     }
                 }
-                
+
                 // 生成ALTER TABLE语句
                 String alterSql = "ALTER TABLE `" + tableName + "` ADD UNIQUE KEY `" + indexName + "` (`" + String.join("`, `", uniqueFields) + "`)";
-                
+
                 // 执行SQL语句
                 sqlExecuteService.executeSql(alterSql);
             }
@@ -234,7 +234,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
             e.printStackTrace();
         }
     }
-    
+
     /**
      * 新增规则
      */
@@ -244,13 +244,13 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         if (!CodeValidator.isValidCode(rule.getRuleCode())) {
             throw new RuntimeException("规则编码格式不正确");
         }
-        
+
         // 验证规则中的字段
         validateRuleFields(rule);
-        
+
         ruleMapper.insert(rule);
         logService.logSuccess("admin", "ADD", "新增业务规则：" + JSON.toJSONString(rule));
-        
+
         // 生成并执行唯一索引
         generateAndExecuteUniqueIndex(rule);
     }
@@ -265,14 +265,14 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         if (existing == null) {
             throw new RuntimeException("规则不存在");
         }
-        
+
         // 验证规则中的字段
         validateRuleFields(rule);
-        
+
         rule.setId(existing.getId());
         ruleMapper.update(rule);
         logService.logSuccess("admin", "EDIT", "更新业务规则：" + JSON.toJSONString(rule));
-        
+
         // 生成并执行唯一索引
         generateAndExecuteUniqueIndex(rule);
     }

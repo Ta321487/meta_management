@@ -12,6 +12,7 @@ import com.metadata.service.CheckConstraintParser;
 import com.metadata.service.MetadataSyncService;
 import com.metadata.service.OperationLogService;
 import com.metadata.service.constant.SqlConstants;
+import com.metadata.service.impl.CodeGenUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -201,13 +202,27 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 // 解析字段类型和大小
                 String columnType = columnTypeFull;
                 int columnSize = 0;
+                String enumValuesStr = null;
+                
                 // 提取字段类型（如 VARCHAR(10) -> VARCHAR）
-                Pattern typePattern = Pattern.compile("^(\\w+)(?:\\((\\d+)\\))?");
+                Pattern typePattern = Pattern.compile("^(\\w+)(?:\\(([^)]+)\\))?");
                 Matcher typeMatcher = typePattern.matcher(columnTypeFull);
                 if (typeMatcher.find()) {
                     columnType = typeMatcher.group(1);
-                    if (typeMatcher.group(2) != null) {
-                        columnSize = Integer.parseInt(typeMatcher.group(2));
+                    String typeParams = typeMatcher.group(2);
+                    if (typeParams != null) {
+                        if (columnType.equalsIgnoreCase("ENUM")) {
+                            // 保存ENUM值字符串
+                            enumValuesStr = typeParams;
+                        } else if (columnType.equalsIgnoreCase("VARCHAR") || columnType.equalsIgnoreCase("CHAR") || 
+                                   columnType.equalsIgnoreCase("DECIMAL") || columnType.equalsIgnoreCase("NUMERIC")) {
+                            // 提取数值大小
+                            try {
+                                columnSize = Integer.parseInt(typeParams);
+                            } catch (NumberFormatException e) {
+                                // 忽略解析失败的情况
+                            }
+                        }
                     }
                 }
                 
@@ -216,6 +231,9 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 if (columnSize > 0 && (columnType.equalsIgnoreCase("VARCHAR") || columnType.equalsIgnoreCase("CHAR") || 
                     columnType.equalsIgnoreCase("DECIMAL") || columnType.equalsIgnoreCase("NUMERIC"))) {
                     fieldType = columnType + "(" + columnSize + ")";
+                } else if (columnType.equalsIgnoreCase("ENUM") && enumValuesStr != null) {
+                    // ENUM类型：保留完整的ENUM值，如 ENUM('1','2','3')
+                    fieldType = columnType + "(" + enumValuesStr + ")";
                 }
                 
                 // 生成字段编码（使用列名的大写形式）
@@ -230,23 +248,47 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 field.setLabel(comments != null && !comments.isEmpty() ? comments : columnName);
                 field.setBusinessCode(table.getBusinessCode()); // 使用表的业务系统编码
                 
-                // 判断是否是自增主键
-                boolean isAutoIncrementPk = (autoIncrementPkColumn != null && 
-                    autoIncrementPkColumn.equalsIgnoreCase(columnName)) ||
-                    (extra != null && extra.contains(SqlConstants.AUTO_INCREMENT));
-                
                 // 判断是否是主键字段
                 boolean isPrimaryKey = primaryKeyColumns.contains(columnName);
                 
                 if (isPrimaryKey) {
                     // 所有主键字段：使用primary_key表单组件
                     field.setFormComponent("primary_key"); // 主键字段使用primary_key表单组件
-                    // 自增主键对用户来说不是必填，普通主键可能需要必填
-                    field.setIsRequired(isAutoIncrementPk ? 0 : ("NO".equalsIgnoreCase(nullableStr) ? 1 : 0));
+                    // 所有主键在数据库层面都是必填的（NOT NULL）
+                    field.setIsRequired(1);
                 } else {
                     // 普通字段：根据字段类型设置表单组件和必填状态
                     field.setIsRequired("NO".equalsIgnoreCase(nullableStr) ? 1 : 0);
                     field.setFormComponent(getDefaultFormComponent(fieldType));
+                }
+                
+                // 处理ENUM类型的校验规则
+                if (enumValuesStr != null) {
+                    try {
+                        // 解析ENUM值，生成IN约束校验规则
+                        List<String> enumValues = new ArrayList<>();
+                        
+                        // 使用正则表达式匹配ENUM值
+                        Pattern enumValuePattern = Pattern.compile("'([^']+)'");
+                        Matcher enumValueMatcher = enumValuePattern.matcher(enumValuesStr);
+                        while (enumValueMatcher.find()) {
+                            enumValues.add(enumValueMatcher.group(1));
+                        }
+                        
+                        if (!enumValues.isEmpty()) {
+                            // 生成IN约束校验规则
+                            JSONObject validateRule = new JSONObject();
+                            validateRule.put("operator", "IN");
+                            validateRule.put("values", enumValues);
+                            validateRule.put("message", "请选择有效值");
+                            validateRule.put("trigger", "blur");
+                            
+                            field.setValidateRule(validateRule.toJSONString());
+                        }
+                    } catch (Exception e) {
+                        // 解析ENUM值失败，记录日志但不影响字段同步
+                        logService.logError("admin", SqlConstants.LOG_MODULE_PARSE_ENUM, "解析ENUM值失败: " + columnName, e.getMessage());
+                    }
                 }
                 
                 field.setSort(sort++);
@@ -332,7 +374,15 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
             String columnName = physicalField.getFieldName();
             
             // 检查是否有对应的CHECK约束
-            if (checkConstraints.containsKey(columnName.toUpperCase())) {
+            // 但如果字段已经是 ENUM 类型并且已经设置了校验规则，就不要用 CHECK 约束覆盖
+            boolean hasEnumValidation = physicalField.getFieldType().toUpperCase().startsWith("ENUM") &&
+                                        physicalField.getValidateRule() != null &&
+                                        !physicalField.getValidateRule().isEmpty();
+            
+            if (hasEnumValidation && checkConstraints.containsKey(columnName.toUpperCase())) {
+                // ENUM字段已经有校验规则，跳过CHECK约束处理
+                logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_VALIDATE_RULE, "ENUM字段已有校验规则，跳过CHECK约束: " + columnName);
+            } else if (checkConstraints.containsKey(columnName.toUpperCase())) {
                 try {
                     String checkConstraint = checkConstraints.get(columnName.toUpperCase());
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_PARSE_CHECK_CONSTRAINT, "解析CHECK约束: " + checkConstraint);
@@ -352,10 +402,22 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                                 if (jsonObj.containsKey("values")) {
                                     JSONArray valuesArray = jsonObj.getJSONArray("values");
                                     if (valuesArray != null && !valuesArray.isEmpty()) {
-                                        // 简化ENUM类型表示，只使用ENUM而不包含具体的值，避免超过字段长度限制
-                                        String enumType = "ENUM";
-                                        physicalField.setFieldType(enumType);
-                                        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_ENUM_TYPE, "设置字段类型为ENUM: " + columnName + " -> " + enumType);
+                                        // 检查values数组是否包含有效的非空值
+                                        boolean hasValidValues = false;
+                                        for (int i = 0; i < valuesArray.size(); i++) {
+                                            Object val = valuesArray.get(i);
+                                            if (val != null && !val.toString().trim().isEmpty()) {
+                                                hasValidValues = true;
+                                                break;
+                                            }
+                                        }
+                                        // 只有当values数组包含有效的非空值时，才设置字段类型为ENUM
+                                        if (hasValidValues) {
+                                            // 简化ENUM类型表示，只使用ENUM而不包含具体的值，避免超过字段长度限制
+                                            String enumType = "ENUM";
+                                            physicalField.setFieldType(enumType);
+                                            logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_ENUM_TYPE, "设置字段类型为ENUM: " + columnName + " -> " + enumType);
+                                        }
                                     }
                                 }
                             } catch (Exception e) {
@@ -376,10 +438,35 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 
                 // 更新字段信息（只更新物理表相关的字段，保留用户手动配置的其他字段）
                 existingField.setFieldName(physicalField.getFieldName());
-                // 对于字段类型，如果是IN约束转换的ENUM类型，则更新；否则尊重用户手动配置
+                // 对于字段类型，如果是IN约束转换的ENUM类型，且validateRule包含有效的非空值，则更新；否则尊重用户手动配置
                 if (physicalField.getFieldType().equalsIgnoreCase("ENUM") && physicalField.getValidateRule() != null && physicalField.getValidateRule().contains("\"operator\":\"IN\"")) {
-                    existingField.setFieldType(physicalField.getFieldType());
-                    logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_ENUM_TYPE, "更新字段类型为ENUM: " + columnName + " -> " + physicalField.getFieldType());
+                    // 检查validateRule是否包含有效的非空值
+                    boolean hasValidValues = false;
+                    try {
+                        JSONObject jsonObj = JSONObject.parseObject(physicalField.getValidateRule());
+                        if (jsonObj != null && jsonObj.containsKey("values")) {
+                            JSONArray valuesArray = jsonObj.getJSONArray("values");
+                            if (valuesArray != null && !valuesArray.isEmpty()) {
+                                for (int i = 0; i < valuesArray.size(); i++) {
+                                    Object val = valuesArray.get(i);
+                                    if (val != null && !val.toString().trim().isEmpty()) {
+                                        hasValidValues = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (Exception e) {
+                        // JSON解析失败，不更新字段类型
+                    }
+                    // 只有当validateRule包含有效的非空值时，才更新字段类型
+                    if (hasValidValues) {
+                        existingField.setFieldType(physicalField.getFieldType());
+                        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_ENUM_TYPE, "更新字段类型为ENUM: " + columnName + " -> " + physicalField.getFieldType());
+                    } else {
+                        // 保留用户手动配置的字段类型
+                        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "保留用户手动配置的字段类型（validateRule无效）: " + columnName + " -> " + existingField.getFieldType());
+                    }
                 } else {
                     // 保留用户手动配置的字段类型
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "保留用户手动配置的字段类型: " + columnName + " -> " + existingField.getFieldType());
@@ -399,15 +486,79 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                     existingField.setFormComponent(physicalField.getFormComponent());
                 }
                 
-                // 更新校验规则：无论现有规则是否为空，都同步物理表的CHECK约束
+                // 更新校验规则：只有当物理表的CHECK约束解析成功且包含有效值时，才同步
+                // 但需要保留用户手动设置的message字段
                 if (physicalField.getValidateRule() != null && !physicalField.getValidateRule().isEmpty()) {
-                    existingField.setValidateRule(physicalField.getValidateRule());
-                } else {
-                    // 如果解析后的校验规则为空，清空现有校验规则
-                    if (existingField.getValidateRule() != null && !existingField.getValidateRule().isEmpty()) {
-                        existingField.setValidateRule(null);
-                        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_VALIDATE_RULE, "清空校验规则: " + tableCode + "." + fieldCode);
+                    // 检查validateRule是否包含有效的非空值（特别是对于IN约束）
+                    boolean hasValidValues = true;
+                    try {
+                        JSONObject jsonObj = JSONObject.parseObject(physicalField.getValidateRule());
+                        if (jsonObj != null && jsonObj.containsKey("operator") && "IN".equals(jsonObj.getString("operator"))) {
+                            // 对于IN约束，检查values数组是否包含有效的非空值
+                            if (jsonObj.containsKey("values")) {
+                                JSONArray valuesArray = jsonObj.getJSONArray("values");
+                                if (valuesArray == null || valuesArray.isEmpty()) {
+                                    hasValidValues = false;
+                                } else {
+                                    hasValidValues = false;
+                                    for (int i = 0; i < valuesArray.size(); i++) {
+                                        Object val = valuesArray.get(i);
+                                        if (val != null && !val.toString().trim().isEmpty()) {
+                                            hasValidValues = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            } else {
+                                hasValidValues = false;
+                            }
+                        }
+                    } catch (Exception e) {
+                        // JSON解析失败，不更新validateRule
+                        hasValidValues = false;
                     }
+                    
+                    // 只有当validateRule包含有效的非空值时，才更新
+                    if (hasValidValues) {
+                        // 提取现有字段validate_rule中的message（如果存在）
+                        String existingMessage = null;
+                        if (existingField.getValidateRule() != null && !existingField.getValidateRule().isEmpty()) {
+                            try {
+                                JSONObject existingJson = JSONObject.parseObject(existingField.getValidateRule());
+                                if (existingJson != null && existingJson.containsKey("message")) {
+                                    String msg = existingJson.getString("message");
+                                    // 只有当message不为空时才保留
+                                    if (msg != null && !msg.isEmpty()) {
+                                        existingMessage = msg;
+                                    }
+                                }
+                            } catch (Exception e) {
+                                // 解析失败，忽略，继续使用新的validate_rule
+                            }
+                        }
+                        
+                        // 合并message到新的validate_rule中
+                        String mergedValidateRule = physicalField.getValidateRule();
+                        if (existingMessage != null && !existingMessage.isEmpty()) {
+                            try {
+                                JSONObject newJson = JSONObject.parseObject(physicalField.getValidateRule());
+                                if (newJson != null) {
+                                    newJson.put("message", existingMessage);
+                                    mergedValidateRule = newJson.toJSONString();
+                                }
+                            } catch (Exception e) {
+                                // 合并失败，使用原始的validate_rule
+                            }
+                        }
+                        
+                        existingField.setValidateRule(mergedValidateRule);
+                    } else {
+                        // validateRule无效，保留用户手动配置的validateRule
+                        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_VALIDATE_RULE, "保留用户手动配置的校验规则（同步的validateRule无效）: " + tableCode + "." + fieldCode);
+                    }
+                } else {
+                    // 如果解析后的校验规则为空，保留用户手动配置的校验规则
+                    logService.logSuccess("admin", SqlConstants.LOG_MODULE_SET_VALIDATE_RULE, "保留用户手动配置的校验规则: " + tableCode + "." + fieldCode);
                 }
                 
                 fieldMapper.update(existingField);
@@ -429,6 +580,52 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "删除字段: " + tableCode + "." + fieldCode);
             }
         }
+        
+        // 3. 为ENUM类型字段生成CHECK约束
+        // 遍历所有已保存的字段，为ENUM类型且有校验规则的字段生成CHECK约束
+        List<MetadataField> savedFields = fieldMapper.selectByTableCode(tableCode);
+        for (MetadataField field : savedFields) {
+            // 检查字段类型是否为ENUM，且是否有校验规则
+            if (field.getFieldType() != null && field.getFieldType().toUpperCase().startsWith("ENUM") &&
+                field.getValidateRule() != null && !field.getValidateRule().isEmpty()) {
+                try {
+                    // 解析校验规则，检查是否为IN约束
+                    JSONObject validateRuleJson = JSONObject.parseObject(field.getValidateRule());
+                    if (validateRuleJson != null && "IN".equalsIgnoreCase(validateRuleJson.getString("operator"))) {
+                        // 生成CHECK约束
+                        String checkConstraint = CodeGenUtils.generateCheckConstraint(field);
+                        if (checkConstraint != null && !checkConstraint.isEmpty()) {
+                            // 使用物理表名（tableName参数）
+                            String physicalTableName = tableName;
+                            
+                            // 生成约束名
+                            String constraintName = "ck_" + physicalTableName + "_" + field.getFieldName();
+                            
+                            // 先删除旧的CHECK约束（如果存在）
+                            String dropSql = "ALTER TABLE `" + physicalTableName + "` DROP CHECK `" + constraintName + "`";
+                            try (Statement stmt = newConnection.createStatement()) {
+                                try {
+                                    stmt.execute(dropSql);
+                                    logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "删除旧CHECK约束: " + constraintName);
+                                } catch (SQLException e) {
+                                    // 约束不存在，忽略错误
+                                    logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "旧CHECK约束不存在，跳过删除: " + constraintName);
+                                }
+                                
+                                // 添加新的CHECK约束
+                                String addSql = "ALTER TABLE `" + physicalTableName + "` ADD CONSTRAINT `" + constraintName + "` " + checkConstraint;
+                                stmt.execute(addSql);
+                                logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "生成CHECK约束成功: " + constraintName + " -> " + checkConstraint);
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    // 生成CHECK约束失败，记录日志但不影响字段同步
+                    logService.logError("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "为ENUM字段生成CHECK约束失败: " + field.getFieldName(), e.getMessage());
+                }
+            }
+        }
+        
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_END, "表字段同步完成: " + tableName);
         }
     }
@@ -446,6 +643,8 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
             return "datepicker";
         } else if (upperType.contains("TEXT")) {
             return "textarea";
+        } else if (upperType.contains("ENUM")) {
+            return "select";
         } else {
             return "input";
         }

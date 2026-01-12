@@ -9,18 +9,19 @@ import java.util.Map;
  * 配置文件生成模块，负责配置文件生成相关逻辑
  */
 public class ConfigGenerator {
-    
+
     private TemplateManager templateManager;
-    
+
     /**
      * 构造方法
      */
     public ConfigGenerator() {
         this.templateManager = TemplateManager.getInstance();
     }
-    
+
     /**
      * 生成Spring Boot启动类
+     *
      * @param packageName 包名
      * @return Spring Boot启动类代码
      * @throws CodeGenException 代码生成异常
@@ -41,9 +42,10 @@ public class ConfigGenerator {
                 "    }\n" +
                 "}";
     }
-    
+
     /**
      * 生成application.yml配置文件
+     *
      * @param packageName 包名
      * @return application.yml配置文件代码
      * @throws CodeGenException 代码生成异常
@@ -68,10 +70,12 @@ public class ConfigGenerator {
                 "logging:\n" +
                 "  level:\n" +
                 "    root: INFO\n" +
-                "    " + packageName + ": DEBUG\n";}
-    
+                "    " + packageName + ": DEBUG\n";
+    }
+
     /**
      * 生成MyBatis配置类
+     *
      * @param packageName 包名
      * @return MyBatis配置类代码
      * @throws CodeGenException 代码生成异常
@@ -79,12 +83,13 @@ public class ConfigGenerator {
     public String generateMyBatisConfig(String packageName) throws CodeGenException {
         Map<String, Object> data = new HashMap<>();
         data.put("packageName", packageName);
-        
+
         return templateManager.processTemplate("mybatis-config.java.ftl", data);
     }
-    
+
     /**
      * 生成CORS配置类
+     *
      * @param packageName 包名
      * @return CORS配置类代码
      * @throws CodeGenException 代码生成异常
@@ -92,15 +97,16 @@ public class ConfigGenerator {
     public String generateCorsConfig(String packageName) throws CodeGenException {
         Map<String, Object> data = new HashMap<>();
         data.put("packageName", packageName);
-        
+
         return templateManager.processTemplate("cors-config.java.ftl", data);
     }
-    
+
     /**
      * 生成pom.xml配置文件
-     * @param groupId 组织ID
-     * @param artifactId 项目ID
-     * @param name 项目名称
+     *
+     * @param groupId     组织ID
+     * @param artifactId  项目ID
+     * @param name        项目名称
      * @param description 项目描述
      * @return pom.xml配置文件代码
      * @throws CodeGenException 代码生成异常
@@ -111,7 +117,7 @@ public class ConfigGenerator {
         data.put("artifactId", artifactId);
         data.put("name", name);
         data.put("description", description);
-        
+
         return templateManager.processTemplate("pom.xml.ftl", data);
     }
 }

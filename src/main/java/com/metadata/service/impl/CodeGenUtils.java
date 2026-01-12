@@ -5,14 +5,16 @@ import com.alibaba.fastjson2.JSONArray;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.entity.MetadataField;
+import com.metadata.entity.MetadataTableRelation;
 import com.metadata.service.MetadataBusinessSystemService;
+
 import java.util.*;
 
 /**
  * 代码生成工具类，包含公共方法和工具函数
  */
 public class CodeGenUtils {
-    
+
     /**
      * 内置正则表达式映射表，根据type值提供相应的正则表达式
      */
@@ -24,29 +26,72 @@ public class CodeGenUtils {
             put("integer", "^-?\\d+$");
         }
     };
-    
+
     /**
      * Java关键字集合，用于避免生成的名称与关键字冲突
      */
     private static final Set<String> JAVA_KEYWORDS = new HashSet<String>() {
         {
-            add("abstract"); add("assert"); add("boolean"); add("break"); add("byte");
-            add("case"); add("catch"); add("char"); add("class"); add("const");
-            add("continue"); add("default"); add("do"); add("double"); add("else");
-            add("enum"); add("extends"); add("final"); add("finally"); add("float");
-            add("for"); add("goto"); add("if"); add("implements"); add("import");
-            add("instanceof"); add("int"); add("interface"); add("long"); add("native");
-            add("new"); add("package"); add("private"); add("protected"); add("public");
-            add("return"); add("short"); add("static"); add("strictfp"); add("super");
-            add("switch"); add("synchronized"); add("this"); add("throw"); add("throws");
-            add("transient"); add("try"); add("void"); add("volatile"); add("while");
-            add("true"); add("false"); add("null");
+            add("abstract");
+            add("assert");
+            add("boolean");
+            add("break");
+            add("byte");
+            add("case");
+            add("catch");
+            add("char");
+            add("class");
+            add("const");
+            add("continue");
+            add("default");
+            add("do");
+            add("double");
+            add("else");
+            add("enum");
+            add("extends");
+            add("final");
+            add("finally");
+            add("float");
+            add("for");
+            add("goto");
+            add("if");
+            add("implements");
+            add("import");
+            add("instanceof");
+            add("int");
+            add("interface");
+            add("long");
+            add("native");
+            add("new");
+            add("package");
+            add("private");
+            add("protected");
+            add("public");
+            add("return");
+            add("short");
+            add("static");
+            add("strictfp");
+            add("super");
+            add("switch");
+            add("synchronized");
+            add("this");
+            add("throw");
+            add("throws");
+            add("transient");
+            add("try");
+            add("void");
+            add("volatile");
+            add("while");
+            add("true");
+            add("false");
+            add("null");
         }
     };
-    
+
     /**
      * 获取业务系统名称
-     * @param businessCode 业务系统编码
+     *
+     * @param businessCode          业务系统编码
      * @param businessSystemService 业务系统服务
      * @return 业务系统名称
      */
@@ -61,9 +106,10 @@ public class CodeGenUtils {
             return businessCode;
         }
     }
-    
+
     /**
      * 准备字段列表，添加转换后的属性
+     *
      * @param fields 字段列表
      * @return 转换后的字段列表
      */
@@ -74,13 +120,13 @@ public class CodeGenUtils {
             if (field.getIsEnabled() != null && field.getIsEnabled() == 0) {
                 continue;
             }
-            
+
             Map<String, Object> fieldMap = new HashMap<>();
             fieldMap.put("field", field);
             fieldMap.put("fieldName", field.getFieldName());
             // 格式化字段类型，确保生成有效的MySQL数据类型
             String formattedFieldType = formatFieldType(field.getFieldType());
-            
+
             // 处理enum类型，从validateRule中获取enum值
             if ("enum('')".equals(formattedFieldType)) {
                 Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
@@ -105,7 +151,7 @@ public class CodeGenUtils {
                         }
                     }
                 }
-                
+
                 // 处理操作符为IN的情况，从values字段获取enum值
                 if ("enum('')".equals(formattedFieldType) && validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
                     String operator = (String) validationRules.get("operator");
@@ -132,31 +178,32 @@ public class CodeGenUtils {
                     }
                 }
             }
-            
+
             fieldMap.put("fieldType", formattedFieldType);
             fieldMap.put("label", field.getLabel());
             fieldMap.put("isRequired", field.getIsRequired());
             fieldMap.put("formComponent", field.getFormComponent());
             fieldMap.put("javaType", getJavaType(field.getFieldType()));
-            
+
             // 生成字段名并检查是否为关键字
             String camelCaseName = convertToCamelCase(field.getFieldName(), false);
             if (JAVA_KEYWORDS.contains(camelCaseName)) {
                 camelCaseName = "_" + camelCaseName;
             }
             fieldMap.put("camelCaseName", camelCaseName);
-            
+
             // 解析校验规则
             Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
             fieldMap.put("validationRules", validationRules);
-            
+
             fieldList.add(fieldMap);
         }
         return fieldList;
     }
-    
+
     /**
      * 格式化字段类型，确保生成有效的MySQL数据类型
+     *
      * @param fieldType 字段类型
      * @return 格式化后的字段类型
      */
@@ -164,9 +211,9 @@ public class CodeGenUtils {
         if (fieldType == null || fieldType.trim().isEmpty()) {
             return "varchar(255)";
         }
-        
+
         String type = fieldType.trim().toLowerCase();
-        
+
         // 处理常见的无效字段类型
         if (type.equals("var")) {
             return "varchar(255)";
@@ -221,18 +268,19 @@ public class CodeGenUtils {
         } else if (type.equals("boolean")) {
             return "tinyint(1)";
         }
-        
+
         // 如果是已经包含括号的类型，直接返回
         if (type.contains("(")) {
             return fieldType;
         }
-        
+
         // 默认返回varchar(255)
         return "varchar(255)";
     }
-    
+
     /**
      * 解析校验规则JSON，提取正则表达式等信息
+     *
      * @param validateRule 校验规则JSON字符串
      * @return 解析后的校验规则
      */
@@ -244,14 +292,14 @@ public class CodeGenUtils {
         rules.put("hasLength", false);
         rules.put("hasRange", false);
         rules.put("hasOperator", false);
-        
+
         if (validateRule == null || validateRule.trim().isEmpty()) {
             return rules;
         }
-        
+
         try {
             JSONObject jsonObject = JSON.parseObject(validateRule);
-            
+
             // 提取正则表达式或type属性对应的内置正则表达式
             String pattern = null;
             if (jsonObject.containsKey("pattern")) {
@@ -262,7 +310,7 @@ public class CodeGenUtils {
                     pattern = BUILT_IN_REGEX_MAP.get(type);
                 }
             }
-            
+
             if (pattern != null) {
                 String message = jsonObject.getString("message");
                 rules.put("hasPattern", true);
@@ -271,7 +319,7 @@ public class CodeGenUtils {
             } else {
                 rules.put("hasPattern", false);
             }
-            
+
             // 提取选项（用于下拉框）
             if (jsonObject.containsKey("options")) {
                 Object options = jsonObject.get("options");
@@ -280,7 +328,7 @@ public class CodeGenUtils {
             } else {
                 rules.put("hasOptions", false);
             }
-            
+
             // 提取长度限制
             boolean hasLength = false;
             if (jsonObject.containsKey("minLength") || jsonObject.containsKey("maxLength")) {
@@ -295,7 +343,7 @@ public class CodeGenUtils {
                 rules.put("lengthMessage", lengthMessage != null ? lengthMessage : "长度必须在${minLength}到${maxLength}之间");
             }
             rules.put("hasLength", hasLength);
-            
+
             // 提取数值范围
             boolean hasRange = false;
             if (jsonObject.containsKey("min") || jsonObject.containsKey("max")) {
@@ -310,22 +358,22 @@ public class CodeGenUtils {
                 rules.put("rangeMessage", rangeMessage != null ? rangeMessage : "数值必须在${min}到${max}之间");
             }
             rules.put("hasRange", hasRange);
-            
+
             // 提取操作符（IN、BETWEEN等）
             if (jsonObject.containsKey("operator")) {
                 String operator = jsonObject.getString("operator");
                 rules.put("hasOperator", true);
                 rules.put("operator", operator);
-                
+
                 String operatorMessage = jsonObject.getString("operatorMessage");
                 rules.put("operatorMessage", operatorMessage != null ? operatorMessage : "值必须在指定范围内");
-                
+
                 // 提取IN操作符的values
                 if ("IN".equalsIgnoreCase(operator) && jsonObject.containsKey("values")) {
                     Object values = jsonObject.get("values");
                     rules.put("values", values);
                 }
-                
+
                 // 提取BETWEEN操作符的min和max
                 if ("BETWEEN".equalsIgnoreCase(operator)) {
                     if (jsonObject.containsKey("min")) {
@@ -336,7 +384,37 @@ public class CodeGenUtils {
                     }
                 }
             }
-            
+
+            // 提取跨字段比较规则
+            if (jsonObject.containsKey("type") && "crossField".equalsIgnoreCase(jsonObject.getString("type"))) {
+                rules.put("hasCrossField", true);
+                if (jsonObject.containsKey("field1")) {
+                    rules.put("crossField1", jsonObject.getString("field1"));
+                }
+                if (jsonObject.containsKey("operator")) {
+                    rules.put("crossFieldOperator", jsonObject.getString("operator"));
+                }
+                if (jsonObject.containsKey("field2")) {
+                    rules.put("crossField2", jsonObject.getString("field2"));
+                }
+                if (jsonObject.containsKey("condition")) {
+                    rules.put("crossFieldCondition", jsonObject.getString("condition"));
+                }
+                // 提取跨字段比较的message，如果有message则使用message，否则使用condition
+                if (jsonObject.containsKey("message")) {
+                    String message = jsonObject.getString("message");
+                    if (message != null && !message.trim().isEmpty()) {
+                        rules.put("crossFieldMessage", message);
+                    } else if (jsonObject.containsKey("condition")) {
+                        rules.put("crossFieldMessage", jsonObject.getString("condition"));
+                    }
+                } else if (jsonObject.containsKey("condition")) {
+                    rules.put("crossFieldMessage", jsonObject.getString("condition"));
+                }
+            } else {
+                rules.put("hasCrossField", false);
+            }
+
         } catch (Exception e) {
             // JSON解析失败，忽略校验规则
             rules.put("hasPattern", false);
@@ -344,13 +422,15 @@ public class CodeGenUtils {
             rules.put("hasLength", false);
             rules.put("hasRange", false);
             rules.put("hasOperator", false);
+            rules.put("hasCrossField", false);
         }
-        
+
         return rules;
     }
-    
+
     /**
      * 将对象转换为Number类型，如果是字符串则尝试解析为数值
+     *
      * @param value 要转换的值
      * @return 转换后的数值
      */
@@ -375,9 +455,10 @@ public class CodeGenUtils {
         }
         return null;
     }
-    
+
     /**
      * 工具方法：转换为类名（大驼峰）
+     *
      * @param code 编码
      * @return 类名
      */
@@ -391,9 +472,10 @@ public class CodeGenUtils {
         }
         return className;
     }
-    
+
     /**
      * 工具方法：转换为实体名（小驼峰）
+     *
      * @param code 编码
      * @return 实体名
      */
@@ -407,9 +489,10 @@ public class CodeGenUtils {
         }
         return entityName;
     }
-    
+
     /**
      * 工具方法：转换为组件名
+     *
      * @param code 编码
      * @return 组件名
      */
@@ -418,9 +501,10 @@ public class CodeGenUtils {
         String processedCode = code.replace("_TABLE", "");
         return convertToCamelCase(processedCode, true);
     }
-    
+
     /**
      * 工具方法：转换为表名（下划线）
+     *
      * @param code 编码
      * @return 表名
      */
@@ -428,10 +512,11 @@ public class CodeGenUtils {
         // 将 TABLE_CODE 转换为 table_code
         return code.toLowerCase().replace("_TABLE", "");
     }
-    
+
     /**
      * 工具方法：转换为驼峰命名
-     * @param code 编码
+     *
+     * @param code       编码
      * @param firstUpper 首字母是否大写
      * @return 驼峰命名
      */
@@ -459,9 +544,10 @@ public class CodeGenUtils {
         }
         return result;
     }
-    
+
     /**
      * 获取Java类型
+     *
      * @param fieldType 字段类型
      * @return Java类型
      */
@@ -484,54 +570,94 @@ public class CodeGenUtils {
             return "String";
         }
     }
-    
+
     /**
      * 检查字段列表中是否有日期类型
+     *
      * @param fields 字段列表
      * @return 是否包含日期类型
      */
     public static boolean hasDate(List<MetadataField> fields) {
-        return fields.stream().anyMatch(f -> 
-            f.getFieldType() != null && 
-            (f.getFieldType().toLowerCase().contains("date") || f.getFieldType().toLowerCase().contains("time"))
+        return fields.stream().anyMatch(f ->
+                f.getFieldType() != null &&
+                        (f.getFieldType().toLowerCase().contains("date") || f.getFieldType().toLowerCase().contains("time"))
         );
     }
-    
+
     /**
      * 检查字段列表中是否有Decimal类型
+     *
      * @param fields 字段列表
      * @return 是否包含Decimal类型
      */
     public static boolean hasDecimal(List<MetadataField> fields) {
-        return fields.stream().anyMatch(f -> 
-            f.getFieldType() != null && 
-            (f.getFieldType().toLowerCase().contains("decimal") || 
-             f.getFieldType().toLowerCase().contains("numeric") ||
-             f.getFieldType().toLowerCase().contains("float") ||
-             f.getFieldType().toLowerCase().contains("double"))
+        return fields.stream().anyMatch(f ->
+                f.getFieldType() != null &&
+                        (f.getFieldType().toLowerCase().contains("decimal") ||
+                                f.getFieldType().toLowerCase().contains("numeric") ||
+                                f.getFieldType().toLowerCase().contains("float") ||
+                                f.getFieldType().toLowerCase().contains("double"))
         );
     }
-    
+
+    /**
+     * 将字符串中的 \\uXXXX / \\UXXXXXXXX Unicode 转义还原为真实字符。
+     * 仅处理合法十六进制序列；其他内容保持不变。
+     */
+    private static String unescapeUnicode(String input) {
+        if (input == null || input.isEmpty()) {
+            return input;
+        }
+        StringBuilder out = new StringBuilder(input.length());
+        for (int i = 0; i < input.length(); i++) {
+            char c = input.charAt(i);
+            if (c == '\\' && i + 1 < input.length()) {
+                char next = input.charAt(i + 1);
+                if (next == 'u' && i + 6 <= input.length()) {
+                    String hex = input.substring(i + 2, i + 6);
+                    if (hex.matches("[0-9a-fA-F]{4}")) {
+                        out.append((char) Integer.parseInt(hex, 16));
+                        i += 5;
+                        continue;
+                    }
+                } else if (next == 'U' && i + 10 <= input.length()) {
+                    String hex = input.substring(i + 2, i + 10);
+                    if (hex.matches("[0-9a-fA-F]{8}")) {
+                        int codePoint = (int) Long.parseLong(hex, 16);
+                        out.append(new String(Character.toChars(codePoint)));
+                        i += 9;
+                        continue;
+                    }
+                }
+            }
+            out.append(c);
+        }
+        return out.toString();
+    }
+
     /**
      * 生成CHECK约束
+     *
      * @param field 字段信息
      * @return CHECK约束字符串
      */
     public static String generateCheckConstraint(MetadataField field) {
         Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
         List<String> conditions = new ArrayList<>();
-        
+
         // 处理正则表达式
         if (validationRules.containsKey("hasPattern") && (Boolean) validationRules.get("hasPattern")) {
             String pattern = (String) validationRules.get("pattern");
+            // MySQL REGEXP/REGEXP_LIKE 不支持 \\uXXXX 这类Unicode转义，需先将其还原为真实字符
+            pattern = unescapeUnicode(pattern);
             conditions.add("`" + field.getFieldName() + "` REGEXP '" + pattern + "'");
         }
-        
+
         // 处理数值范围
         if (validationRules.containsKey("hasRange") && (Boolean) validationRules.get("hasRange")) {
             Number min = convertToNumber(validationRules.get("min"));
             Number max = convertToNumber(validationRules.get("max"));
-            
+
             if (min != null && max != null) {
                 conditions.add("`" + field.getFieldName() + "` BETWEEN " + min + " AND " + max);
             } else if (min != null) {
@@ -540,7 +666,7 @@ public class CodeGenUtils {
                 conditions.add("`" + field.getFieldName() + "` <= " + max);
             }
         }
-        
+
         // 处理枚举值
         if (validationRules.containsKey("hasOptions") && (Boolean) validationRules.get("hasOptions")) {
             Object options = validationRules.get("options");
@@ -565,11 +691,11 @@ public class CodeGenUtils {
                 }
             }
         }
-        
+
         // 处理操作符（IN、BETWEEN等）
         if (validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
             String operator = (String) validationRules.get("operator");
-            
+
             // 处理IN操作符
             if ("IN".equalsIgnoreCase(operator)) {
                 Object values = validationRules.get("values");
@@ -594,7 +720,7 @@ public class CodeGenUtils {
                     }
                 }
             }
-            
+
             // 处理BETWEEN操作符
             else if ("BETWEEN".equalsIgnoreCase(operator)) {
                 Number min = convertToNumber(validationRules.get("min"));
@@ -604,12 +730,186 @@ public class CodeGenUtils {
                 }
             }
         }
-        
+
         // 如果有条件，生成单个CHECK约束
         if (!conditions.isEmpty()) {
             return "CHECK (" + String.join(" AND ", conditions) + ")";
         }
-        
+
         return null;
     }
+
+    /**
+     * 判断字段是否为外键
+     *
+     * @param field     字段信息
+     * @param relations 表关联关系列表
+     * @return 是否为外键
+     */
+    public static boolean isForeignKey(MetadataField field, List<MetadataTableRelation> relations) {
+        if (relations == null || relations.isEmpty()) {
+            return false;
+        }
+
+        return relations.stream().anyMatch(relation ->
+                relation.getSlaveFieldCode().equalsIgnoreCase(field.getFieldName())
+        );
+    }
+
+    /**
+     * 获取字段关联的主表信息
+     *
+     * @param field     字段信息
+     * @param relations 表关联关系列表
+     * @return 关联的主表信息
+     */
+    public static MetadataTableRelation getRelatedTableRelation(MetadataField field, List<MetadataTableRelation> relations) {
+        if (relations == null || relations.isEmpty()) {
+            return null;
+        }
+
+        return relations.stream()
+                .filter(relation -> relation.getSlaveFieldCode().equalsIgnoreCase(field.getFieldName()))
+                .findFirst()
+                .orElse(null);
+    }
+
+    /**
+     * 获取关联主表名称
+     *
+     * @param relation 表关联关系
+     * @return 关联主表名称
+     */
+    public static String getRelatedTableName(MetadataTableRelation relation) {
+        if (relation == null) {
+            return null;
+        }
+        return relation.getMainTableCode();
+    }
+
+    /**
+     * 获取关联主表字段名称
+     *
+     * @param relation 表关联关系
+     * @return 关联主表字段名称
+     */
+    public static String getRelatedTableFieldName(MetadataTableRelation relation) {
+        if (relation == null) {
+            return null;
+        }
+        return relation.getMainFieldCode();
+    }
+
+    /**
+     * 准备字段列表，添加转换后的属性和关联关系信息
+     *
+     * @param fields    字段列表
+     * @param relations 表关联关系列表
+     * @return 转换后的字段列表
+     */
+    public static List<Map<String, Object>> prepareFieldList(List<MetadataField> fields, List<MetadataTableRelation> relations) {
+        List<Map<String, Object>> fieldList = new ArrayList<>();
+        for (MetadataField field : fields) {
+            // 只处理启用的字段
+            if (field.getIsEnabled() != null && field.getIsEnabled() == 0) {
+                continue;
+            }
+
+            Map<String, Object> fieldMap = new HashMap<>();
+            fieldMap.put("field", field);
+            fieldMap.put("fieldName", field.getFieldName());
+            // 格式化字段类型，确保生成有效的MySQL数据类型
+            String formattedFieldType = formatFieldType(field.getFieldType());
+
+            // 处理enum类型，从validateRule中获取enum值
+            if ("enum('')".equals(formattedFieldType)) {
+                Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
+                if (validationRules.containsKey("hasOptions") && (Boolean) validationRules.get("hasOptions")) {
+                    Object options = validationRules.get("options");
+                    if (options instanceof JSONArray) {
+                        JSONArray optionsArray = (JSONArray) options;
+                        if (!optionsArray.isEmpty()) {
+                            StringBuilder enumValues = new StringBuilder();
+                            for (int i = 0; i < optionsArray.size(); i++) {
+                                if (i > 0) {
+                                    enumValues.append(", ");
+                                }
+                                Object option = optionsArray.get(i);
+                                if (option instanceof String) {
+                                    enumValues.append("'").append(option).append("'");
+                                } else {
+                                    enumValues.append(option);
+                                }
+                            }
+                            formattedFieldType = "enum(" + enumValues.toString() + ")";
+                        }
+                    }
+                }
+
+                // 处理操作符为IN的情况，从values字段获取enum值
+                if ("enum('')".equals(formattedFieldType) && validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
+                    String operator = (String) validationRules.get("operator");
+                    if ("IN".equalsIgnoreCase(operator)) {
+                        Object values = validationRules.get("values");
+                        if (values instanceof JSONArray) {
+                            JSONArray valuesArray = (JSONArray) values;
+                            if (!valuesArray.isEmpty()) {
+                                StringBuilder enumValues = new StringBuilder();
+                                for (int i = 0; i < valuesArray.size(); i++) {
+                                    if (i > 0) {
+                                        enumValues.append(", ");
+                                    }
+                                    Object value = valuesArray.get(i);
+                                    if (value instanceof String) {
+                                        enumValues.append("'").append(value).append("'");
+                                    } else {
+                                        enumValues.append(value);
+                                    }
+                                }
+                                formattedFieldType = "enum(" + enumValues.toString() + ")";
+                            }
+                        }
+                    }
+                }
+            }
+
+            fieldMap.put("fieldType", formattedFieldType);
+            fieldMap.put("label", field.getLabel());
+            fieldMap.put("isRequired", field.getIsRequired());
+            fieldMap.put("formComponent", field.getFormComponent());
+            fieldMap.put("javaType", getJavaType(field.getFieldType()));
+
+            // 生成字段名并检查是否为关键字
+            String camelCaseName = convertToCamelCase(field.getFieldName(), false);
+            if (JAVA_KEYWORDS.contains(camelCaseName)) {
+                camelCaseName = "_" + camelCaseName;
+            }
+            fieldMap.put("camelCaseName", camelCaseName);
+
+            // 解析校验规则
+            Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
+            fieldMap.put("validationRules", validationRules);
+
+            // 处理关联关系
+            if (relations != null && !relations.isEmpty()) {
+                boolean isForeign = isForeignKey(field, relations);
+                fieldMap.put("isForeignKey", isForeign);
+
+                if (isForeign) {
+                    MetadataTableRelation relation = getRelatedTableRelation(field, relations);
+                    fieldMap.put("relation", relation);
+                    fieldMap.put("relatedTableName", getRelatedTableName(relation));
+                    fieldMap.put("relatedTableFieldName", getRelatedTableFieldName(relation));
+                    fieldMap.put("relatedTableClassName", convertToClassName(getRelatedTableName(relation)));
+                    fieldMap.put("relatedTableCamelCaseName", convertToCamelCase(getRelatedTableName(relation), false));
+                }
+            } else {
+                fieldMap.put("isForeignKey", false);
+            }
+
+            fieldList.add(fieldMap);
+        }
+        return fieldList;
+    }
+
 }

@@ -63,7 +63,7 @@
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_field 
         WHERE table_code = #{tableCode} AND field_code = #{fieldCode}
-        <if test="businessCode != null and businessCode != ''">
+        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
             AND business_code = #{businessCode}
         </if>
     </select>
@@ -71,7 +71,7 @@
     <select id="selectByTableCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_field 
         WHERE table_code = #{tableCode}
-        <if test="businessCode != null and businessCode != ''">
+        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
             AND business_code = #{businessCode}
         </if>
         ORDER BY sort ASC, create_time ASC
@@ -80,14 +80,14 @@
     <select id="countByCode" resultType="int">
         SELECT COUNT(*) FROM metadata_field 
         WHERE table_code = #{tableCode} AND field_code = #{fieldCode}
-        <if test="businessCode != null and businessCode != ''">
+        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
             AND business_code = #{businessCode}
         </if>
     </select>
 
     <select id="countByTableCode" resultType="Long">
         SELECT COUNT(*) FROM metadata_field WHERE table_code = #{tableCode}
-        <if test="businessCode != null and businessCode != ''">
+        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
             AND business_code = #{businessCode}
         </if>
     </select>
@@ -95,7 +95,7 @@
     <select id="selectPageByTableCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_field 
         WHERE table_code = #{tableCode}
-        <if test="businessCode != null and businessCode != ''">
+        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
             AND business_code = #{businessCode}
         </if>
         ORDER BY sort ASC, create_time ASC

@@ -313,3 +313,83 @@ export function getFormFieldOptions(field) {
   
   return [];
 }
+
+// 获取关联数据选项
+export function getRelatedDataOptions(relatedTableName) {
+  if (!relatedTableName) {
+    return [];
+  }
+  
+  // 根据表名生成更通用的模拟数据
+  const tableName = relatedTableName.toLowerCase();
+  const options = [];
+  
+  // 生成模拟数据的数量
+  const count = 4;
+  
+  // 根据表名中的关键词生成不同的模拟数据
+  if (tableName.includes('user') || tableName.includes('owner') || tableName.includes('person') || tableName.includes('member')) {
+    // 用户、所有者、人员、成员相关表
+    const names = ['张三', '李四', '王五', '赵六', '孙七', '周八', '吴九', '郑十'];
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: i + 1,
+        name: names[i]
+      });
+    }
+  } else if (tableName.includes('type') || tableName.includes('category') || tableName.includes('kind') || tableName.includes('class')) {
+    // 类型、分类、种类、类别相关表
+    const types = ['类型1', '类型2', '类型3', '类型4', '类型5', '类型6', '类型7', '类型8'];
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: i + 1,
+        name: types[i]
+      });
+    }
+  } else if (tableName.includes('status') || tableName.includes('state')) {
+    // 状态相关表
+    const statuses = ['启用', '禁用', '待审核', '已审核', '已过期', '已删除', '草稿', '发布'];
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: i + 1,
+        name: statuses[i]
+      });
+    }
+  } else if (tableName.includes('department') || tableName.includes('dept') || tableName.includes('org') || tableName.includes('company')) {
+    // 部门、组织、公司相关表
+    const depts = ['部门1', '部门2', '部门3', '部门4', '部门5', '部门6', '总部', '分公司'];
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: i + 1,
+        name: depts[i]
+      });
+    }
+  } else if (tableName.includes('product') || tableName.includes('goods') || tableName.includes('item')) {
+    // 产品、商品相关表
+    const products = ['产品A', '产品B', '产品C', '产品D', '商品1', '商品2', '商品3', '商品4'];
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: i + 1,
+        name: products[i]
+      });
+    }
+  } else if (tableName.includes('order') || tableName.includes('bill') || tableName.includes('invoice')) {
+    // 订单、账单、发票相关表
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: 1000 + i + 1,
+        name: `${relatedTableName.replace('_TABLE', '')}_${1000 + i + 1}`
+      });
+    }
+  } else {
+    // 默认通用模拟数据
+    for (let i = 0; i < count; i++) {
+      options.push({
+        id: i + 1,
+        name: `${relatedTableName.replace('_TABLE', '')}_${i + 1}`
+      });
+    }
+  }
+  
+  return options;
+}

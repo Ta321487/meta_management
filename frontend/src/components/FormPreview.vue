@@ -24,7 +24,8 @@
         :model="formData" 
         :rules="formRules" 
         ref="formRef" 
-        label-width="100px"
+        label-width="auto"
+        label-position="top"
       >
         <el-form-item 
           v-for="field in filteredFields" 
@@ -33,9 +34,24 @@
           :prop="getFormFieldPropName(field)"
           :required="field.isRequired === 1"
         >
+          <!-- 外键字段下拉选择 -->
+          <el-select 
+            v-if="field.isForeignKey"
+            v-model="formData[getFormFieldPropName(field)]" 
+            :placeholder="`请选择${field.label}`"
+            style="width: 100%"
+            filterable
+          >
+            <el-option 
+              v-for="item in getRelatedDataOptions(field.relatedTableName)"
+              :key="item.id"
+              :label="item.name"
+              :value="item.id"
+            />
+          </el-select>
           <!-- 输入框 -->
           <el-input 
-            v-if="field.formComponent === 'input' && !['INT', 'NUMBER', 'DECIMAL'].includes(field.fieldType)"
+            v-else-if="field.formComponent === 'input' && !['INT', 'NUMBER', 'DECIMAL'].includes(field.fieldType)"
             v-model="formData[getFormFieldPropName(field)]" 
             :placeholder="`请输入${field.label}`"
           />
@@ -102,9 +118,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { Loading } from '@element-plus/icons-vue';
-import { getFormFieldPropName, getFormFieldOptions } from '../utils/mockDataGenerator';
-
-// Props
+// 导入工具函数
+import { getFormFieldPropName, getFormFieldOptions, getRelatedDataOptions } from '../utils/mockDataGenerator';
 const props = defineProps({
   // 可见性
   visible: {
@@ -150,16 +165,33 @@ watch(() => localVisible.value, (newVal) => {
   emit('update:visible', newVal);
 });
 
+// 监听formData变化，用于调试
+watch(() => formData.value, (newVal) => {
+  console.log(`[FormPreview] formData变化:`, newVal);
+}, { deep: true });
+
 // Methods
+
+
 // 处理提交
 const handleSubmit = () => {
+  console.log(`[FormPreview] handleSubmit被调用`);
   if (formRef.value) {
+    console.log(`[FormPreview] formRef存在，开始验证`);
     formRef.value.validate((valid) => {
+      console.log(`[FormPreview] 验证结果 valid:`, valid);
       if (valid) {
         // 模拟保存
         console.log('表单数据:', formData.value);
+      } else {
+        console.log(`[FormPreview] 验证失败，检查错误信息`);
+        formRef.value.validateField('', (errors) => {
+          console.log(`[FormPreview] 所有字段验证错误:`, errors);
+        });
       }
     });
+  } else {
+    console.log(`[FormPreview] formRef不存在`);
   }
 };
 
@@ -176,8 +208,10 @@ const filteredFields = computed(() => {
   return props.fields.filter(field => {
     return field && 
            field.formComponent !== 'primary_key' && 
-           field.fieldName !== 'id' && 
-           field.fieldName !== 'uuid';
+           field.formComponent !== 'primary_key' && 
+           field.fieldName !== 'uuid' &&
+           field.fieldName !== 'create_time' &&
+           field.fieldName !== 'update_time';
   });
 });
 
@@ -191,8 +225,10 @@ const builtInRegexMap = {
 
 // 表单规则
 const formRules = computed(() => {
+  console.log(`[FormPreview] 开始计算formRules，字段数量:`, props.fields.length);
   const rules = {};
   props.fields.forEach(field => {
+    console.log(`[FormPreview] 处理字段:`, field.fieldName, field);
     const propName = getFormFieldPropName(field);
     
     // 初始化该字段的规则数组
@@ -210,12 +246,16 @@ const formRules = computed(() => {
     // 解析并添加自定义验证规则
     if (field.validateRule) {
       try {
+        console.log(`[FormPreview] 字段 ${field.fieldName} 的 validateRule:`, field.validateRule);
         let customRules = JSON.parse(field.validateRule);
+        console.log(`[FormPreview] 字段 ${field.fieldName} 解析后的 customRules:`, customRules);
         // 如果是数组，直接处理；如果是对象，包装成数组
         const rulesToAdd = Array.isArray(customRules) ? customRules : [customRules];
+        console.log(`[FormPreview] 字段 ${field.fieldName} 的 rulesToAdd:`, rulesToAdd);
         
         // 处理各种验证规则
         rulesToAdd.forEach((rule, index) => {
+          console.log(`[FormPreview] 字段 ${field.fieldName} - 处理规则 ${index}:`, rule);
           if (rule.pattern) {
             console.log(`原始正则: ${rule.pattern}`);
             console.log(`正则类型: ${typeof rule.pattern}`);
@@ -243,6 +283,88 @@ const formRules = computed(() => {
             console.log(`IP测试值: ${ipTestValue}，匹配结果: ${regex.test(ipTestValue)}`);
             
             rule.pattern = pattern;
+          } else if (rule.type === 'crossField' && rule.field1 && rule.field2 && rule.operator) {
+            // 处理跨字段比较约束 - 必须在其他type检查之前
+            console.log(`[FormPreview] 字段 ${field.fieldName} - 检测到跨字段比较约束:`, JSON.stringify(rule));
+            console.log(`[FormPreview] 字段 ${field.fieldName} - rule.type:`, rule.type);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - rule.field1:`, rule.field1);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - rule.field2:`, rule.field2);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - rule.operator:`, rule.operator);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - rule.message:`, rule.message);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - rule.condition:`, rule.condition);
+            
+            // 找到 field2 对应的字段
+            const compareField = props.fields.find(f => f.fieldName === rule.field2);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - 查找比较字段 ${rule.field2}:`, compareField);
+            if (!compareField) {
+              console.warn(`[FormPreview] 字段 ${field.fieldName} - 未找到字段: ${rule.field2}`);
+              rulesToAdd[index] = null;
+              return;
+            }
+            
+            const compareFieldPropName = getFormFieldPropName(compareField);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - 比较字段的propName:`, compareFieldPropName);
+            const operator = rule.operator;
+            const condition = rule.condition || `${rule.field1} ${operator} ${rule.field2}`;
+            console.log(`[FormPreview] 字段 ${field.fieldName} - condition:`, condition);
+            
+            // 确定错误消息：优先使用rule.message，如果为空或不存在，则使用condition或默认消息
+            const errorMessage = (rule.message && rule.message.trim()) ? rule.message : (condition || `验证失败: ${rule.field1} ${operator} ${rule.field2}`);
+            console.log(`[FormPreview] 字段 ${field.fieldName} - 最终错误消息:`, errorMessage);
+            
+            // 创建跨字段验证规则
+            const crossFieldRule = {
+              validator: (ruleItem, value, callback) => {
+                console.log(`[FormPreview] 字段 ${field.fieldName} - validator被调用!`);
+                console.log(`[FormPreview] 字段 ${field.fieldName} - 当前值:`, value);
+                console.log(`[FormPreview] 字段 ${field.fieldName} - 比较字段propName:`, compareFieldPropName);
+                console.log(`[FormPreview] 字段 ${field.fieldName} - formData.value:`, formData.value);
+                
+                const compareValue = formData.value[compareFieldPropName];
+                console.log(`[FormPreview] 字段 ${field.fieldName} - 比较值:`, compareValue);
+                console.log(`[FormPreview] 字段 ${field.fieldName} - 操作符:`, operator);
+                
+                // 如果两个值都为空，跳过验证
+                if (!value && !compareValue) {
+                  console.log(`[FormPreview] 字段 ${field.fieldName} - 两个值都为空，跳过验证`);
+                  callback();
+                  return;
+                }
+                
+                // 比较两个值
+                let isValid = false;
+                if (operator === '>=') {
+                  isValid = value >= compareValue;
+                } else if (operator === '<=') {
+                  isValid = value <= compareValue;
+                } else if (operator === '>') {
+                  isValid = value > compareValue;
+                } else if (operator === '<') {
+                  isValid = value < compareValue;
+                } else if (operator === '=' || operator === '==') {
+                  isValid = value === compareValue;
+                } else if (operator === '!=' || operator === '<>') {
+                  isValid = value !== compareValue;
+                }
+                
+                console.log(`[FormPreview] 字段 ${field.fieldName} - 验证结果 isValid:`, isValid);
+                
+                if (isValid) {
+                  console.log(`[FormPreview] 字段 ${field.fieldName} - 验证通过`);
+                  callback();
+                } else {
+                  console.log(`[FormPreview] 字段 ${field.fieldName} - 验证失败，错误消息:`, errorMessage);
+                  const error = new Error(errorMessage);
+                  console.log(`[FormPreview] 字段 ${field.fieldName} - 创建的Error对象:`, error);
+                  callback(error);
+                }
+              },
+              trigger: rule.trigger || 'blur',
+              message: errorMessage
+            };
+            
+            console.log(`[FormPreview] 字段 ${field.fieldName} - 创建的跨字段验证规则:`, crossFieldRule);
+            rulesToAdd[index] = crossFieldRule;
           } else if (rule.type) {
             console.log(`type约束: ${rule.type}`);
             
@@ -313,12 +435,20 @@ const formRules = computed(() => {
           }
         });
         
-        rules[propName] = [...rules[propName], ...rulesToAdd];
+        // 过滤掉被设置为null的无效规则
+        const validRules = rulesToAdd.filter(rule => rule !== null);
+        console.log(`[FormPreview] 字段 ${field.fieldName} - 有效规则:`, validRules);
+        console.log(`[FormPreview] 字段 ${field.fieldName} - propName:`, propName);
+        console.log(`[FormPreview] 字段 ${field.fieldName} - 原有规则:`, rules[propName]);
+        
+        rules[propName] = [...rules[propName], ...validRules];
+        console.log(`[FormPreview] 字段 ${field.fieldName} - 最终规则:`, rules[propName]);
       } catch (e) {
-        console.error('Failed to parse validateRule:', e);
+        console.error(`[FormPreview] 字段 ${field.fieldName} - Failed to parse validateRule:`, e);
       }
     }
   });
+  console.log(`[FormPreview] 最终formRules:`, rules);
   return rules;
 });
 </script>

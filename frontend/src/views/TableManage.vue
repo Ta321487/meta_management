@@ -20,6 +20,7 @@
             >
               批量启用
             </el-button>
+            <el-button type="primary" @click="handleBatchAssignBusinessSystem" :disabled="!selectedRows || selectedRows.length === 0">批量分配业务系统</el-button>
             <el-button type="primary" @click="handleAdd">新增表</el-button>
           </div>
         </div>
@@ -130,13 +131,39 @@
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- 分配业务系统对话框 -->
+    <el-dialog
+      close-on-click-modal="false"
+      close-on-press-escape="false"
+      v-model="assignDialogVisible"
+      title="批量分配业务系统"
+      width="500px"
+    >
+      <el-form :model="assignForm" :rules="assignRules" ref="assignFormRef" label-width="120px">
+        <el-form-item label="业务系统" prop="businessCode">
+          <el-select v-model="assignForm.businessCode" placeholder="请选择业务系统" style="width: 100%">
+            <el-option
+              v-for="system in businessSystems"
+              :key="system.businessCode"
+              :label="system.businessName"
+              :value="system.businessCode"
+            />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="assignDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleAssignSubmit">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList } from '../api'
+import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList, batchAssignBusinessSystem } from '../api'
 
 export default {
   name: 'TableManage',
@@ -148,6 +175,15 @@ export default {
     const formRef = ref(null)
     const tableRef = ref(null)
     const selectedRows = ref([])
+    // 分配业务系统相关
+    const assignDialogVisible = ref(false)
+    const assignFormRef = ref(null)
+    const assignForm = reactive({
+      businessCode: ''
+    })
+    const assignRules = {
+      businessCode: [{ required: true, message: '请选择业务系统', trigger: 'change' }]
+    }
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -409,6 +445,58 @@ export default {
       formRef.value?.resetFields()
     }
 
+    // 打开批量分配业务系统对话框
+    const handleBatchAssignBusinessSystem = () => {
+      assignForm.businessCode = ''
+      assignDialogVisible.value = true
+    }
+
+    // 批量分配业务系统提交
+    const handleAssignSubmit = async () => {
+      try {
+        // 先验证表单
+        await assignFormRef.value.validate()
+        
+        // 检查选中的表是否已有业务系统
+        const tablesWithBusinessSystem = selectedRows.value.filter(row => {
+          return row.businessCode && row.businessCode !== 'DEFAULT'
+        })
+        
+        if (tablesWithBusinessSystem.length > 0) {
+          let warningMessage = '部分选中的表已存在业务系统，不可分配其他业务系统：'
+          
+          // 限制显示的表名数量，最多显示5个
+          const maxDisplayCount = 5
+          const displayTables = tablesWithBusinessSystem.slice(0, maxDisplayCount)
+          const tableNames = displayTables.map(row => row.tableName).join('、')
+          
+          if (tablesWithBusinessSystem.length > maxDisplayCount) {
+            warningMessage += `${tableNames} 等 ${tablesWithBusinessSystem.length} 个表`
+          } else {
+            warningMessage += tableNames
+          }
+          
+          ElMessage.warning(warningMessage)
+          return
+        }
+        
+        // 准备批量分配的数据
+        const tableCodes = selectedRows.value.map(row => row.tableCode)
+        
+        // 调用批量分配接口
+        await batchAssignBusinessSystem({ tableCodes, businessCode: assignForm.businessCode })
+        ElMessage.success('批量分配业务系统成功')
+        
+        // 关闭对话框并刷新数据
+        assignDialogVisible.value = false
+        loadData()
+        // 清空选中状态
+        selectedRows.value = []
+      } catch (error) {
+        ElMessage.error(error.response?.data?.message || error.data?.message || error.message || '批量分配业务系统失败')
+      }
+    }
+
     onMounted(() => {
       loadData()
       loadBusinessSystems()
@@ -438,7 +526,14 @@ export default {
       handleBatchDelete,
       handleBatchToggleEnable,
       handleSelectionChange,
-      handleDialogClose
+      handleDialogClose,
+      // 分配业务系统相关
+      assignDialogVisible,
+      assignFormRef,
+      assignForm,
+      assignRules,
+      handleBatchAssignBusinessSystem,
+      handleAssignSubmit
     }
   }
 }

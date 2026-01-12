@@ -32,6 +32,9 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     @Autowired
     private MetadataBusinessRuleService businessRuleService;
 
+    @Autowired
+    private MetadataTableRelationService relationService;
+
     // 各个生成器模块
     private final SqlGenerator sqlGenerator;
     private final JavaCodeGenerator javaCodeGenerator;
@@ -43,17 +46,19 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
                                     MetadataTableService tableService,
                                     MetadataBusinessSystemService businessSystemService,
                                     MetadataFunctionNodeMapper nodeMapper,
-                                    MetadataBusinessRuleService businessRuleService) {
+                                    MetadataBusinessRuleService businessRuleService,
+                                    MetadataTableRelationService relationService) {
         this.fieldService = fieldService;
         this.tableService = tableService;
         this.businessSystemService = businessSystemService;
         this.nodeMapper = nodeMapper;
         this.businessRuleService = businessRuleService;
+        this.relationService = relationService;
 
         // 初始化各个生成器模块
         this.sqlGenerator = new SqlGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService);
-        this.javaCodeGenerator = new JavaCodeGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService);
-        this.vueCodeGenerator = new VueCodeGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService);
+        this.javaCodeGenerator = new JavaCodeGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService, relationService);
+        this.vueCodeGenerator = new VueCodeGenerator(tableService, fieldService, businessSystemService, nodeMapper, businessRuleService, relationService);
         this.configGenerator = new ConfigGenerator();
     }
 

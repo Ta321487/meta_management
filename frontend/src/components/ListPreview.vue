@@ -145,7 +145,8 @@
         :model="formData" 
         :rules="formRules" 
         ref="formRef" 
-        label-width="100px"
+        label-width="auto"
+        label-position="top"
       >
         <el-form-item 
           v-for="field in filteredFields" 
@@ -155,7 +156,7 @@
           :required="field.isRequired === 1"
         >
           <!-- 主键字段不显示输入组件 -->
-          <template v-if="field.formComponent === 'primary_key' || field.fieldName === 'id' || field.fieldName === 'uuid'">
+          <template v-if="field.formComponent === 'primary_key'">
             <el-input 
               v-model="formData[getListFieldPropName(field)]" 
               placeholder="主键自动生成" 
@@ -286,6 +287,7 @@ import {
   getListFieldPropName,
   getFormFieldOptions
 } from '../utils/mockDataGenerator';
+import { processPatternRule } from '../utils/regexUtils';
 
 // Props
 const props = defineProps({
@@ -359,8 +361,10 @@ const filteredFields = computed(() => {
   return props.fields.filter(field => {
     return field && 
            field.formComponent !== 'primary_key' && 
-           field.fieldName !== 'id' && 
-           field.fieldName !== 'uuid';
+           field.formComponent !== 'primary_key' && 
+           field.fieldName !== 'uuid' &&
+           field.fieldName !== 'create_time' &&
+           field.fieldName !== 'update_time';
   });
 });
 
@@ -537,8 +541,18 @@ const formRules = computed(() => {
         
         // 处理单个对象形式的约束
         const extractRulesFromRule = (rule) => {
+          // 处理pattern约束
+          if (rule.pattern) {
+            // 使用公共工具函数处理pattern规则
+            const processedRule = processPatternRule(rule);
+            if (processedRule === null) {
+              // 规则无效，跳过该规则
+              return;
+            }
+            rulesToAdd.push(processedRule);
+          }
           // 处理min/max约束
-          if (rule.min !== undefined || rule.max !== undefined) {
+          else if (rule.min !== undefined || rule.max !== undefined) {
             console.log(`处理min/max约束: ${JSON.stringify(rule)}`);
             console.log(`字段名: ${field.fieldName}, 字段类型: ${field.fieldType}, 表单组件: ${field.formComponent}`);
             
@@ -571,7 +585,7 @@ const formRules = computed(() => {
             console.log(`最终minMaxRule: ${JSON.stringify(minMaxRule)}`);
             rulesToAdd.push(minMaxRule);
           } else {
-            // 非min/max约束，直接添加
+            // 其他约束，直接添加
             rulesToAdd.push(rule);
           }
         };

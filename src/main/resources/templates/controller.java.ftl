@@ -170,5 +170,24 @@ public class ${className}Controller {
             return Result.error("查询失败：" + e.getMessage());
         }
     }
+    
+    <#-- 添加关联数据查询接口 -->
+    <#list fields as field>
+    <#if field.isForeignKey!false>
+    /**
+     * 获取${field.relatedTableName}列表，用于${field.field.label}下拉选择
+     */
+    @GetMapping("/related/${field.relatedTableCamelCaseName}")
+    public Result<List<${field.relatedTableClassName}>> get${field.relatedTableClassName}List() {
+        try {
+            <#-- 这里需要注入${field.relatedTableClassName}Service，暂时使用通用的列表查询 -->
+            List<${field.relatedTableClassName}> list = ${entityName}Service.get${field.relatedTableClassName}List();
+            return Result.success(list);
+        } catch (Exception e) {
+            return Result.error("获取${field.relatedTableName}列表失败：" + e.getMessage());
+        }
+    }
+    </#if>
+    </#list>
 }
 

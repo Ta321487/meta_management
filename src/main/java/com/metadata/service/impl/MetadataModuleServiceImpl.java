@@ -202,11 +202,11 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         if (module == null) {
             throw new RuntimeException("模块不存在");
         }
-        
+
         // 更新模块状态
         module.setStatus(status);
         moduleMapper.update(module);
-        
+
         // 同步更新模块下所有功能节点的状态
         List<MetadataFunctionNode> nodes = functionNodeMapper.selectByModuleCode(module.getModuleCode(), module.getBusinessCode());
         if (nodes != null && !nodes.isEmpty()) {
@@ -215,7 +215,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                 functionNodeMapper.update(node);
             }
         }
-        
+
         logService.logSuccess("admin", "EDIT", "更新模块状态：" + module.getModuleCode() + " -> " + status + ", 同步更新功能节点数：" + (nodes != null ? nodes.size() : 0));
     }
 
@@ -232,7 +232,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                 // 更新模块状态
                 module.setStatus(status);
                 moduleMapper.update(module);
-                
+
                 // 同步更新模块下所有功能节点的状态
                 List<MetadataFunctionNode> nodes = functionNodeMapper.selectByModuleCode(module.getModuleCode(), module.getBusinessCode());
                 if (nodes != null && !nodes.isEmpty()) {
@@ -246,7 +246,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         }
         logService.logSuccess("admin", "BATCH_EDIT", "批量更新模块状态：ids=" + ids + ", status=" + status + ", 同步更新功能节点数：" + totalNodesUpdated);
     }
-    
+
     /**
      * 更新模块的业务系统
      */
@@ -298,7 +298,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         }
         return moduleMapper.selectByCodes(moduleCodes);
     }
-    
+
     /**
      * 重建模块的功能节点
      */
@@ -309,11 +309,11 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         if (module == null) {
             throw new RuntimeException("模块不存在：" + moduleCode);
         }
-        
+
         // 获取模块关联的表列表
         List<MetadataTable> tables = tableService.listByModuleCode(moduleCode);
         List<String> tableCodes = tables.stream().map(MetadataTable::getTableCode).toList();
-        
+
         // 调用现有的创建默认功能节点方法
         createDefaultFunctionNodes(module, tableCodes);
     }

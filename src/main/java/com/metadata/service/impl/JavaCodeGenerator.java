@@ -5,11 +5,13 @@ import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.entity.MetadataTable;
+import com.metadata.entity.MetadataTableRelation;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.service.MetadataBusinessRuleService;
 import com.metadata.service.MetadataBusinessSystemService;
 import com.metadata.service.MetadataFieldService;
+import com.metadata.service.MetadataTableRelationService;
 import com.metadata.service.MetadataTableService;
 import com.metadata.service.exception.CodeGenException;
 
@@ -30,6 +32,7 @@ public class JavaCodeGenerator {
     private MetadataBusinessSystemService businessSystemService;
     private MetadataFunctionNodeMapper nodeMapper;
     private MetadataBusinessRuleService businessRuleService;
+    private MetadataTableRelationService relationService;
     private TemplateManager templateManager;
     
     /**
@@ -39,17 +42,20 @@ public class JavaCodeGenerator {
      * @param businessSystemService 业务系统服务
      * @param nodeMapper 功能节点Mapper
      * @param businessRuleService 业务规则服务
+     * @param relationService 表关联关系服务
      */
     public JavaCodeGenerator(MetadataTableService tableService,
                             MetadataFieldService fieldService,
                             MetadataBusinessSystemService businessSystemService,
                             MetadataFunctionNodeMapper nodeMapper,
-                            MetadataBusinessRuleService businessRuleService) {
+                            MetadataBusinessRuleService businessRuleService,
+                            MetadataTableRelationService relationService) {
         this.tableService = tableService;
         this.fieldService = fieldService;
         this.businessSystemService = businessSystemService;
         this.nodeMapper = nodeMapper;
         this.businessRuleService = businessRuleService;
+        this.relationService = relationService;
         this.templateManager = TemplateManager.getInstance();
     }
     
@@ -81,11 +87,14 @@ public class JavaCodeGenerator {
             throw new CodeGenException("FIELD_NOT_FOUND", "表没有配置字段: " + tableCode);
         }
 
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        // 获取表关联关系
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
         data.put("packageName", packageName);
         data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
         data.put("tableName", CodeGenUtils.convertToTableName(table.getTableCode()));
@@ -121,11 +130,14 @@ public class JavaCodeGenerator {
         }
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        // 获取表关联关系
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
         data.put("packageName", packageName);
         data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
         data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));

@@ -11,6 +11,12 @@ import java.math.BigDecimal;
 import java.util.UUID;
 import com.baomidou.mybatisplus.annotation.TableField;
 </#if>
+<#-- 添加关联实体导入 -->
+<#list fields as field>
+<#if field.isForeignKey!false>
+import ${packageName}.entity.${field.relatedTableClassName};
+</#if>
+</#list>
 
 /**
  * ${table.tableName}实体类
@@ -23,20 +29,40 @@ public class ${className} {
     /**
      * ${field.field.label}
      */
-    <#if field.field.fieldName == "id" && table.pkStrategy == "UUID">
+    <#if field.field.formComponent == "primary_key" && table.pkStrategy == "UUID">
     @TableField("uuid")
-    private UUID id;
+    private UUID ${field.camelCaseName};
     <#else>
     private ${field.javaType} ${field.camelCaseName};
     </#if>
 </#list>
     <#if table.pkStrategy == "UUID">
+    <#-- 无参构造函数，自动生成UUID主键 -->
+    <#assign primaryKeyCamelCaseName = "">
+    <#list fields as field>
+        <#if field.field.formComponent == "primary_key">
+            <#assign primaryKeyCamelCaseName = field.camelCaseName>
+            <#break>
+        </#if>
+    </#list>
+    <#if primaryKeyCamelCaseName != "">
     /**
      * 无参构造函数，自动生成UUID主键
      */
     public ${className}() {
-        this.id = UUID.randomUUID();
+        this.${primaryKeyCamelCaseName} = UUID.randomUUID();
     }
     </#if>
+    </#if>
+    
+    <#-- 添加关联实体 -->
+    <#list fields as field>
+    <#if field.isForeignKey!false>
+    /**
+     * ${field.field.label}关联实体
+     */
+    private ${field.relatedTableClassName} ${field.relatedTableCamelCaseName};
+    </#if>
+    </#list>
 }
 

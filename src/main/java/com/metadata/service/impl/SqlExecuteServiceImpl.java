@@ -54,13 +54,14 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     /**
      * 执行SQL语句（内部方法，允许执行DROP TABLE等危险操作）
      * 仅供内部服务调用，不对外暴露
-     * @param sql SQL语句
+     *
+     * @param sql             SQL语句
      * @param skipSafetyCheck 是否跳过安全检查
      * @return 执行结果
      */
     private Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck) {
         Map<String, Object> result = new HashMap<>();
-        
+
         if (sql == null || sql.trim().isEmpty()) {
             result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
             result.put(SqlConstants.RESULT_KEY_MESSAGE, "SQL语句不能为空");
@@ -69,7 +70,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
         // 移除SQL注释和多余空白
         sql = sql.trim();
-        
+
         // 移除多行注释 /* */
         sql = sql.replaceAll(SqlConstants.REGEX_MULTI_LINE_COMMENT, " ");
         // 移除单行注释 --
@@ -77,10 +78,10 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         sql = lineCommentPattern.matcher(sql).replaceAll("");
         // 移除多余的空白字符
         sql = sql.replaceAll(SqlConstants.REGEX_EXCESSIVE_WHITESPACE, " ").trim();
-        
+
         // 检查是否为危险操作（DROP、TRUNCATE等）
         String upperSql = sql.toUpperCase().trim();
-        
+
         if (!skipSafetyCheck) {
             // 检查明显的危险操作
             if (isDangerousSql(upperSql)) {
@@ -104,13 +105,13 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
         try (Connection connection = dataSource.getConnection();
              Statement statement = connection.createStatement()) {
-            
+
             // 使用策略模式执行SQL
             SqlResult sqlResult = executeSqlWithStrategy(sql, connection, statement, upperSql);
-            
+
             // 转换为Map结果格式，保持接口兼容
             convertSqlResultToMap(sqlResult, result);
-            
+
             // 如果是 CREATE TABLE 或 ALTER TABLE 语句，自动同步字段到元数据系统
             if (upperSql.startsWith(SqlConstants.SQL_TYPE_CREATE + " TABLE") || upperSql.startsWith(SqlConstants.SQL_TYPE_ALTER + " TABLE")) {
                 try {
@@ -132,11 +133,11 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                     logService.logError("admin", SqlConstants.LOG_MODULE_SYNC_EXCEPTION, "同步异常详情", e.toString());
                 }
             }
-            
+
         } catch (Exception e) {
             handleSqlException(e, upperSql, result);
         }
-        
+
         return result;
     }
 
@@ -152,8 +153,8 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         } else {
             // 如果没有找到对应的策略，使用默认的执行方式
             int affectedRows = statement.executeUpdate(sql);
-            logService.logSuccess("admin", SqlConstants.LOG_MODULE_SQL_EXECUTE, 
-                "执行SQL: " + sql.substring(0, Math.min(100, sql.length())) + "，影响行数: " + affectedRows);
+            logService.logSuccess("admin", SqlConstants.LOG_MODULE_SQL_EXECUTE,
+                    "执行SQL: " + sql.substring(0, Math.min(100, sql.length())) + "，影响行数: " + affectedRows);
             return SqlResult.successUpdate(affectedRows, "执行成功");
         }
     }
@@ -164,7 +165,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     private void convertSqlResultToMap(SqlResult sqlResult, Map<String, Object> result) {
         result.put(SqlConstants.RESULT_KEY_SUCCESS, sqlResult.isSuccess());
         result.put(SqlConstants.RESULT_KEY_MESSAGE, sqlResult.getMessage());
-        
+
         if (sqlResult.isSuccess()) {
             if (sqlResult.getData() != null) {
                 result.put(SqlConstants.RESULT_KEY_DATA, sqlResult.getData());
@@ -184,7 +185,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     private void handleSqlException(Exception e, String upperSql, Map<String, Object> result) {
         String errorMessage = e.getMessage();
         String simpleClassName = e.getClass().getSimpleName();
-        
+
         // 改进错误信息，特别是对于ALTER TABLE语句和CHECK约束违反的情况
         if (upperSql.startsWith(SqlConstants.SQL_TYPE_ALTER + " TABLE")) {
             if (errorMessage.contains("Check constraint") || errorMessage.contains("check constraint")) {
@@ -201,12 +202,12 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
             // 其他SQL错误
             errorMessage = "SQL执行失败: " + e.getMessage();
         }
-        
+
         result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
         result.put(SqlConstants.RESULT_KEY_MESSAGE, errorMessage);
         result.put(SqlConstants.RESULT_KEY_ERROR, simpleClassName);
         result.put(SqlConstants.RESULT_KEY_ORIGINAL_ERROR, e.getMessage()); // 保留原始错误信息，便于调试
-        
+
         logService.logError("admin", SqlConstants.LOG_MODULE_SQL_EXECUTE, "执行SQL失败", e.getMessage());
     }
 
@@ -236,6 +237,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
     /**
      * 执行SQL语句（对外接口，禁止危险操作）
+     *
      * @param sql SQL语句
      * @return 执行结果
      */
@@ -243,10 +245,11 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     public Map<String, Object> executeSql(String sql) {
         return executeSqlInternal(sql, false);
     }
-    
+
     /**
      * 执行SQL语句（支持跳过安全检查）
-     * @param sql SQL语句
+     *
+     * @param sql             SQL语句
      * @param skipSafetyCheck 是否跳过安全检查
      * @return 执行结果
      */
@@ -257,6 +260,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
     /**
      * 执行DROP TABLE语句（仅供内部服务调用）
+     *
      * @param tableName 表名
      * @return 执行结果
      */
@@ -269,25 +273,25 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
             result.put(SqlConstants.RESULT_KEY_MESSAGE, "表名不能为空");
             return result;
         }
-        
+
         // 转义表名，防止SQL注入
         String safeTableName = tableName.trim().replace("`", "").replace("'", "").replace("\"", "");
         String dropSql = "DROP TABLE IF EXISTS `" + safeTableName + "`";
-        
+
         Map<String, Object> result = executeSqlInternal(dropSql, true);
-        
+
         // 如果DROP TABLE执行成功，清理metadata_field表中的相关字段
         if ((Boolean) result.get(SqlConstants.RESULT_KEY_SUCCESS)) {
             try {
                 // 查找对应的表编码
                 String tableCode = safeTableName.toUpperCase();
                 MetadataTable table = tableMapper.selectByCode(tableCode);
-                
+
                 if (table != null) {
                     // 删除该表的所有字段
                     fieldMapper.deleteByTableCode(tableCode);
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "删除表字段: " + tableCode);
-                    
+
                     // 删除表记录
                     tableMapper.deleteById(table.getId());
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE, "删除表记录: " + tableCode);
@@ -299,7 +303,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                             // 删除该表的所有字段
                             fieldMapper.deleteByTableCode(t.getTableCode());
                             logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "删除表字段: " + t.getTableCode());
-                            
+
                             // 删除表记录
                             tableMapper.deleteById(t.getId());
                             logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE, "删除表记录: " + t.getTableCode());
@@ -312,12 +316,13 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                 logService.logError("admin", "CLEAN_FIELDS", "清理表字段失败: " + safeTableName, e.getMessage());
             }
         }
-        
+
         return result;
     }
 
     /**
      * 执行多条SQL语句（用分号分隔）
+     *
      * @param sqls SQL语句（用分号分隔）
      * @return 执行结果
      */
@@ -326,7 +331,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     public Map<String, Object> executeMultipleSql(String sqls) {
         Map<String, Object> result = new HashMap<>();
         List<Map<String, Object>> results = new ArrayList<>();
-        
+
         if (sqls == null || sqls.trim().isEmpty()) {
             result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
             result.put(SqlConstants.RESULT_KEY_MESSAGE, "SQL语句不能为空");
@@ -337,37 +342,38 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         String[] sqlArray = sqls.split(";\s*");
         int successCount = 0;
         int failCount = 0;
-        
+
         for (String sql : sqlArray) {
             sql = sql.trim();
             if (sql.isEmpty()) {
                 continue;
             }
-            
+
             Map<String, Object> singleResult = executeSql(sql);
             singleResult.put(SqlConstants.RESULT_KEY_SQL, sql);
             results.add(singleResult);
-            
+
             if ((Boolean) singleResult.get(SqlConstants.RESULT_KEY_SUCCESS)) {
                 successCount++;
             } else {
                 failCount++;
             }
         }
-        
+
         result.put(SqlConstants.RESULT_KEY_SUCCESS, failCount == 0);
-        result.put(SqlConstants.RESULT_KEY_MESSAGE, String.format("共执行%d条SQL，成功%d条，失败%d条", 
-            results.size(), successCount, failCount));
+        result.put(SqlConstants.RESULT_KEY_MESSAGE, String.format("共执行%d条SQL，成功%d条，失败%d条",
+                results.size(), successCount, failCount));
         result.put(SqlConstants.RESULT_KEY_RESULTS, results);
         result.put(SqlConstants.RESULT_KEY_TOTAL_COUNT, results.size());
         result.put(SqlConstants.RESULT_KEY_SUCCESS_COUNT, successCount);
         result.put(SqlConstants.RESULT_KEY_FAIL_COUNT, failCount);
-        
+
         return result;
     }
 
     /**
      * 同步数据库表外键到元数据关联关系系统（公共方法，供外部调用）
+     *
      * @param tableCode 表编码，如果为null则同步所有表
      * @return 同步结果
      */
@@ -379,14 +385,14 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         int failCount = 0;
         int totalCreated = 0; // 总共创建的关联关系记录数
         List<String> messages = new ArrayList<>();
-        
+
         try (Connection connection = dataSource.getConnection()) {
             if (tableCode != null && !tableCode.trim().isEmpty()) {
                 // 同步指定表
                 // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写
                 String tableName1 = metadataSyncService.convertToTableName(tableCode);
                 String tableName2 = tableCode.toLowerCase();
-                
+
                 try {
                     // 先尝试去掉_TABLE的格式
                     int created = metadataSyncService.syncTableForeignKeys(tableName1, connection);
@@ -410,13 +416,13 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
             } else {
                 // 同步所有表
                 List<MetadataTable> tables = tableMapper.selectAll(null);
-                
+
                 for (MetadataTable table : tables) {
                     try {
                         // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写
                         String tableName1 = metadataSyncService.convertToTableName(table.getTableCode());
                         String tableName2 = table.getTableCode().toLowerCase();
-                        
+
                         // 先尝试去掉_TABLE的格式
                         try {
                             int created = metadataSyncService.syncTableForeignKeys(tableName1, connection);
@@ -445,7 +451,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                     messages.add(0, "成功同步 " + successCount + " 个表的外键，共创建 " + totalCreated + " 条关联关系");
                 }
             }
-            
+
             result.put(SqlConstants.RESULT_KEY_SUCCESS, failCount == 0);
             result.put(SqlConstants.RESULT_KEY_MESSAGE, String.join("; ", messages));
             result.put(SqlConstants.RESULT_KEY_SUCCESS_COUNT, successCount);
@@ -459,7 +465,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
             result.put(SqlConstants.RESULT_KEY_TOTAL_CREATED, totalCreated);
             logService.logError("admin", SqlConstants.LOG_MODULE_SYNC_FOREIGN_KEY, "同步外键失败", e.getMessage());
         }
-        
+
         return result;
     }
 }

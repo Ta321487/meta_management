@@ -107,7 +107,8 @@ import {
   generateApplicationYml,
   generateMyBatisConfig,
   generatePomXml,
-  generateAuth
+  generateAuth,
+  getRelationsBySlave
 } from '../api'
 
 // 导入子组件
@@ -674,7 +675,7 @@ const handlePreviewList = async () => {
     if (fieldRes.code === 200) {
       const fields = Array.isArray(fieldRes.data) ? fieldRes.data : (fieldRes.data?.records || [])
       // 过滤掉主键字段
-      listPreviewFields.value = fields.filter(f => f.fieldName !== 'id' && f.fieldName !== 'ID')
+      listPreviewFields.value = fields.filter(f => f.formComponent !== 'primary_key')
     }
   } catch (error) {
     console.log('加载字段信息失败:', error)
@@ -706,7 +707,45 @@ const handlePreviewForm = async () => {
     // 获取字段信息
     const fieldRes = await getFieldList(form.tableCode)
     if (fieldRes.code === 200) {
-      const fields = Array.isArray(fieldRes.data) ? fieldRes.data : (fieldRes.data?.records || [])
+      let fields = Array.isArray(fieldRes.data) ? fieldRes.data : (fieldRes.data?.records || [])
+      
+      // 获取表关联关系
+      const relationRes = await getRelationsBySlave(form.tableCode, form.businessCode)
+      console.log('relationRes:', relationRes)
+      if (relationRes.code === 200 && relationRes.data && relationRes.data.length > 0) {
+        const relations = relationRes.data
+        console.log('relations:', relations)
+        // 标记外键字段
+        fields = fields.map(field => {
+          console.log('Processing field:', field.fieldName)
+          const relation = relations.find(r => r.slaveFieldCode.toLowerCase() === field.fieldName.toLowerCase())
+          console.log('Found relation:', relation)
+          if (relation) {
+            return {
+              ...field,
+              isForeignKey: true,
+              relation,
+              relatedTableName: relation.mainTableCode,
+              relatedTableFieldName: relation.mainFieldCode,
+              relatedTableClassName: relation.mainTableCode.replace(/_TABLE$/, '').split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(''),
+              relatedTableCamelCaseName: relation.mainTableCode.replace(/_TABLE$/, '').split('_').map((word, index) => index === 0 ? word.toLowerCase() : word.charAt(0).toUpperCase() + word.slice(1)).join('')
+            }
+          }
+          return {
+            ...field,
+            isForeignKey: false
+          }
+        })
+      } else {
+        console.log('No relations found')
+        // 没有关联关系，所有字段都不是外键
+        fields = fields.map(field => ({
+          ...field,
+          isForeignKey: false
+        }))
+      }
+      console.log('Final fields:', fields)
+      
       formPreviewFields.value = fields
     }
   } catch (error) {

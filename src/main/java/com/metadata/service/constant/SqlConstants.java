@@ -89,6 +89,7 @@ public class SqlConstants {
     public static final String LOG_MODULE_SET_ENUM_TYPE = "SET_ENUM_TYPE";
     public static final String LOG_MODULE_SYNC_FOREIGN_KEY = "SYNC_FOREIGN_KEY";
     public static final String LOG_MODULE_EXTRACT_FIELD_NAME = "EXTRACT_FIELD_NAME";
+    public static final String LOG_MODULE_PARSE_ENUM = "PARSE_ENUM";
     
     // 结果相关
     public static final String RESULT_KEY_SUCCESS = "success";

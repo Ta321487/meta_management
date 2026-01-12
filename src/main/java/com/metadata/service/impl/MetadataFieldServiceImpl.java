@@ -189,87 +189,96 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         field.setFieldCode(existing.getFieldCode()); // 编码不可修改
         field.setTableCode(existing.getTableCode()); // 表编码不可修改
 
-        // 保存原有校验规则的message字段
-        String oldMessage = extractMessageFromValidateRule(existing.getValidateRule());
+        // 保存用户新设置的校验规则的message字段（从用户提交的field中提取）
+        String newMessage = extractMessageFromValidateRule(field.getValidateRule());
 
         // 检查字段名称是否变化以及validate_rule是否变化
         boolean fieldNameChanged = !Objects.equals(existing.getFieldName(), field.getFieldName());
         boolean validateRuleChanged = !Objects.equals(existing.getValidateRule(), field.getValidateRule());
 
-        // 如果字段名称变化或validate_rule变化，需要先处理CHECK约束
-        if (fieldNameChanged || validateRuleChanged) {
-            try {
-                String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
+        // 每次编辑字段时都检查并处理CHECK约束
+        // 确保物理表中存在与validate_rule匹配的约束
+        try {
+            String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
 
-                // 生成旧约束名
-                String oldConstraintName = "ck_" + tableName + "_" + existing.getFieldName();
+            // 生成旧约束名
+            String oldConstraintName = "ck_" + tableName + "_" + existing.getFieldName();
 
-                // 先删除旧的CHECK约束（如果存在）
-                String dropOldSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + oldConstraintName + "`";
-                // 执行删除旧约束的SQL语句（忽略失败，因为约束可能不存在）
-                sqlExecuteService.executeSql(dropOldSql, true);
-            } catch (Exception e) {
-                // 记录错误日志，但不影响主流程
-                logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "删除旧CHECK约束失败", e.getMessage());
-            }
+            // 先删除旧的CHECK约束（如果存在）
+            String dropOldSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + oldConstraintName + "`";
+            // 执行删除旧约束的SQL语句（忽略失败，因为约束可能不存在）
+            sqlExecuteService.executeSql(dropOldSql, true);
+        } catch (Exception e) {
+            // 记录错误日志，但不影响主流程
+            logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "删除旧CHECK约束失败", e.getMessage());
         }
 
         // 生成并执行ALTER TABLE语句
         try {
-            String alterSql;
-            String operationType;
+            // 检查是否是主键字段
+            boolean isPrimaryKey = "primary_key".equals(field.getFormComponent()) || "id".equals(field.getFieldName()) || "uuid".equals(field.getFieldName());
+            
+            // 对于主键字段，由于在数据库层面已经是NOT NULL的，只需要更新元数据即可
+            // 避免执行ALTER TABLE操作导致外键约束错误
+            if (!isPrimaryKey) {
+                String alterSql;
+                String operationType;
 
-            // 检查字段名称是否发生了变化
-            if (fieldNameChanged) {
-                // 字段名称发生了变化，执行CHANGE COLUMN语句
-                alterSql = codeGeneratorService.generateAlterTableChangeColumnSQL(field.getTableCode(), existing.getFieldName(), field);
-                operationType = "ALTER_TABLE_CHANGE_COLUMN";
+                // 检查字段名称是否发生了变化
+                if (fieldNameChanged) {
+                    // 字段名称发生了变化，执行CHANGE COLUMN语句
+                    alterSql = codeGeneratorService.generateAlterTableChangeColumnSQL(field.getTableCode(), existing.getFieldName(), field);
+                    operationType = "ALTER_TABLE_CHANGE_COLUMN";
+                } else {
+                    // 字段名称没有变化，执行MODIFY COLUMN语句
+                    alterSql = codeGeneratorService.generateAlterTableModifyColumnSQL(field.getTableCode(), field);
+                    operationType = "ALTER_TABLE_MODIFY_COLUMN";
+                }
+
+                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
+                if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
+                    throw new RuntimeException("执行" + operationType + "失败: " + sqlResult.get("message"));
+                }
+                logService.logSuccess("admin", operationType, "执行" + operationType + "成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
             } else {
-                // 字段名称没有变化，执行MODIFY COLUMN语句
-                alterSql = codeGeneratorService.generateAlterTableModifyColumnSQL(field.getTableCode(), field);
-                operationType = "ALTER_TABLE_MODIFY_COLUMN";
+                // 主键字段只更新元数据，不执行ALTER TABLE操作
+                // 因为主键在数据库层面已经是NOT NULL的，只需要更新元数据即可
+                logService.logSuccess("admin", "UPDATE_PRIMARY_KEY_FIELD", "更新主键字段元数据成功: " + field.getFieldCode());
             }
-
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
-            if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw new RuntimeException("执行" + operationType + "失败: " + sqlResult.get("message"));
-            }
-            logService.logSuccess("admin", operationType, "执行" + operationType + "成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
         } catch (Exception e) {
             logService.logError("admin", "ALTER_TABLE_OPERATION", "执行ALTER TABLE操作失败", e.getMessage());
             throw new RuntimeException("执行ALTER TABLE操作失败: " + e.getMessage());
         }
 
-        // 如果字段名称变化或validate_rule变化，添加新的CHECK约束
-        if (fieldNameChanged || validateRuleChanged) {
-            try {
-                String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
+        // 每次编辑字段时都检查并处理CHECK约束
+        // 确保物理表中存在与validate_rule匹配的约束
+        try {
+            String tableName = codeGeneratorService.convertToTableName(field.getTableCode());
 
-                // 生成新的约束名
-                String newConstraintName = "ck_" + tableName + "_" + field.getFieldName();
+            // 生成新的约束名
+            String newConstraintName = "ck_" + tableName + "_" + field.getFieldName();
 
-                // 生成删除新CHECK约束的SQL语句（以防万一，确保没有重复约束）
-                String dropNewSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + newConstraintName + "`";
-                // 执行删除新约束的SQL语句（忽略失败，因为约束可能不存在）
-                sqlExecuteService.executeSql(dropNewSql, true);
+            // 生成删除新CHECK约束的SQL语句（以防万一，确保没有重复约束）
+            String dropNewSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + newConstraintName + "`";
+            // 执行删除新约束的SQL语句（忽略失败，因为约束可能不存在）
+            sqlExecuteService.executeSql(dropNewSql, true);
 
-                // 生成新的CHECK约束
-                String checkConstraint = codeGeneratorService.generateCheckConstraint(field);
+            // 生成新的CHECK约束
+            String checkConstraint = codeGeneratorService.generateCheckConstraint(field);
 
-                // 如果有新的CHECK约束，执行添加新CHECK约束的SQL语句
-                if (checkConstraint != null && !checkConstraint.isEmpty()) {
-                    String addSql = "ALTER TABLE `" + tableName + "` ADD CONSTRAINT `" + newConstraintName + "` " + checkConstraint;
-                    Map<String, Object> addResult = sqlExecuteService.executeSql(addSql, true);
-                    if (Boolean.TRUE.equals(addResult.get("success"))) {
-                        logService.logSuccess("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束成功: " + newConstraintName);
-                    } else {
-                        logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", String.valueOf(addResult.get("message")));
-                    }
+            // 如果有新的CHECK约束，执行添加新CHECK约束的SQL语句
+            if (checkConstraint != null && !checkConstraint.isEmpty()) {
+                String addSql = "ALTER TABLE `" + tableName + "` ADD CONSTRAINT `" + newConstraintName + "` " + checkConstraint;
+                Map<String, Object> addResult = sqlExecuteService.executeSql(addSql, true);
+                if (Boolean.TRUE.equals(addResult.get("success"))) {
+                    logService.logSuccess("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束成功: " + newConstraintName);
+                } else {
+                    logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", String.valueOf(addResult.get("message")));
                 }
-            } catch (Exception e) {
-                // 记录错误日志，但不影响主流程
-                logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", e.getMessage());
             }
+        } catch (Exception e) {
+            // 记录错误日志，但不影响主流程
+            logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束失败", e.getMessage());
         }
 
         // 更新数据库记录（将ALTER TABLE和CHECK约束操作放在前面，确保syncTableFields先执行）
@@ -279,8 +288,8 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息）
         MetadataField latestField = fieldMapper.selectByCode(field.getTableCode(), field.getFieldCode());
 
-        // 合并message字段到最新的校验规则中
-        mergeMessageIntoValidateRule(field, latestField, oldMessage);
+        // 合并用户新设置的message字段到最新的校验规则中
+        mergeMessageIntoValidateRule(field, latestField, newMessage);
     }
 
     /**

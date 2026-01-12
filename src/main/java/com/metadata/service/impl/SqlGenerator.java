@@ -255,13 +255,44 @@ public class SqlGenerator {
         String fieldType = field.getFieldType();
         Map<String, Object> validationRules = CodeGenUtils.parseValidationRule(field.getValidateRule());
         
-        // 转换长度限制
-        if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
+        // 处理ENUM类型：如果字段类型是ENUM，需要从validate_rule中提取values生成完整的ENUM定义
+        if (fieldType != null && fieldType.toUpperCase().equals("ENUM")) {
+            if (validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
+                String operator = (String) validationRules.get("operator");
+                if ("IN".equalsIgnoreCase(operator) && validationRules.containsKey("values")) {
+                    Object valuesObj = validationRules.get("values");
+                    if (valuesObj instanceof JSONArray) {
+                        JSONArray valuesArray = (JSONArray) valuesObj;
+                        StringBuilder enumDef = new StringBuilder("ENUM(");
+                        for (int i = 0; i < valuesArray.size(); i++) {
+                            if (i > 0) {
+                                enumDef.append(",");
+                            }
+                            String value = valuesArray.getString(i);
+                            // 转义单引号
+                            value = value.replace("'", "''");
+                            enumDef.append("'").append(value).append("'");
+                        }
+                        enumDef.append(")");
+                        fieldType = enumDef.toString();
+                    }
+                }
+            }
+            // 如果无法从validate_rule中提取values，保持原样（可能是数据库已有完整定义）
+        }
+        
+        // 转换长度限制：仅当fieldType不包含括号（即没有指定长度）时，才考虑使用validationRules中的maxLength
+        if (fieldType != null && fieldType.indexOf('(') == -1 && validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
             Number maxLengthNum = CodeGenUtils.convertToNumber(validationRules.get("maxLength"));
             Integer maxLength = maxLengthNum != null ? maxLengthNum.intValue() : null;
             if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
                 fieldType = "VARCHAR(" + maxLength + ")";
             }
+        }
+        
+        // 确保fieldType不为null
+        if (fieldType == null) {
+            fieldType = "VARCHAR(255)"; // 默认类型
         }
         
         sql.append(fieldType);
@@ -299,13 +330,44 @@ public class SqlGenerator {
         String fieldType = field.getFieldType();
         Map<String, Object> validationRules = CodeGenUtils.parseValidationRule(field.getValidateRule());
         
-        // 转换长度限制
-        if (validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
+        // 处理ENUM类型：如果字段类型是ENUM，需要从validate_rule中提取values生成完整的ENUM定义
+        if (fieldType != null && fieldType.toUpperCase().equals("ENUM")) {
+            if (validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
+                String operator = (String) validationRules.get("operator");
+                if ("IN".equalsIgnoreCase(operator) && validationRules.containsKey("values")) {
+                    Object valuesObj = validationRules.get("values");
+                    if (valuesObj instanceof JSONArray) {
+                        JSONArray valuesArray = (JSONArray) valuesObj;
+                        StringBuilder enumDef = new StringBuilder("ENUM(");
+                        for (int i = 0; i < valuesArray.size(); i++) {
+                            if (i > 0) {
+                                enumDef.append(",");
+                            }
+                            String value = valuesArray.getString(i);
+                            // 转义单引号
+                            value = value.replace("'", "''");
+                            enumDef.append("'").append(value).append("'");
+                        }
+                        enumDef.append(")");
+                        fieldType = enumDef.toString();
+                    }
+                }
+            }
+            // 如果无法从validate_rule中提取values，保持原样（可能是数据库已有完整定义）
+        }
+        
+        // 转换长度限制：仅当fieldType不包含括号（即没有指定长度）时，才考虑使用validationRules中的maxLength
+        if (fieldType != null && fieldType.indexOf('(') == -1 && validationRules.containsKey("hasLength") && (Boolean) validationRules.get("hasLength")) {
             Number maxLengthNum = CodeGenUtils.convertToNumber(validationRules.get("maxLength"));
             Integer maxLength = maxLengthNum != null ? maxLengthNum.intValue() : null;
             if (maxLength != null && fieldType.toLowerCase().contains("varchar")) {
                 fieldType = "VARCHAR(" + maxLength + ")";
             }
+        }
+        
+        // 确保fieldType不为null
+        if (fieldType == null) {
+            fieldType = "VARCHAR(255)"; // 默认类型
         }
         
         sql.append(fieldType);

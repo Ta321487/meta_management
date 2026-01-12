@@ -4,21 +4,23 @@
 
 CREATE TABLE IF NOT EXISTS `${tableName}` (
 <#list fields as field>
-  <#-- 对于主键字段，根据策略使用不同的列名 -->
-  <#if field.fieldName == 'id'>
-    <#if table.pkStrategy == 'UUID'>
-    `uuid` ${field.fieldType}<#if field.isRequired == 1> NOT NULL</#if> COMMENT '${field.label}'<#if field_has_next>,</#if>
-    <#else>
-    `id` ${field.fieldType}<#if field.isRequired == 1> NOT NULL</#if><#if table.pkStrategy == 'AUTO'> AUTO_INCREMENT</#if> COMMENT '${field.label}'<#if field_has_next>,</#if>
-    </#if>
+  <#-- 对于主键字段，根据策略添加AUTO_INCREMENT -->
+  <#if field.formComponent == 'primary_key'>
+  `${field.fieldName}` ${field.fieldType}<#if field.isRequired == 1> NOT NULL</#if><#if table.pkStrategy == 'AUTO'> AUTO_INCREMENT</#if> COMMENT '${field.label}'<#if field_has_next>,</#if>
   <#else>
   `${field.fieldName}` ${field.fieldType}<#if field.isRequired == 1> NOT NULL</#if> COMMENT '${field.label}'<#if field_has_next>,</#if>
   </#if>
 </#list>
-  <#if table.pkStrategy == 'UUID'>
-  ,PRIMARY KEY (`uuid`)
-  <#else>
-  ,PRIMARY KEY (`id`)
+  <#-- 动态生成主键约束 -->
+  <#assign primaryKeyFieldName = ''>
+  <#list fields as field>
+    <#if field.formComponent == 'primary_key'>
+      <#assign primaryKeyFieldName = field.fieldName>
+      <#break>
+    </#if>
+  </#list>
+  <#if primaryKeyFieldName != ''>
+  ,PRIMARY KEY (`${primaryKeyFieldName}`)
   </#if>
   <#-- 添加CHECK约束 -->
   <#if checkConstraints?has_content>

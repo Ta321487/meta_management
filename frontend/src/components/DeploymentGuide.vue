@@ -85,6 +85,26 @@
                 <td>项目根目录</td>
                 <td>Maven依赖配置</td>
               </tr>
+              <tr>
+                <td>Result.java</td>
+                <td>src/main/java/your/package/common/</td>
+                <td>统一响应结果类</td>
+              </tr>
+              <tr>
+                <td>PageRequest.java</td>
+                <td>src/main/java/your/package/common/</td>
+                <td>分页请求类</td>
+              </tr>
+              <tr>
+                <td>PageResult.java</td>
+                <td>src/main/java/your/package/common/</td>
+                <td>分页结果类</td>
+              </tr>
+              <tr>
+                <td>MyBatisConfig.java</td>
+                <td>src/main/java/your/package/config/</td>
+                <td>MyBatis配置类</td>
+              </tr>
             </tbody>
           </table>
         </div>

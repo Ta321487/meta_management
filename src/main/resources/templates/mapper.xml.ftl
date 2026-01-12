@@ -6,7 +6,7 @@
 
     <resultMap id="BaseResultMap" type="${packageName}.entity.${className}">
         <#list fields as field>
-            <#if field.field.fieldName == 'id'>
+            <#if field.field.formComponent == 'primary_key'>
             <id column="<#if table.pkStrategy == 'UUID'>uuid<#else>${field.field.fieldName}</#if>" property="${field.camelCaseName}"/>
             </#if>
         </#list>
@@ -14,6 +14,29 @@
             <#if field.field.fieldName != 'id'>
             <result column="${field.field.fieldName}" property="${field.camelCaseName}"/>
             </#if>
+        </#list>
+        
+        <#-- 添加关联实体映射 -->
+        <#list fields as field>
+        <#if field.isForeignKey!false>
+            <association property="${field.relatedTableCamelCaseName}" javaType="${packageName}.entity.${field.relatedTableClassName}" fetchType="lazy">
+                <id column="${field.relatedTableCamelCaseName}_id" property="id"/>
+                <#-- 这里只映射id字段，需要在关联查询时添加其他字段的映射 -->
+            </association>
+        </#if>
+        </#list>
+    </resultMap>
+    
+    <#-- 关联查询结果映射 -->
+    <resultMap id="AssociationResultMap" type="${packageName}.entity.${className}" extends="BaseResultMap">
+        <#list fields as field>
+        <#if field.isForeignKey!false>
+            <association property="${field.relatedTableCamelCaseName}" javaType="${packageName}.entity.${field.relatedTableClassName}" fetchType="lazy">
+                <id column="${field.relatedTableCamelCaseName}_id" property="id"/>
+                <result column="${field.relatedTableCamelCaseName}_${field.relatedTableFieldName}" property="${field.relatedTableFieldName}"/>
+                <#-- 可以根据需要添加更多关联实体字段映射 -->
+            </association>
+        </#if>
         </#list>
     </resultMap>
 

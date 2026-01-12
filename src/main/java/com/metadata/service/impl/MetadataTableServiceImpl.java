@@ -69,52 +69,52 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         }
         // 先创建元数据记录
         tableMapper.insert(table);
-        
+
         // 检查是否有字段配置
         List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
-        
+
         // 如果没有字段，根据主键策略自动创建一个主键字段
-            if (fields.isEmpty()) {
-                MetadataField primaryKeyField = new MetadataField();
-                primaryKeyField.setFieldCode("ID");
-                primaryKeyField.setTableCode(table.getTableCode());
-                // 根据主键策略设置不同的字段名
-                if ("UUID".equals(table.getPkStrategy())) {
-                    primaryKeyField.setFieldName("uuid");
-                    primaryKeyField.setLabel("主键UUID");
-                } else {
-                    primaryKeyField.setFieldName("id");
-                    primaryKeyField.setLabel("主键ID");
-                }
-                primaryKeyField.setSort(0);
-                
-                // 根据主键策略设置字段类型和表单组件
-                if ("AUTO".equals(table.getPkStrategy())) {
-                    // 自增主键：不需要表单组件，但在数据库层面是必填的
-                    primaryKeyField.setFieldType("BIGINT");
-                    primaryKeyField.setFormComponent("primary_key"); // 自增字段使用primary_key表单组件
-                    primaryKeyField.setIsRequired(1); // 主键在数据库层面必须是必填的
-                } else if ("UUID".equals(table.getPkStrategy())) {
-                    primaryKeyField.setFieldType("VARCHAR(36)");
-                    primaryKeyField.setFormComponent("primary_key"); // UUID字段使用primary_key表单组件
-                    primaryKeyField.setIsRequired(1);
-                    // UUID默认值通过SQL模板设置，这里不需要额外设置
-                } else {
-                    // 默认使用 BIGINT
-                    primaryKeyField.setFieldType("BIGINT");
-                    primaryKeyField.setFormComponent("primary_key"); // 其他主键使用primary_key表单组件
-                    primaryKeyField.setIsRequired(1);
-                }   
-                // 启用主键字段
-                primaryKeyField.setIsEnabled(1);
-                // 设置业务系统编码，与表保持一致
-                primaryKeyField.setBusinessCode(table.getBusinessCode());
-                
-                // 插入主键字段
+        if (fields.isEmpty()) {
+            MetadataField primaryKeyField = new MetadataField();
+            primaryKeyField.setFieldCode("ID");
+            primaryKeyField.setTableCode(table.getTableCode());
+            // 根据主键策略设置不同的字段名
+            if ("UUID".equals(table.getPkStrategy())) {
+                primaryKeyField.setFieldName("uuid");
+                primaryKeyField.setLabel("主键UUID");
+            } else {
+                primaryKeyField.setFieldName("id");
+                primaryKeyField.setLabel("主键ID");
+            }
+            primaryKeyField.setSort(0);
+
+            // 根据主键策略设置字段类型和表单组件
+            if ("AUTO".equals(table.getPkStrategy())) {
+                // 自增主键：不需要表单组件，但在数据库层面是必填的
+                primaryKeyField.setFieldType("BIGINT");
+                primaryKeyField.setFormComponent("primary_key"); // 自增字段使用primary_key表单组件
+                primaryKeyField.setIsRequired(1); // 主键在数据库层面必须是必填的
+            } else if ("UUID".equals(table.getPkStrategy())) {
+                primaryKeyField.setFieldType("VARCHAR(36)");
+                primaryKeyField.setFormComponent("primary_key"); // UUID字段使用primary_key表单组件
+                primaryKeyField.setIsRequired(1);
+                // UUID默认值通过SQL模板设置，这里不需要额外设置
+            } else {
+                // 默认使用 BIGINT
+                primaryKeyField.setFieldType("BIGINT");
+                primaryKeyField.setFormComponent("primary_key"); // 其他主键使用primary_key表单组件
+                primaryKeyField.setIsRequired(1);
+            }
+            // 启用主键字段
+            primaryKeyField.setIsEnabled(1);
+            // 设置业务系统编码，与表保持一致
+            primaryKeyField.setBusinessCode(table.getBusinessCode());
+
+            // 插入主键字段
             fieldMapper.insert(primaryKeyField);
             logService.logSuccess("admin", "AUTO_CREATE_PK_FIELD", "自动创建主键字段: " + table.getTableCode());
         }
-        
+
         // 生成并执行CREATE TABLE SQL
         try {
             String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode());
@@ -128,7 +128,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             logService.logError("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL失败: " + table.getTableCode(), e.getMessage());
             throw new RuntimeException("创建数据库表失败: " + e.getMessage());
         }
-        
+
         logService.logSuccess("admin", "ADD", "新增表：" + JSON.toJSONString(table));
     }
 
@@ -143,15 +143,15 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             throw new RuntimeException("表不存在");
         }
         table.setTableCode(existing.getTableCode()); // 编码不可修改
-        
+
         // 检查主键生成策略是否变更
         if (table.getPkStrategy() != null && !existing.getPkStrategy().equals(table.getPkStrategy())) {
             throw new RuntimeException("主键生成策略不允许修改，请删除表后重新创建");
         }
-        
+
         // 检查业务系统是否变更
         boolean businessSystemChanged = table.getBusinessCode() != null && !table.getBusinessCode().equals(existing.getBusinessCode());
-        
+
         // 检查表是否被禁用
         boolean isDisabled = table.getIsEnabled() != null && table.getIsEnabled() == 0 && existing.getIsEnabled() == 1;
         if (isDisabled) {
@@ -162,21 +162,21 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 logService.log("admin", "EDIT", "表被禁用且有关联模块: " + table.getTableCode() + ", 关联模块: " + String.join(",", moduleCodes), 0, "");
             }
         }
-        
+
         // 更新元数据记录
         tableMapper.update(table);
-        
+
         // 如果业务系统发生变化，更新表的所有字段的业务系统
         if (businessSystemChanged) {
             // 调用updateTableBusinessSystem方法更新表和字段的业务系统
             updateTableBusinessSystem(table.getTableCode(), table.getBusinessCode());
         }
-        
+
         // 如果表名或描述发生变化，更新数据库表的注释（通过ALTER TABLE COMMENT）
         // 注意：这里只更新注释，不执行其他ALTER TABLE操作（如DROP COLUMN等危险操作）
-        if (!existing.getTableName().equals(table.getTableName()) || 
-            (existing.getDescription() != null && !existing.getDescription().equals(table.getDescription())) ||
-            (table.getDescription() != null && !table.getDescription().equals(existing.getDescription()))) {
+        if (!existing.getTableName().equals(table.getTableName()) ||
+                (existing.getDescription() != null && !existing.getDescription().equals(table.getDescription())) ||
+                (table.getDescription() != null && !table.getDescription().equals(existing.getDescription()))) {
             try {
                 String tableName = convertToTableName(table.getTableCode());
                 String comment = table.getTableName();
@@ -188,8 +188,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql);
                 if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                     // 更新注释失败不影响元数据更新，只记录日志
-                    logService.logError("admin", "UPDATE_TABLE_COMMENT", "更新表注释失败: " + table.getTableCode(), 
-                        sqlResult.get("message").toString());
+                    logService.logError("admin", "UPDATE_TABLE_COMMENT", "更新表注释失败: " + table.getTableCode(),
+                            sqlResult.get("message").toString());
                 } else {
                     logService.logSuccess("admin", "UPDATE_TABLE_COMMENT", "更新表注释成功: " + table.getTableCode());
                 }
@@ -198,7 +198,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 logService.logError("admin", "UPDATE_TABLE_COMMENT", "更新表注释失败: " + table.getTableCode(), e.getMessage());
             }
         }
-        
+
         logService.logSuccess("admin", "EDIT", "更新表：" + JSON.toJSONString(table));
     }
 
@@ -212,10 +212,10 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (table == null) {
             throw new RuntimeException("表不存在");
         }
-        
+
         String tableCode = table.getTableCode();
         String tableName = convertToTableName(tableCode);
-        
+
         // 先执行DROP TABLE删除实际数据库表
         try {
             Map<String, Object> dropResult = sqlExecuteService.executeDropTable(tableName);
@@ -223,14 +223,14 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 logService.logSuccess("admin", "DROP_TABLE", "删除数据库表成功: " + tableCode);
             } else {
                 // DROP TABLE失败不影响元数据删除，只记录日志
-                logService.logError("admin", "DROP_TABLE", "删除数据库表失败: " + tableCode, 
-                    dropResult.get("message").toString());
+                logService.logError("admin", "DROP_TABLE", "删除数据库表失败: " + tableCode,
+                        dropResult.get("message").toString());
             }
         } catch (Exception e) {
             // DROP TABLE失败不影响元数据删除，只记录日志
             logService.logError("admin", "DROP_TABLE", "删除数据库表失败: " + tableCode, e.getMessage());
         }
-        
+
         // 删除字段
         fieldMapper.deleteByTableCode(tableCode);
         // 删除模块关联
@@ -288,26 +288,26 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     public List<MetadataTable> listByModuleCode(String moduleCode, String businessCode) {
         // 1. 获取模块直接关联的表
         List<MetadataTable> directTables = tableMapper.selectByModuleCode(moduleCode, businessCode);
-        
+
         // 2. 如果没有直接关联的表，直接返回空列表
         if (directTables == null || directTables.isEmpty()) {
             return new ArrayList<>();
         }
-        
+
         // 3. 创建一个Set用于存储所有相关表的编码，确保唯一性
         Set<String> tableCodeSet = new HashSet<>();
         List<MetadataTable> allTables = new ArrayList<>();
-        
+
         // 4. 添加直接关联的表到结果列表和Set中
         for (MetadataTable table : directTables) {
             allTables.add(table);
             tableCodeSet.add(table.getTableCode());
         }
-        
+
         // 5. 遍历直接关联的表，查找与它们有外键关联的其他表
         for (MetadataTable table : directTables) {
             String currentTableCode = table.getTableCode();
-            
+
             // 获取当前表作为主表的所有关联关系（主表 -> 从表）
             List<MetadataTableRelation> mainRelations = relationService.listByMainTableCode(currentTableCode, businessCode);
             for (MetadataTableRelation relation : mainRelations) {
@@ -321,7 +321,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                     }
                 }
             }
-            
+
             // 获取当前表作为从表的所有关联关系（从表 <- 主表）
             List<MetadataTableRelation> slaveRelations = relationService.listBySlaveTableCode(currentTableCode, businessCode);
             for (MetadataTableRelation relation : slaveRelations) {
@@ -336,7 +336,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 }
             }
         }
-        
+
         return allTables;
     }
 
@@ -351,20 +351,20 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (table == null) {
             throw new RuntimeException("表不存在");
         }
-        
+
         // 更新表的业务系统
         table.setBusinessCode(businessCode);
         tableMapper.update(table);
-        
+
         // 更新表关联的所有字段的业务系统
         fieldMapper.updateFieldsBusinessSystemByTable(tableCode, businessCode);
-        
+
         // 更新该表作为主表的所有关联关系的业务系统编码
         relationMapper.updateRelationBusinessSystemByMainTable(tableCode, businessCode);
-        
+
         // 更新该表作为从表的所有关联关系的业务系统编码
         relationMapper.updateRelationBusinessSystemBySlaveTable(tableCode, businessCode);
-        
+
         logService.logSuccess("admin", "EDIT", "更新表业务系统：" + tableCode + " -> " + businessCode);
     }
 
@@ -377,7 +377,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (tableCodes == null || tableCodes.isEmpty()) {
             throw new RuntimeException("表编码列表不能为空");
         }
-        
+
         for (String tableCode : tableCodes) {
             updateTableBusinessSystem(tableCode, businessCode);
         }
@@ -393,7 +393,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         }
         return tableMapper.selectByCodes(tableCodes);
     }
-    
+
     /**
      * 批量更新表状态
      */
@@ -413,7 +413,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         }
         logService.logSuccess("admin", "BATCH_EDIT", "批量更新表状态：ids=" + ids + ", status=" + status);
     }
-    
+
     /**
      * 工具方法：转换为表名（下划线）
      */
@@ -421,7 +421,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 将 TABLE_CODE 转换为 table_code
         return code.toLowerCase().replace("_TABLE", "");
     }
-    
+
     /**
      * 工具方法：转义SQL字符串中的单引号
      */
