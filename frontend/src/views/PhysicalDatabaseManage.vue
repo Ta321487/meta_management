@@ -8,7 +8,7 @@
         </div>
       </template>
       <el-alert
-        title="在这里维护要在数据库里使用的库名，方便和业务配置对上号。打开「保存时建库」后，点保存会尝试在服务器上创建这个库（已有则不会重复创建）。删除只是删掉这条登记，不会动服务器里真正的库；如果别的地方还在用这个库名，需要先把引用改掉再删。"
+        title="在这里维护要在数据库里使用的库名，方便和业务配置对上号。打开「保存时建库」后，点保存会尝试在服务器上创建这个库（已有则不会重复创建）。删除时会清理元数据里对该库名的引用；若选择同时删服务器库，将执行 DROP DATABASE，库内数据不可恢复。"
         type="info"
         :closable="false"
         style="margin-bottom: 16px"
@@ -77,7 +77,7 @@
         <el-form-item label="保存时建库">
           <el-switch v-model="form.syncToInstance" :active-value="1" :inactive-value="0" />
           <div class="el-form-item__help" style="color: #909399; margin-top: 8px;">
-            打开后，保存本条登记时会顺便在服务器上建这个库（没有才建，有就跳过）
+            打开后，保存时会顺便在服务器上建这个库（没有才建，有就跳过）
           </div>
         </el-form-item>
         <el-form-item label="启用">
@@ -249,20 +249,53 @@ export default {
       }
     }
 
-    const handleDelete = (row) => {
-      ElMessageBox.confirm('确定删除「' + row.catalogName + '」这条登记吗？不会删除服务器上的库。', '提示', {
-        type: 'warning'
-      })
-        .then(async () => {
-          try {
-            await deletePhysicalDatabase({ id: row.id })
-            ElMessage.success('已删除')
-            loadData()
-          } catch (e) {
-            ElMessage.error(e.message || '删除失败，可能仍有配置在引用这个库名')
+    const handleDelete = async (row) => {
+      const name = row.catalogName
+      try {
+        await ElMessageBox.confirm(
+          `确定要删除库「${name}」吗？会清理元数据里对该库名的引用。`,
+          '提示',
+          { type: 'warning' }
+        )
+      } catch {
+        return
+      }
+
+      let dropOnInstance = false
+      try {
+        await ElMessageBox.confirm(
+          `是否在服务器上同时删除库「${name}」？库内数据不可恢复。`,
+          '提示',
+          {
+            type: 'warning',
+            confirmButtonText: '同时删服务器库',
+            cancelButtonText: '仅删配置',
+            distinguishCancelAndClose: true
           }
-        })
-        .catch(() => {})
+        )
+        try {
+          await ElMessageBox.confirm(
+            `再次确认：将删除服务器上的库「${name}」，此操作不可恢复。`,
+            '提示',
+            { type: 'warning', confirmButtonText: '确定删除' }
+          )
+          dropOnInstance = true
+        } catch {
+          return
+        }
+      } catch (action) {
+        if (action !== 'cancel') {
+          return
+        }
+      }
+
+      try {
+        await deletePhysicalDatabase(row.id, dropOnInstance)
+        ElMessage.success(dropOnInstance ? '已删除，服务器库已一并删除' : '删除成功')
+        loadData()
+      } catch (e) {
+        ElMessage.error(e.message || '删除失败')
+      }
     }
 
     const handleSync = async (row) => {

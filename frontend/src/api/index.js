@@ -123,10 +123,11 @@ export const associateModulesToBusinessSystem = (data) => request.post('/busines
 export const disassociateModulesFromBusinessSystem = (data) => request.post('/businessSystem/disassociateModules', data)
 export const getAssociatedModules = (businessCode) => request.get(`/businessSystem/associatedModules/${businessCode}`)
 
-// 物理库登记
+// 物理库
 export const getPhysicalDatabaseList = () => request.get('/physicalDatabase/list')
 export const addPhysicalDatabase = (data) => request.post('/physicalDatabase/add', data)
 export const updatePhysicalDatabase = (data) => request.post('/physicalDatabase/update', data)
-export const deletePhysicalDatabase = (data) => request.delete(`/physicalDatabase/delete/${data.id}`)
+export const deletePhysicalDatabase = (id, dropOnInstance = false) =>
+  request.delete(`/physicalDatabase/delete/${id}`, { params: { dropOnInstance } })
 export const syncPhysicalDatabase = (id) => request.post(`/physicalDatabase/sync/${id}`)
 

@@ -12,6 +12,7 @@ package com.metadata.common.codes;
  *   <li>13xx — 模块（预留）</li>
  *   <li>14xx — 表关联 / 外键同步等</li>
  *   <li>15xx — SQL 执行工具</li>
+ *   <li>16xx — 物理库登记</li>
  *   <li>90xx — 认证 / 会话</li>
  *   <li>98xx — 通用请求与数据约束</li>
  *   <li>99xx — 系统内部错误</li>
@@ -66,6 +67,19 @@ public final class AppErrorCodes {
 
     // ---------- SQL 工具 15xx ----------
     public static final int SQL_TEXT_EMPTY = 1501;
+
+    // ---------- 物理库登记 16xx ----------
+    /** 物理库登记记录不存在 */
+    public static final int PHYSICAL_DB_REGISTRATION_NOT_FOUND = 1601;
+    /** 物理库名非法或校验失败 */
+    public static final int PHYSICAL_DB_CATALOG_INVALID = 1602;
+    /** 库名已登记 */
+    public static final int PHYSICAL_DB_NAME_DUPLICATE = 1603;
+    /** 级联删除表或元数据时失败（事务将回滚） */
+    public static final int PHYSICAL_DB_CASCADE_FAILED = 1604;
+
+    /** 在实例上删除物理库失败 */
+    public static final int PHYSICAL_DB_DROP_FAILED = 1605;
 
     // ---------- 认证 90xx ----------
     public static final int AUTH_SESSION_REQUIRED = 9001;

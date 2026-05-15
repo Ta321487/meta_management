@@ -35,6 +35,13 @@
         WHERE database_name IS NOT NULL AND TRIM(database_name) &lt;&gt; ''
           AND LOWER(TRIM(database_name)) = LOWER(TRIM(#{databaseName}))
     </select>
+
+    <update id="clearDatabaseNameByDatabaseName">
+        UPDATE metadata_business_system
+        SET database_name = NULL
+        WHERE database_name IS NOT NULL AND TRIM(database_name) &lt;&gt; ''
+          AND LOWER(TRIM(database_name)) = LOWER(TRIM(#{databaseName}))
+    </update>
     
     <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessSystem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_business_system (

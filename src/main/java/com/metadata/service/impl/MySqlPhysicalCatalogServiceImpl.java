@@ -6,10 +6,13 @@ import com.metadata.service.MySqlPhysicalCatalogService;
 import com.metadata.service.OperationLogService;
 import com.metadata.service.constant.SqlConstants;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+
+import com.metadata.util.JdbcCatalogUrlRewriter;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -18,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
@@ -36,6 +40,13 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
         CHARSET_TO_COLLATIONS.put("utf8", List.of("utf8_unicode_ci", "utf8_general_ci"));
         CHARSET_TO_COLLATIONS.put("latin1", List.of("latin1_swedish_ci", "latin1_general_ci"));
     }
+
+    private static final Set<String> SYSTEM_CATALOGS = Set.of(
+            "information_schema", "mysql", "performance_schema", "sys"
+    );
+
+    @Value("${spring.datasource.url:}")
+    private String datasourceUrl;
 
     @Autowired
     private DataSource dataSource;
@@ -84,6 +95,38 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
             throw new RuntimeException("物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
         }
         runEnsure(cat, charsetName, collationName);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    public void dropCatalogIfExists(String catalogName) {
+        if (catalogName == null || catalogName.trim().isEmpty()) {
+            return;
+        }
+        String cat = catalogName.trim();
+        if (!isValidCatalogName(cat)) {
+            throw new RuntimeException("物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
+        }
+        assertCatalogDroppable(cat);
+        String escaped = cat.replace("`", "``");
+        String ddl = "DROP DATABASE IF EXISTS `" + escaped + "`";
+        try (Connection connection = dataSource.getConnection();
+             Statement statement = connection.createStatement()) {
+            statement.executeUpdate(ddl);
+            logService.logSuccess("admin", SqlConstants.LOG_MODULE_SQL_EXECUTE, "删除服务器物理库: " + cat);
+        } catch (Exception e) {
+            throw new RuntimeException("删除服务器物理库失败: " + e.getMessage(), e);
+        }
+    }
+
+    private void assertCatalogDroppable(String catalogName) {
+        String lower = catalogName.toLowerCase(Locale.ROOT);
+        if (SYSTEM_CATALOGS.contains(lower)) {
+            throw new RuntimeException("不允许删除系统库: " + catalogName);
+        }
+        if (JdbcCatalogUrlRewriter.sameCatalog(datasourceUrl, catalogName)) {
+            throw new RuntimeException("不允许删除元数据管理库: " + catalogName);
+        }
     }
 
     private void runEnsure(String catalogNameTrimmed, String charsetName, String collationName) {

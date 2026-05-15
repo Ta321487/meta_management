@@ -12,7 +12,7 @@ public interface MetadataPhysicalDatabaseService {
 
     void update(MetadataPhysicalDatabase row);
 
-    void delete(Long id);
+    void delete(Long id, boolean dropOnInstance);
 
     /** 对已登记库在实例上执行 CREATE IF NOT EXISTS */
     void syncToInstance(Long id);

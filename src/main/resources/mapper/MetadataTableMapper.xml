@@ -124,5 +124,12 @@
           AND LOWER(TRIM(database_name)) = LOWER(TRIM(#{databaseName}))
     </select>
 
+    <select id="selectByDatabaseName" resultMap="BaseResultMap">
+        SELECT * FROM metadata_table
+        WHERE database_name IS NOT NULL AND TRIM(database_name) &lt;&gt; ''
+          AND LOWER(TRIM(database_name)) = LOWER(TRIM(#{databaseName}))
+        ORDER BY id ASC
+    </select>
+
 </mapper>
 

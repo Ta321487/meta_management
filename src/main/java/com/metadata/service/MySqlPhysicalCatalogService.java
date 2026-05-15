@@ -16,7 +16,12 @@ public interface MySqlPhysicalCatalogService {
     void ensureCatalogExists(String catalogName);
 
     /**
-     * 按指定字符集与排序规则建库（须为系统允许的组合），用于登记表尚未写入库时的同步。
+     * 按指定字符集与排序规则建库（须为系统允许的组合），用于库配置尚未写入时的同步。
      */
     void ensureCatalogExists(String catalogName, String charsetName, String collationName);
+
+    /**
+     * 若库在实例上存在则删除（DROP DATABASE）；禁止删除元数据库与系统库。
+     */
+    void dropCatalogIfExists(String catalogName);
 }

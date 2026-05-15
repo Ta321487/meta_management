@@ -97,5 +97,10 @@ public interface MetadataTableRelationMapper {
      * @return 更新的记录数
      */
     int updateRelationBusinessSystemBySlaveTable(@Param("slaveTableCode") String slaveTableCode, @Param("businessCode") String businessCode);
+
+    /**
+     * 删除主表或从表编码涉及该表的所有关联（删除表元数据前调用）
+     */
+    int deleteByTableCodeEitherSide(@Param("tableCode") String tableCode);
 }
 

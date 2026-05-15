@@ -42,11 +42,12 @@ public class MetadataPhysicalDatabaseController {
     }
 
     @DeleteMapping("/delete/{id}")
-    @Operation(summary = "删除登记")
-    public Result<?> delete(@Parameter(description = "主键") @PathVariable Long id) {
-        physicalDatabaseService.delete(id);
+    @Operation(summary = "删除库")
+    public Result<?> delete(
+            @Parameter(description = "主键") @PathVariable Long id,
+            @Parameter(description = "是否同时在服务器上 DROP DATABASE") @RequestParam(defaultValue = "false") boolean dropOnInstance) {
+        physicalDatabaseService.delete(id, dropOnInstance);
         return Result.success();
-
     }
 
     @PostMapping("/sync/{id}")

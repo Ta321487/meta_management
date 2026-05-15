@@ -78,5 +78,10 @@ public interface MetadataTableMapper {
      * 表级物理库名与参数一致（忽略大小写、首尾空格）的表数量
      */
     int countByDatabaseName(@Param("databaseName") String databaseName);
+
+    /**
+     * 表级物理库名与参数一致（忽略大小写、首尾空格）的表列表
+     */
+    List<MetadataTable> selectByDatabaseName(@Param("databaseName") String databaseName);
 }
 

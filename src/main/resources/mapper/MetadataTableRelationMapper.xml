@@ -123,5 +123,11 @@
         WHERE slave_table_code = #{slaveTableCode}
     </update>
 
+    <delete id="deleteByTableCodeEitherSide">
+        DELETE FROM metadata_table_relation
+        WHERE main_table_code = #{tableCode}
+           OR slave_table_code = #{tableCode}
+    </delete>
+
 </mapper>
 

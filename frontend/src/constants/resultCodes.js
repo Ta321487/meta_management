@@ -1,6 +1,6 @@
 /**
  * 与后端 AppErrorCodes 对齐的应用层业务码（非 HTTP 状态码）。
- * 分段：10xx 表、11xx 字段、12xx 业务系统、14xx 关联、15xx SQL、90xx 认证、98xx 通用、99xx 系统。
+ * 分段：10xx 表、11xx 字段、12xx 业务系统、14xx 关联、15xx SQL、16xx 物理库登记、90xx 认证、98xx 通用、99xx 系统。
  */
 export const RESULT_OK = 200
 
@@ -30,6 +30,12 @@ export const RELATION_OPERATION_FAILED = 1401
 export const RELATION_FK_SYNC_FAILED = 1402
 
 export const SQL_TEXT_EMPTY = 1501
+
+export const PHYSICAL_DB_REGISTRATION_NOT_FOUND = 1601
+export const PHYSICAL_DB_CATALOG_INVALID = 1602
+export const PHYSICAL_DB_NAME_DUPLICATE = 1603
+export const PHYSICAL_DB_CASCADE_FAILED = 1604
+export const PHYSICAL_DB_DROP_FAILED = 1605
 
 /** 未登录或会话失效（JSON body 业务码，非浏览器「页面 404」） */
 export const AUTH_SESSION_REQUIRED = 9001

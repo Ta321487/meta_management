@@ -48,4 +48,9 @@ public interface MetadataBusinessSystemMapper {
      * 默认物理库名与参数一致（忽略大小写、首尾空格）的业务系统数量
      */
     int countByDatabaseName(@Param("databaseName") String databaseName);
+
+    /**
+     * 将默认物理库名等于指定库名的业务系统记录的 database_name 置空（用于删除物理库登记前解除引用）
+     */
+    int clearDatabaseNameByDatabaseName(@Param("databaseName") String databaseName);
 }
