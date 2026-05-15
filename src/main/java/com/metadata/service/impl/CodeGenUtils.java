@@ -108,6 +108,29 @@ public class CodeGenUtils {
     }
 
     /**
+     * 主键字段在 Java/Vue 中使用的驼峰属性名（与 Entity 模板一致）；无 primary_key 标记时默认 id。
+     */
+    public static String getPrimaryKeyCamelCase(List<MetadataField> fields) {
+        if (fields == null || fields.isEmpty()) {
+            return "id";
+        }
+        for (MetadataField field : fields) {
+            if (field.getIsEnabled() != null && field.getIsEnabled() == 0) {
+                continue;
+            }
+            if (!"primary_key".equals(field.getFormComponent())) {
+                continue;
+            }
+            String camelCaseName = convertToCamelCase(field.getFieldName(), false);
+            if (JAVA_KEYWORDS.contains(camelCaseName)) {
+                camelCaseName = "_" + camelCaseName;
+            }
+            return camelCaseName;
+        }
+        return "id";
+    }
+
+    /**
      * 准备字段列表，添加转换后的属性
      *
      * @param fields 字段列表

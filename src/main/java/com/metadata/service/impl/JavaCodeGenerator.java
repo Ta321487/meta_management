@@ -171,11 +171,13 @@ public class JavaCodeGenerator {
         }
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
         data.put("packageName", packageName);
         data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
         data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
@@ -209,13 +211,15 @@ public class JavaCodeGenerator {
         }
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
         // 获取表相关的业务规则
         List<Map<String, Object>> businessRules = getTableBusinessRules(tableCode, businessCode);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
         data.put("packageName", packageName);
         data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
         data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
@@ -260,13 +264,15 @@ public class JavaCodeGenerator {
             }
 
             List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-            List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+            List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+            List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
             // 获取表相关的业务规则
             List<Map<String, Object>> businessRules = getTableBusinessRules(tableCode, businessCode);
 
             Map<String, Object> data = new HashMap<>();
             data.put("table", table);
             data.put("fields", fieldList);
+            data.put("relations", relations);
             data.put("packageName", packageName);
             data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
             data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
@@ -302,11 +308,13 @@ public class JavaCodeGenerator {
         }
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
         data.put("packageName", packageName);
         data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
         data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
@@ -341,11 +349,13 @@ public class JavaCodeGenerator {
         }
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
         data.put("packageName", packageName);
         data.put("className", CodeGenUtils.convertToClassName(table.getTableCode()));
         data.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));

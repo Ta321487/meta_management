@@ -65,12 +65,20 @@
       >
         <el-table-column type="selection" width="55" />
 <#list fields as field>
+        <#if field.isForeignKey!false>
+        <el-table-column label="${field.field.label}" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ ${field.camelCaseName}FkLabel(row) }}
+          </template>
+        </el-table-column>
+        <#else>
         <el-table-column 
           prop="${field.camelCaseName}" 
           label="${field.field.label}"
           sortable="custom"
           @sort-change="(sort) => handleSortChange('${field.camelCaseName}', sort)"
         />
+        </#if>
 </#list>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
@@ -148,7 +156,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ${componentName}Api } from '../api'
+import { ${componentName}Api<#list relatedLoadTargets as rt>, ${rt.relatedTableClassName}Api</#list> } from '../api'
 
 export default {
   name: '${componentName}List',
@@ -180,6 +188,34 @@ export default {
       ${field.camelCaseName}: <#if field.field.fieldType?contains("int")>null<#elseif field.field.fieldType?contains("date")>null<#else>''</#if>,
 </#list>
     })
+
+    <#list relatedLoadTargets as rt>
+    const ${rt.relatedTableCamelCaseName}List = ref([])
+    </#list>
+
+    <#list relatedLoadTargets as rt>
+    const load${rt.relatedTableClassName}Data = async () => {
+      try {
+        const res = await ${rt.relatedTableClassName}Api.list()
+        const raw = res.data
+        ${rt.relatedTableCamelCaseName}List.value = Array.isArray(raw) ? raw : (raw && raw.records ? raw.records : [])
+      } catch (e) {
+        ${rt.relatedTableCamelCaseName}List.value = []
+      }
+    }
+    </#list>
+
+    <#list fields as field>
+    <#if field.isForeignKey!false>
+    const ${field.camelCaseName}FkLabel = (row) => {
+      const val = row.${field.camelCaseName}
+      if (val === null || val === undefined || val === '') return ''
+      const list = ${field.relatedTableCamelCaseName}List.value
+      const item = list.find(i => i.id === val || String(i.id) === String(val) || i.${field.relatedTableFieldName} === val || String(i.${field.relatedTableFieldName}) === String(val))
+      return item != null ? String(item.${field.relatedTableFieldName}) : String(val)
+    }
+    </#if>
+    </#list>
     
     const rules = {
 <#list fields as field>
@@ -317,7 +353,7 @@ export default {
       await formRef.value.validate(async (valid) => {
         if (valid) {
           try {
-            if (form.id) {
+            if (form.${primaryKeyCamelCase}) {
               await ${componentName}Api.update(form)
             } else {
               await ${componentName}Api.add(form)
@@ -339,7 +375,7 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          await ${componentName}Api.delete(row.id)
+          await ${componentName}Api.delete({ id: row.${primaryKeyCamelCase} })
           ElMessage.success('删除成功')
           loadData()
         } catch (error) {
@@ -362,8 +398,8 @@ export default {
         type: 'warning'
       }).then(async () => {
         try {
-          const ids = multipleSelection.value.map(row => row.id)
-          await ${componentName}Api.batchDelete(ids)
+          const ids = multipleSelection.value.map(row => row.${primaryKeyCamelCase})
+          await ${componentName}Api.batchDelete({ ids })
           ElMessage.success('批量删除成功')
           loadData()
         } catch (error) {
@@ -383,7 +419,10 @@ export default {
       formRef.value?.resetFields()
     }
 
-    onMounted(() => {
+    onMounted(async () => {
+      <#list relatedLoadTargets as rt>
+      await load${rt.relatedTableClassName}Data()
+      </#list>
       loadData()
     })
 
@@ -411,7 +450,9 @@ export default {
       handleDelete,
       handleBatchDelete,
       handleSelectionChange,
-      handleDialogClose
+      handleDialogClose<#list relatedLoadTargets as rt>,
+      ${rt.relatedTableCamelCaseName}List</#list><#list fields as field><#if field.isForeignKey!false>,
+      ${field.camelCaseName}FkLabel</#if></#list>
     }
   }
 }

@@ -201,8 +201,8 @@ export default {
             try {
               const params = { ${ruleField.fieldName}: value };
               // 更新时排除自身
-              if (form.id) {
-                params.id = form.id;
+              if (form.${primaryKeyCamelCase}) {
+                params.${primaryKeyCamelCase} = form.${primaryKeyCamelCase};
               }
               const res = await ${componentName}Api.checkUnique(params);
               if (res.code === 200 && !res.data) {
@@ -271,8 +271,8 @@ export default {
           </#list>
         }
         // 更新时排除自身
-        if (form.id) {
-          params.id = form.id;
+        if (form.${primaryKeyCamelCase}) {
+          params.${primaryKeyCamelCase} = form.${primaryKeyCamelCase};
         }
         const res = await ${componentName}Api.checkUniqueCombo(params)
         if (res.code === 200 && res.data) {
@@ -298,7 +298,7 @@ export default {
             return
           }
           try {
-            if (form.id) {
+            if (form.${primaryKeyCamelCase}) {
               await ${componentName}Api.update(form)
             } else {
               await ${componentName}Api.add(form)

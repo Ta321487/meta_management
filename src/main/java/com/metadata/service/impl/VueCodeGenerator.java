@@ -74,17 +74,37 @@ public class VueCodeGenerator {
             throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
         }
 
-        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
-        // 过滤掉主键字段，列表页通常不显示主键
-        fields = fields.stream()
+        List<MetadataField> allFields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(allFields);
+        List<MetadataField> fields = allFields.stream()
+                // 过滤掉主键字段，列表页通常不显示主键
                 .filter(f -> !"primary_key".equals(f.getFormComponent()))
                 .collect(Collectors.toList());
 
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields);
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
+
+        // 去重：多个外键指向同一主表时只生成一份主表 list 与一次加载
+        List<Map<String, Object>> relatedLoadTargets = new ArrayList<>();
+        java.util.Set<String> seenRelatedClasses = new java.util.HashSet<>();
+        for (Map<String, Object> fm : fieldList) {
+            if (Boolean.TRUE.equals(fm.get("isForeignKey"))) {
+                String cls = (String) fm.get("relatedTableClassName");
+                if (cls != null && seenRelatedClasses.add(cls)) {
+                    Map<String, Object> row = new HashMap<>();
+                    row.put("relatedTableClassName", cls);
+                    row.put("relatedTableCamelCaseName", fm.get("relatedTableCamelCaseName"));
+                    relatedLoadTargets.add(row);
+                }
+            }
+        }
 
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("relations", relations);
+        data.put("relatedLoadTargets", relatedLoadTargets);
+        data.put("primaryKeyCamelCase", primaryKeyCamelCase);
         data.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
         data.put("businessCode", businessCode);
         data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
@@ -109,6 +129,7 @@ public class VueCodeGenerator {
         }
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(fields);
         // 获取表关联关系
         List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
         List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
@@ -118,6 +139,7 @@ public class VueCodeGenerator {
         Map<String, Object> data = new HashMap<>();
         data.put("table", table);
         data.put("fields", fieldList);
+        data.put("primaryKeyCamelCase", primaryKeyCamelCase);
         data.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
         data.put("businessCode", businessCode);
         data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
