@@ -51,26 +51,44 @@ public class ConfigGenerator {
      * @throws CodeGenException 代码生成异常
      */
     public String generateApplicationConfig(String packageName) throws CodeGenException {
-        return "# Spring Boot 应用配置\n" +
-                "spring:\n" +
-                "  application:\n" +
-                "    name: application\n" +
-                "  datasource:\n" +
-                "    # 数据库连接配置\n" +
-                "    url: jdbc:mysql://localhost:3306/your_database?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true\n" +
-                "    username: root\n" +
-                "    password: your_password\n" +
-                "    driver-class-name: com.mysql.cj.jdbc.Driver\n" +
-                "\n" +
-                "# 服务器配置\n" +
-                "server:\n" +
-                "  port: 8080\n" +
-                "\n" +
-                "# 日志配置\n" +
-                "logging:\n" +
-                "  level:\n" +
-                "    root: INFO\n" +
-                "    " + packageName + ": DEBUG\n";
+        return generateApplicationConfig(packageName, false);
+    }
+
+    public String generateApplicationConfig(String packageName, boolean captchaEnabled) throws CodeGenException {
+        StringBuilder sb = new StringBuilder();
+        sb.append("# Spring Boot 应用配置\n");
+        sb.append("spring:\n");
+        sb.append("  application:\n");
+        sb.append("    name: application\n");
+        sb.append("  datasource:\n");
+        sb.append("    # 数据库连接配置\n");
+        sb.append("    url: jdbc:mysql://localhost:3306/your_database?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true\n");
+        sb.append("    username: root\n");
+        sb.append("    password: your_password\n");
+        sb.append("    driver-class-name: com.mysql.cj.jdbc.Driver\n");
+        sb.append("\n");
+        sb.append("# 服务器配置\n");
+        sb.append("server:\n");
+        sb.append("  port: 8080\n");
+        sb.append("\n");
+        sb.append("# 日志配置\n");
+        sb.append("logging:\n");
+        sb.append("  level:\n");
+        sb.append("    root: INFO\n");
+        sb.append("    ").append(packageName).append(": DEBUG\n");
+        if (captchaEnabled) {
+            sb.append("\n");
+            sb.append("# 认证扩展包（验证码 + Session 登录）\n");
+            sb.append("app:\n");
+            sb.append("  auth:\n");
+            sb.append("    default-username: admin\n");
+            sb.append("    default-password: admin123\n");
+            sb.append("  captcha:\n");
+            sb.append("    enabled: true\n");
+            sb.append("    length: 4\n");
+            sb.append("    expire-seconds: 300\n");
+        }
+        return sb.toString();
     }
 
     /**

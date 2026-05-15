@@ -17,6 +17,7 @@ import com.metadata.service.exception.CodeGenException;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -623,5 +624,25 @@ public class JavaCodeGenerator {
                 "        this.records = records;\n" +
                 "    }\n" +
                 "}";
+    }
+
+    /**
+     * 生成认证扩展包（字符型验证码 + Session 登录）
+     */
+    public Map<String, String> generateAuthExtension(String packageName, boolean captchaEnabled) throws CodeGenException {
+        if (!captchaEnabled) {
+            return Map.of();
+        }
+        Map<String, Object> data = new HashMap<>();
+        data.put("packageName", packageName);
+        Map<String, String> files = new LinkedHashMap<>();
+        files.put("CaptchaService.java", templateManager.processTemplate("auth-extension/captcha-service.java.ftl", data));
+        files.put("AuthService.java", templateManager.processTemplate("auth-extension/auth-service.java.ftl", data));
+        files.put("AuthServiceImpl.java", templateManager.processTemplate("auth-extension/auth-service-impl.java.ftl", data));
+        files.put("AuthController.java", templateManager.processTemplate("auth-extension/auth-controller.java.ftl", data));
+        files.put("LoginRequest.java", templateManager.processTemplate("auth-extension/login-request.java.ftl", data));
+        files.put("LoginInterceptor.java", templateManager.processTemplate("auth-extension/login-interceptor.java.ftl", data));
+        files.put("InterceptorConfig.java", templateManager.processTemplate("auth-extension/interceptor-config.java.ftl", data));
+        return files;
     }
 }

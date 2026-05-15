@@ -101,6 +101,18 @@
       />
     </el-tab-pane>
 
+    <el-tab-pane v-if="codeMap.captchaInput" label="验证码组件" name="captchaInput">
+      <CodeContainer
+        code-type="captchaInput"
+        :code="codeMap.captchaInput"
+        :show-download="true"
+        placeholder="请勾选「字符型验证码」后生成"
+        @refresh="handleRefresh"
+        @copy="handleCopy"
+        @download="handleDownload"
+      />
+    </el-tab-pane>
+
     <el-tab-pane label=".env配置" name="env">
       <CodeContainer
         code-type="env"

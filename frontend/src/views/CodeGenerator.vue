@@ -108,6 +108,8 @@ import {
   generateMyBatisConfig,
   generatePomXml,
   generateAuth,
+  generateCaptchaInput,
+  generateAuthExtension,
   getRelationsBySlave
 } from '../api'
 
@@ -130,7 +132,8 @@ const form = reactive({
   businessCode: '',
   tableCode: '',
   packageName: 'com.example',
-  useInterface: false
+  useInterface: false,
+  captchaEnabled: false
 });
 
 // 业务系统列表
@@ -163,6 +166,9 @@ const codeMap = reactive({
   api: '',
   requestJs: '',
   auth: '',
+  captchaInput: '',
+  authController: '',
+  captchaService: '',
   env: '',
   result: '',
   pageRequest: '',
@@ -436,7 +442,7 @@ const handleGenerate = async (type) => {
         }
         break
       case 'applicationYml':
-        let resAppYml = await generateApplicationYml(form.packageName)
+        let resAppYml = await generateApplicationYml(form.packageName, form.captchaEnabled)
         if (resAppYml.code === 200) {
           codeMap.applicationYml = resAppYml.data
         }
@@ -472,9 +478,22 @@ const handleGenerate = async (type) => {
         }
         break
       case 'auth':
-        let resAuth = await generateAuth()
+        let resAuth = await generateAuth(form.captchaEnabled)
         if (resAuth.code === 200) {
           codeMap.auth = resAuth.data
+        }
+        break
+      case 'captchaInput':
+        let resCaptchaInput = await generateCaptchaInput()
+        if (resCaptchaInput.code === 200) {
+          codeMap.captchaInput = resCaptchaInput.data
+        }
+        break
+      case 'authController':
+        let resAuthExt = await generateAuthExtension(form.packageName, form.captchaEnabled)
+        if (resAuthExt.code === 200 && resAuthExt.data) {
+          codeMap.authController = resAuthExt.data['AuthController.java'] || ''
+          codeMap.captchaService = resAuthExt.data['CaptchaService.java'] || ''
         }
         break
       case 'env':
@@ -484,7 +503,7 @@ const handleGenerate = async (type) => {
         }
         break
       case 'login':
-        res = await generateLoginPage(form.businessCode)
+        res = await generateLoginPage(form.businessCode, form.captchaEnabled)
         if (res.code === 200) {
           codeMap.login = res.data
         }
@@ -504,7 +523,7 @@ const handleGenerateCurrentTable = async () => {
   }
 
   try {
-    const res = await generateAll(form.tableCode, form.packageName, form.businessCode, form.useInterface)
+    const res = await generateAll(form.tableCode, form.packageName, form.businessCode, form.useInterface, form.captchaEnabled)
     if (res.code === 200 && res.data) {
       const data = res.data
       codeMap.sql = data['create_table.sql'] || ''
@@ -530,6 +549,10 @@ const handleGenerateCurrentTable = async () => {
       codeMap.pageRequest = data['PageRequest.java'] || ''
       codeMap.pageResult = data['PageResult.java'] || ''
       codeMap.pomXml = data['pom.xml'] || ''
+      codeMap.auth = data['auth.js'] || codeMap.auth
+      codeMap.captchaInput = data['CaptchaInput.vue'] || ''
+      codeMap.authController = data['AuthController.java'] || ''
+      codeMap.captchaService = data['CaptchaService.java'] || ''
       ElMessage.success('代码生成成功')
     }
   } catch (error) {
@@ -637,7 +660,7 @@ const runTest = async () => {
 
   try {
     ElMessage.info('正在测试代码...')
-    const res = await testCode(form.tableCode, form.packageName)
+    const res = await testCode(form.tableCode, form.packageName, form.businessCode, form.useInterface, form.captchaEnabled)
     if (res.code === 200) {
       testResult.value = res.data
       if (res.data.success) {

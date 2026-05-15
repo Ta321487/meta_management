@@ -124,7 +124,11 @@
           </el-select>
         </el-form-item>
         <el-form-item label="物理库名">
-          <el-input v-model="form.databaseName" placeholder="留空则用业务系统默认库；填写则保存/建表前自动建库（若不存在）" clearable />
+          <el-input v-model="form.databaseName" placeholder="留空=用上方业务系统的默认物理库" clearable />
+          <div class="database-name-hint">
+            填写时：仅本表使用该 MySQL 库名（覆盖业务系统默认）。新增表并执行建表 SQL 时，若该库在实例上不存在，会先自动
+            <code>CREATE DATABASE IF NOT EXISTS</code>（库名须为 1–64 位字母、数字、下划线或 <code>$</code>）。仅保存元数据、不触发建表时不会建库。
+          </div>
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" />
@@ -559,6 +563,20 @@ export default {
 
 .search-form {
   margin-bottom: 20px;
+}
+
+.database-name-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+}
+
+.database-name-hint code {
+  font-size: 11px;
+  padding: 0 3px;
+  background: #f4f4f5;
+  border-radius: 2px;
 }
 </style>
 

@@ -112,6 +112,26 @@
         @copy="handleCopy"
       />
     </el-tab-pane>
+
+    <el-tab-pane v-if="codeMap.authController" label="AuthController" name="authController">
+      <CodeContainer
+        code-type="authController"
+        :code="codeMap.authController"
+        placeholder="请勾选「字符型验证码」后生成"
+        @refresh="handleRefresh"
+        @copy="handleCopy"
+      />
+    </el-tab-pane>
+
+    <el-tab-pane v-if="codeMap.captchaService" label="CaptchaService" name="captchaService">
+      <CodeContainer
+        code-type="captchaService"
+        :code="codeMap.captchaService"
+        placeholder="请勾选「字符型验证码」后生成"
+        @refresh="handleRefresh"
+        @copy="handleCopy"
+      />
+    </el-tab-pane>
   </el-tabs>
 </template>
 

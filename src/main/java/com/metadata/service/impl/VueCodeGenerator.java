@@ -213,10 +213,35 @@ public class VueCodeGenerator {
      * @return 前端认证API文件代码
      * @throws CodeGenException 代码生成异常
      */
-    public String generateAuth() throws CodeGenException {
+    public String generateAuth(boolean captchaEnabled) throws CodeGenException {
         Map<String, Object> data = new HashMap<>();
-        
+        data.put("captchaEnabled", captchaEnabled);
         return templateManager.processTemplate("auth.js.ftl", data);
+    }
+
+    public String generateAuth() throws CodeGenException {
+        return generateAuth(false);
+    }
+    
+    /**
+     * 生成登录页
+     * @param businessCode 业务系统编码
+     * @return 登录页代码
+     * @throws CodeGenException 代码生成异常
+     */
+    public String generateLoginPage(String businessCode, boolean captchaEnabled) throws CodeGenException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("businessCode", businessCode);
+        data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+        data.put("captchaEnabled", captchaEnabled);
+        return templateManager.processTemplate("login.vue.ftl", data);
+    }
+
+    /**
+     * 生成验证码输入组件
+     */
+    public String generateCaptchaInput() throws CodeGenException {
+        return templateManager.processTemplate("auth-extension/captcha-input.vue.ftl", new HashMap<>());
     }
     
     /**
@@ -226,11 +251,7 @@ public class VueCodeGenerator {
      * @throws CodeGenException 代码生成异常
      */
     public String generateLoginPage(String businessCode) throws CodeGenException {
-        Map<String, Object> data = new HashMap<>();
-        data.put("businessCode", businessCode);
-        data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
-        
-        return templateManager.processTemplate("login.vue.ftl", data);
+        return generateLoginPage(businessCode, false);
     }
     
     /**

@@ -187,8 +187,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成登录页")
     public Result<String> generateLoginPage(
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) throws Exception {
-        String code = codeGeneratorService.generateLoginPage(businessCode);
+            @RequestParam(required = false) String businessCode,
+            @Parameter(description = "是否生成验证码扩展")
+            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+        String code = codeGeneratorService.generateLoginPage(businessCode, captchaEnabled);
         return Result.success(code);
 
     }
@@ -205,8 +207,10 @@ public class CodeGeneratorController {
             @Parameter(description = "业务系统编码")
             @RequestParam(required = false) String businessCode,
             @Parameter(description = "是否使用接口模式生成Service")
-            @RequestParam(defaultValue = "false") boolean useInterface) throws Exception {
-        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface);
+            @RequestParam(defaultValue = "false") boolean useInterface,
+            @Parameter(description = "是否生成验证码认证扩展包")
+            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled);
         return Result.success(codeMap);
 
     }
@@ -338,10 +342,32 @@ public class CodeGeneratorController {
      */
     @GetMapping("/common/auth")
     @Operation(summary = "生成认证API文件")
-    public Result<String> generateAuth() throws Exception {
-        String code = codeGeneratorService.generateAuth();
+    public Result<String> generateAuth(
+            @Parameter(description = "是否包含验证码 API")
+            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+        String code = codeGeneratorService.generateAuth(captchaEnabled);
         return Result.success(code);
 
+    }
+
+    /**
+     * 生成验证码输入组件
+     */
+    @GetMapping("/vue/captchaInput")
+    @Operation(summary = "生成验证码输入组件")
+    public Result<String> generateCaptchaInput() throws Exception {
+        return Result.success(codeGeneratorService.generateCaptchaInput());
+    }
+
+    /**
+     * 生成认证扩展包（后端）
+     */
+    @GetMapping("/auth-extension")
+    @Operation(summary = "生成认证扩展包（验证码 + Session 登录）")
+    public Result<Map<String, String>> generateAuthExtension(
+            @RequestParam String packageName,
+            @RequestParam(defaultValue = "true") boolean captchaEnabled) throws Exception {
+        return Result.success(codeGeneratorService.generateAuthExtension(packageName, captchaEnabled));
     }
     
     /**
@@ -388,8 +414,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成application.yml配置文件")
     public Result<String> generateApplicationYml(
             @Parameter(description = "包名")
-            @RequestParam String packageName) throws Exception {
-        String code = codeGeneratorService.generateApplicationConfig(packageName);
+            @RequestParam String packageName,
+            @Parameter(description = "是否包含验证码配置")
+            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+        String code = codeGeneratorService.generateApplicationConfig(packageName, captchaEnabled);
         return Result.success(code);
 
     }

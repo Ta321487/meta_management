@@ -166,6 +166,26 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         return vueCodeGenerator.generateAuth();
     }
 
+    @Override
+    public String generateAuth(boolean captchaEnabled) throws Exception {
+        return vueCodeGenerator.generateAuth(captchaEnabled);
+    }
+
+    @Override
+    public String generateLoginPage(String businessCode, boolean captchaEnabled) throws Exception {
+        return vueCodeGenerator.generateLoginPage(businessCode, captchaEnabled);
+    }
+
+    @Override
+    public String generateCaptchaInput() throws Exception {
+        return vueCodeGenerator.generateCaptchaInput();
+    }
+
+    @Override
+    public Map<String, String> generateAuthExtension(String packageName, boolean captchaEnabled) throws Exception {
+        return javaCodeGenerator.generateAuthExtension(packageName, captchaEnabled);
+    }
+
     /**
      * 生成前端request.js工具类
      */
@@ -203,7 +223,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
      * 生成完整的代码包（包含所有文件）
      */
     @Override
-    public Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception {
+    public Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface, boolean captchaEnabled) throws Exception {
         // 为businessCode设置默认值，避免null值传递给模板
         businessCode = businessCode == null ? "DEFAULT" : businessCode;
 
@@ -232,10 +252,22 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         codeMap.put("Form.vue", vueCodeGenerator.generateVueForm(tableCode, businessCode));
         // 生成登录页
         try {
-            codeMap.put("Login.vue", vueCodeGenerator.generateLoginPage(businessCode));
+            codeMap.put("Login.vue", vueCodeGenerator.generateLoginPage(businessCode, captchaEnabled));
         } catch (Exception e) {
-            // 不阻塞主流程，记录但仍返回其他文件
             codeMap.put("Login.vue", "<!-- 生成登录页失败: " + e.getMessage() + " -->");
+        }
+        if (captchaEnabled) {
+            try {
+                codeMap.put("auth.js", vueCodeGenerator.generateAuth(true));
+                codeMap.put("CaptchaInput.vue", vueCodeGenerator.generateCaptchaInput());
+            } catch (Exception e) {
+                codeMap.put("CaptchaInput.vue", "<!-- 生成验证码组件失败: " + e.getMessage() + " -->");
+            }
+            try {
+                codeMap.putAll(javaCodeGenerator.generateAuthExtension(packageName, true));
+            } catch (Exception e) {
+                codeMap.put("AuthController.java", "// 生成认证扩展包失败: " + e.getMessage());
+            }
         }
         // 生成路由配置（供客户集成到前端）
         try {
@@ -269,7 +301,7 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         // 生成Spring Boot启动类
         codeMap.put("Application.java", configGenerator.generateApplication(packageName));
         // 生成application.yml配置文件
-        codeMap.put("application.yml", configGenerator.generateApplicationConfig(packageName));
+        codeMap.put("application.yml", configGenerator.generateApplicationConfig(packageName, captchaEnabled));
         // 生成MyBatis配置类
         codeMap.put("MyBatisConfig.java", configGenerator.generateMyBatisConfig(packageName));
         // 生成CORS配置类
@@ -441,6 +473,11 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
     @Override
     public String generateApplicationConfig(String packageName) throws Exception {
         return configGenerator.generateApplicationConfig(packageName);
+    }
+
+    @Override
+    public String generateApplicationConfig(String packageName, boolean captchaEnabled) throws Exception {
+        return configGenerator.generateApplicationConfig(packageName, captchaEnabled);
     }
 
     /**

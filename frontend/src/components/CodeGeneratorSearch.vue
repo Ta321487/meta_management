@@ -54,6 +54,22 @@
       </el-col>
     </el-row>
 
+    <el-row>
+      <el-col :span="24">
+        <el-form-item label="认证扩展">
+          <div class="mode-container">
+            <el-switch
+              v-model="formData.captchaEnabled"
+              active-text="字符型验证码"
+              inactive-text="不生成验证码"
+              @change="handleCaptchaEnabledChange"
+            />
+            <span class="mode-tip">（勾选后生成 CaptchaService、AuthController、CaptchaInput.vue 等）</span>
+          </div>
+        </el-form-item>
+      </el-col>
+    </el-row>
+
     <div class="form-actions">
       <el-button type="primary" @click="handleGenerateCode">
         <el-icon style="margin-right: 4px"><Finished /></el-icon>
@@ -76,7 +92,8 @@ const props = defineProps({
       businessCode: '',
       tableCode: '',
       packageName: '',
-      useInterface: false
+      useInterface: false,
+      captchaEnabled: false
     })
   },
   businessSystems: { type: Array, default: () => [] },
@@ -104,6 +121,10 @@ const handleBusinessSystemChange = (value) => {
 };
 
 const handleUseInterfaceChange = (value) => {
+  emit('update:form', { ...formData.value });
+};
+
+const handleCaptchaEnabledChange = () => {
   emit('update:form', { ...formData.value });
 };
 

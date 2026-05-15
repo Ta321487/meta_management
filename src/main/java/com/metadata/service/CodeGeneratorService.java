@@ -156,9 +156,13 @@ public interface CodeGeneratorService {
     String generateIntegratedRoutes(String businessCode) throws Exception;
 
     /**
-     * 生成完整的代码包（包含所有文件）
+     * 生成完整的代码包（包含所有文件，可选验证码扩展包）
      */
-    Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception;
+    Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface, boolean captchaEnabled) throws Exception;
+
+    default Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception {
+        return generateAll(tableCode, packageName, businessCode, useInterface, false);
+    }
 
     /**
      * 生成完整的代码包（包含所有文件）（默认业务系统）
@@ -261,6 +265,8 @@ public interface CodeGeneratorService {
      */
     String generateApplicationConfig(String packageName) throws Exception;
 
+    String generateApplicationConfig(String packageName, boolean captchaEnabled) throws Exception;
+
     /**
      * 生成MyBatis配置类
      */
@@ -286,6 +292,8 @@ public interface CodeGeneratorService {
      */
     String generateLoginPage(String businessCode) throws Exception;
 
+    String generateLoginPage(String businessCode, boolean captchaEnabled) throws Exception;
+
     /**
      * 生成前端API请求文件
      */
@@ -295,6 +303,18 @@ public interface CodeGeneratorService {
      * 生成前端认证API文件
      */
     String generateAuth() throws Exception;
+
+    String generateAuth(boolean captchaEnabled) throws Exception;
+
+    /**
+     * 生成验证码输入组件
+     */
+    String generateCaptchaInput() throws Exception;
+
+    /**
+     * 生成认证扩展包（后端 Java 文件）
+     */
+    Map<String, String> generateAuthExtension(String packageName, boolean captchaEnabled) throws Exception;
 
     /**
      * 生成pom.xml配置文件

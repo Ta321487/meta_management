@@ -72,13 +72,15 @@ export const generateMapper = (tableCode, packageName, businessCode) => request.
 export const generateMapperXml = (tableCode, packageName, businessCode) => request.get(`/codegen/mapperxml/${tableCode}`, { params: { packageName, businessCode } })
 export const generateVueList = (tableCode, businessCode) => request.get(`/codegen/vue/list/${tableCode}`, { params: { businessCode } })
 export const generateVueForm = (tableCode, businessCode) => request.get(`/codegen/vue/form/${tableCode}`, { params: { businessCode } })
-export const generateLoginPage = (businessCode) => request.get(`/codegen/vue/login`, { params: { businessCode } })
+export const generateLoginPage = (businessCode, captchaEnabled = false) => request.get(`/codegen/vue/login`, { params: { businessCode, captchaEnabled } })
 export const generateApi = (tableCode, businessCode) => request.get(`/codegen/api/${tableCode}`, { params: { businessCode } })
 export const generateRequestJs = () => request.get(`/codegen/common/requestJs`)
-export const generateAuth = () => request.get(`/codegen/common/auth`)
+export const generateAuth = (captchaEnabled = false) => request.get(`/codegen/common/auth`, { params: { captchaEnabled } })
+export const generateCaptchaInput = () => request.get(`/codegen/vue/captchaInput`)
+export const generateAuthExtension = (packageName, captchaEnabled = true) => request.get(`/codegen/auth-extension`, { params: { packageName, captchaEnabled } })
 export const generateEnvFile = () => request.get(`/codegen/common/env`) 
 export const generateCorsConfig = (packageName) => request.get(`/codegen/common/corsConfig`, { params: { packageName } })
-export const generateAll = (tableCode, packageName, businessCode, useInterface) => request.get(`/codegen/all/${tableCode}`, { params: { packageName, businessCode, useInterface } })
+export const generateAll = (tableCode, packageName, businessCode, useInterface, captchaEnabled = false) => request.get(`/codegen/all/${tableCode}`, { params: { packageName, businessCode, useInterface, captchaEnabled } })
 export const generateRoutes = (tableCode, businessCode) => request.get(`/codegen/routes/${tableCode}`, { params: { businessCode } })
 export const generateIntegratedRoutes = (businessCode) => request.get(`/codegen/routes/integrated/${businessCode}`)
 export const generateAllByBusinessSystem = (businessCode, packageName, useInterface) => request.get(`/codegen/allByBusinessSystem/${businessCode}`, { params: { packageName, useInterface } })
@@ -87,12 +89,13 @@ export const generateResult = (packageName) => request.get(`/codegen/common/resu
 export const generatePageRequest = (packageName) => request.get(`/codegen/common/pageRequest`, { params: { packageName } })
 export const generatePageResult = (packageName) => request.get(`/codegen/common/pageResult`, { params: { packageName } })
 export const generateApplication = (packageName) => request.get(`/codegen/common/application`, { params: { packageName } })
-export const generateApplicationYml = (packageName) => request.get(`/codegen/common/applicationYml`, { params: { packageName } })
+export const generateApplicationYml = (packageName, captchaEnabled = false) => request.get(`/codegen/common/applicationYml`, { params: { packageName, captchaEnabled } })
 export const generateMyBatisConfig = (packageName) => request.get(`/codegen/common/mybatisConfig`, { params: { packageName } })
 export const generatePomXml = (packageName) => request.get(`/codegen/common/pomXml`, { params: { packageName } })
 
 // 代码测试相关
-export const testCode = (tableCode, packageName) => request.get(`/codetest/test/${tableCode}`, { params: { packageName } })
+export const testCode = (tableCode, packageName, businessCode, useInterface, captchaEnabled) =>
+  request.get(`/codetest/test/${tableCode}`, { params: { packageName, businessCode, useInterface, captchaEnabled } })
 
 // 模块类型相关
 export const getModuleTypeList = () => request.get('/moduleType/list')

@@ -32,9 +32,11 @@ public class CodeTestController {
     public Result<Map<String, Object>> testCode(
             @Parameter(description = "表编码") @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
-            @RequestParam(required = false) String businessCode) throws Exception {
-        // 生成所有代码
-        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, false);
+            @RequestParam(required = false) String businessCode,
+            @RequestParam(defaultValue = "false") boolean useInterface,
+            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+        // 生成所有代码（与代码生成页开关一致，便于测试验证码扩展包）
+        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled);
 
         // 构造测试结果
         Map<String, Object> result = new HashMap<>();
@@ -53,6 +55,15 @@ public class CodeTestController {
         testConfigMap.put("List.vue", Map.of("name", "列表页", "type", "Vue组件"));
         testConfigMap.put("Form.vue", Map.of("name", "表单页", "type", "Vue组件"));
         testConfigMap.put("routes.js", Map.of("name", "路由配置", "type", "前端配置"));
+        testConfigMap.put("auth.js", Map.of("name", "认证 API", "type", "前端配置"));
+        testConfigMap.put("CaptchaInput.vue", Map.of("name", "验证码组件", "type", "Vue组件"));
+        testConfigMap.put("AuthController.java", Map.of("name", "认证控制器", "type", "Java代码"));
+        testConfigMap.put("CaptchaService.java", Map.of("name", "验证码服务", "type", "Java代码"));
+        testConfigMap.put("AuthService.java", Map.of("name", "认证服务接口", "type", "Java代码"));
+        testConfigMap.put("AuthServiceImpl.java", Map.of("name", "认证服务实现", "type", "Java代码"));
+        testConfigMap.put("LoginRequest.java", Map.of("name", "登录请求 DTO", "type", "Java代码"));
+        testConfigMap.put("LoginInterceptor.java", Map.of("name", "登录拦截器", "type", "Java代码"));
+        testConfigMap.put("InterceptorConfig.java", Map.of("name", "拦截器配置", "type", "Java代码"));
 
         // 验证生成的每种代码类型
         for (Map.Entry<String, String> entry : codeMap.entrySet()) {
