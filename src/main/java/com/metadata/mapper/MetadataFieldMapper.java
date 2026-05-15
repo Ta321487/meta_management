@@ -69,7 +69,14 @@ public interface MetadataFieldMapper {
     /**
      * 获取表的所有类型约束
      */
-    List<Map<String, Object>> selectAllConstraints(@Param("tableName") String tableName);
+    List<Map<String, Object>> selectAllConstraints(@Param("tableName") String tableName, @Param("tableSchema") String tableSchema);
+
+    /**
+     * 获取表的所有类型约束（当前连接库）
+     */
+    default List<Map<String, Object>> selectAllConstraints(String tableName) {
+        return selectAllConstraints(tableName, null);
+    }
     
     /**
      * 根据表编码更新字段的业务系统

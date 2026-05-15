@@ -73,5 +73,10 @@ public interface MetadataTableMapper {
     default List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes) {
         return selectByCodes(tableCodes, "");
     }
+
+    /**
+     * 表级物理库名与参数一致（忽略大小写、首尾空格）的表数量
+     */
+    int countByDatabaseName(@Param("databaseName") String databaseName);
 }
 

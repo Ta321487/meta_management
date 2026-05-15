@@ -23,6 +23,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Autowired
     private MetadataBusinessSystemMapper businessSystemMapper;
 
+    @Autowired
+    private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
     /**
      * 查询所有业务系统
      */
@@ -70,6 +73,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Override
     @Transactional
     public void update(MetadataBusinessSystem businessSystem) {
+        MetadataBusinessSystem old = businessSystemMapper.selectByCode(businessSystem.getBusinessCode());
         // 如果设置为默认系统，先将其他系统设置为非默认
         if (businessSystem.getIsDefault() != null && businessSystem.getIsDefault() == 1) {
             MetadataBusinessSystem defaultSystem = getDefault();
@@ -79,6 +83,12 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
             }
         }
         businessSystemMapper.update(businessSystem);
+        if (old != null && old.getDatabaseName() != null && !old.getDatabaseName().trim().isEmpty()) {
+            businessDataSourcePoolManager.evictCatalog(old.getDatabaseName());
+        }
+        if (businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
+            businessDataSourcePoolManager.evictCatalog(businessSystem.getDatabaseName());
+        }
     }
 
     /**
@@ -87,11 +97,15 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Override
     @Transactional
     public void delete(Long id) {
-        MetadataBusinessSystem businessSystem = businessSystemMapper.selectByCode("DEFAULT");
-        if (businessSystem != null && businessSystem.getId().equals(id)) {
+        MetadataBusinessSystem defaultRow = businessSystemMapper.selectByCode("DEFAULT");
+        if (defaultRow != null && defaultRow.getId().equals(id)) {
             throw new RuntimeException("默认业务系统不能删除");
         }
+        MetadataBusinessSystem toRemove = businessSystemMapper.selectById(id);
         businessSystemMapper.delete(id);
+        if (toRemove != null && toRemove.getDatabaseName() != null && !toRemove.getDatabaseName().trim().isEmpty()) {
+            businessDataSourcePoolManager.evictCatalog(toRemove.getDatabaseName());
+        }
     }
 
     /**

@@ -57,6 +57,9 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
     @Autowired
     private SqlExecuteService sqlExecuteService;
 
+    @Autowired
+    private BusinessCatalogResolver businessCatalogResolver;
+
     /**
      * 验证规则中的字段是否正确
      */
@@ -184,6 +187,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                 String tableCode = table.getTableCode();
                 // 获取表名
                 String tableName = codeGeneratorService.convertToTableName(tableCode);
+                String phyCatalog = businessCatalogResolver.resolveCatalog(table);
 
                 // 检查字段是否都存在于当前表中
                 List<MetadataField> tableFields = fieldMapper.selectByTableCode(tableCode, rule.getBusinessCode());
@@ -209,7 +213,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
 
                 // 先检查索引是否已经存在，如果存在则先删除
                 String checkIndexSql = "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' AND index_name = '" + indexName + "'";
-                Map<String, Object> checkResult = sqlExecuteService.executeSql(checkIndexSql, false);
+                Map<String, Object> checkResult = sqlExecuteService.executeSql(checkIndexSql, false, phyCatalog);
                 if (checkResult != null && Boolean.TRUE.equals(checkResult.get("success"))) {
                     List<Map<String, Object>> rows = (List<Map<String, Object>>) checkResult.get("data");
                     if (rows != null && !rows.isEmpty()) {
@@ -218,7 +222,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                         if (countObj != null && Integer.parseInt(countObj.toString()) > 0) {
                             // 索引已经存在，先删除它
                             String dropIndexSql = "ALTER TABLE `" + tableName + "` DROP INDEX `" + indexName + "`";
-                            sqlExecuteService.executeSql(dropIndexSql, true);
+                            sqlExecuteService.executeSql(dropIndexSql, true, phyCatalog);
                         }
                     }
                 }
@@ -227,7 +231,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
                 String alterSql = "ALTER TABLE `" + tableName + "` ADD UNIQUE KEY `" + indexName + "` (`" + String.join("`, `", uniqueFields) + "`)";
 
                 // 执行SQL语句
-                sqlExecuteService.executeSql(alterSql);
+                sqlExecuteService.executeSql(alterSql, false, phyCatalog);
             }
         } catch (Exception e) {
             // 如果生成或执行SQL失败，只记录日志，不影响规则保存

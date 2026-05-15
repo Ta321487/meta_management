@@ -41,4 +41,11 @@ public interface MetadataBusinessSystemMapper {
      * 删除业务系统
      */
     int delete(Long id);
+
+    MetadataBusinessSystem selectById(Long id);
+
+    /**
+     * 默认物理库名与参数一致（忽略大小写、首尾空格）的业务系统数量
+     */
+    int countByDatabaseName(@Param("databaseName") String databaseName);
 }

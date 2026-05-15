@@ -118,7 +118,11 @@
             AND tc.table_schema = kcu.table_schema 
             AND tc.table_name = kcu.table_name
         WHERE 
-            tc.table_schema = DATABASE() 
+            tc.table_schema = 
+            <choose>
+                <when test="tableSchema != null and tableSchema != ''">#{tableSchema}</when>
+                <otherwise>DATABASE()</otherwise>
+            </choose>
             AND tc.table_name = #{tableName} 
             AND tc.constraint_type = 'CHECK'
     </select>
@@ -150,7 +154,11 @@
             ON tc.constraint_name = cc.constraint_name
             AND tc.table_schema = cc.constraint_schema
         WHERE 
-            tc.table_schema = DATABASE() 
+            tc.table_schema = 
+            <choose>
+                <when test="tableSchema != null and tableSchema != ''">#{tableSchema}</when>
+                <otherwise>DATABASE()</otherwise>
+            </choose>
             AND tc.table_name = #{tableName}
         UNION ALL
         -- 查询非空约束
@@ -163,7 +171,11 @@
         FROM 
             information_schema.columns c
         WHERE 
-            c.table_schema = DATABASE() 
+            c.table_schema = 
+            <choose>
+                <when test="tableSchema != null and tableSchema != ''">#{tableSchema}</when>
+                <otherwise>DATABASE()</otherwise>
+            </choose>
             AND c.table_name = #{tableName}
             AND c.IS_NULLABLE = 'NO'
             AND c.COLUMN_KEY != 'PRI' -- 排除主键（主键自带非空约束）

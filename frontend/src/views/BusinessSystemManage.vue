@@ -21,6 +21,7 @@
         <el-table-column prop="businessCode" label="业务编码" width="150" />
         <el-table-column prop="businessName" label="业务系统名称" />
         <el-table-column prop="packageName" label="包名" show-overflow-tooltip />
+        <el-table-column prop="databaseName" label="默认物理库" width="140" show-overflow-tooltip />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="isDefault" label="是否默认" width="120">
           <template #default="{ row }">
@@ -82,6 +83,9 @@
         </el-form-item>
         <el-form-item label="包名" prop="packageName">
           <el-input v-model="form.packageName" placeholder="如：com.example" />
+        </el-form-item>
+        <el-form-item label="默认物理库" prop="databaseName">
+          <el-input v-model="form.databaseName" placeholder="MySQL 库名，如 libdemo_db（与 JDBC 同实例）" clearable />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入业务系统描述" />
@@ -181,6 +185,7 @@ export default {
       businessCode: '',
       businessName: '',
       packageName: '',
+      databaseName: '',
       description: '',
       isDefault: 0
     })
@@ -253,6 +258,7 @@ export default {
       form.businessCode = ''
       form.businessName = ''
       form.packageName = ''
+      form.databaseName = ''
       form.description = ''
       form.isDefault = 0
     }
@@ -265,6 +271,7 @@ export default {
       form.businessCode = row.businessCode
       form.businessName = row.businessName
       form.packageName = row.packageName || ''
+      form.databaseName = row.databaseName || ''
       form.description = row.description
       form.isDefault = row.isDefault
     }

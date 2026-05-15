@@ -50,6 +50,12 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     @Autowired
     private DataSource dataSource;
 
+    @Autowired
+    private BusinessCatalogResolver businessCatalogResolver;
+
+    @Autowired
+    private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
     /**
      * 校验主表和从表是否属于同一个业务系统
      *
@@ -194,12 +200,14 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                         existing.getSlaveTableCode(), existing.getSlaveFieldCode());
 
                 if (oldSlaveField != null) {
+                    MetadataTable oldSlaveMeta = tableMapper.selectByCode(existing.getSlaveTableCode(), businessCode);
+                    String oldSlaveCatalog = businessCatalogResolver.resolveCatalog(oldSlaveMeta);
                     // 查找旧的外键约束名称
-                    String oldFkName = findForeignKeyName(oldSlaveTableName, oldSlaveField.getFieldName(), existing.getRelationCode());
+                    String oldFkName = findForeignKeyName(oldSlaveTableName, oldSlaveField.getFieldName(), existing.getRelationCode(), oldSlaveCatalog);
                     if (oldFkName != null && !oldFkName.isEmpty()) {
                         // 删除旧的外键约束
                         String dropFkSql = "ALTER TABLE `" + oldSlaveTableName + "` DROP FOREIGN KEY `" + oldFkName + "`";
-                        Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql, true);
+                        Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql, true, oldSlaveCatalog);
                         if (Boolean.TRUE.equals(dropResult.get("success"))) {
                             logService.logSuccess("admin", "DROP_FOREIGN_KEY", "删除旧外键约束: " + oldFkName);
                         } else {
@@ -216,6 +224,8 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                         relation.getSlaveTableCode(), relation.getSlaveFieldCode());
 
                 if (mainTable != null && slaveTable != null && mainField != null && slaveField != null) {
+                    MetadataTable newSlaveMeta = tableMapper.selectByCode(relation.getSlaveTableCode(), businessCode);
+                    String newSlaveCatalog = businessCatalogResolver.resolveCatalog(newSlaveMeta);
                     String mainTableName = convertToTableName(relation.getMainTableCode());
                     String slaveTableName = convertToTableName(relation.getSlaveTableCode());
                     String newFkName = "fk_" + slaveTableName + "_" + slaveField.getFieldName();
@@ -225,7 +235,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                             slaveTableName, newFkName, slaveField.getFieldName(), mainTableName, mainField.getFieldName()
                     );
 
-                    Map<String, Object> createResult = sqlExecuteService.executeSql(createFkSql, true);
+                    Map<String, Object> createResult = sqlExecuteService.executeSql(createFkSql, true, newSlaveCatalog);
                     if (Boolean.TRUE.equals(createResult.get("success"))) {
                         logService.logSuccess("admin", "CREATE_FOREIGN_KEY", "创建新外键约束: " + newFkName);
                     } else {
@@ -254,15 +264,15 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
      * @param tableName    表名
      * @param columnName   字段名
      * @param relationCode 关联编码
-     * @return 外键约束名称，如果不存在则返回null
+     * @param targetCatalog 物理库名，空则主数据源
      */
-    private String findForeignKeyName(String tableName, String columnName, String relationCode) {
+    private String findForeignKeyName(String tableName, String columnName, String relationCode, String targetCatalog) {
         System.out.println("===== 开始查找外键约束名称 =====");
         System.out.println("表名: " + tableName);
         System.out.println("字段名: " + columnName);
         System.out.println("关联编码: " + relationCode);
 
-        try (Connection connection = dataSource.getConnection()) {
+        try (Connection connection = businessDataSourcePoolManager.getConnection(targetCatalog)) {
             DatabaseMetaData metaData = connection.getMetaData();
             String catalog = connection.getCatalog();
             String schema = connection.getSchema();
@@ -287,7 +297,6 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                     System.out.println("  主键表: " + pkTableName);
                     System.out.println("  主键字段: " + pkColumnName);
 
-                    // 只要字段名匹配，就返回外键名称，不再严格要求外键名称与关联编码相等
                     if (columnName.equalsIgnoreCase(fkColumnName)) {
                         System.out.println("外键字段匹配，返回外键名称: " + fkName);
                         return fkName;
@@ -304,7 +313,6 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             logService.logError("admin", "FIND_FOREIGN_KEY", "查找外键约束名称失败: " + tableName + "." + columnName, e.getMessage());
         }
 
-        // 为了确保外键检查的准确性，我们可以尝试直接执行SQL查询来检查外键是否存在
         System.out.println("使用SQL查询再次检查外键是否存在");
         String checkFkSql = String.format(
                 "SELECT CONSTRAINT_NAME FROM information_schema.KEY_COLUMN_USAGE " +
@@ -314,7 +322,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         );
         System.out.println("执行SQL: " + checkFkSql);
 
-        Map<String, Object> checkResult = sqlExecuteService.executeSql(checkFkSql, false);
+        Map<String, Object> checkResult = sqlExecuteService.executeSql(checkFkSql, false, targetCatalog);
         System.out.println("SQL查询结果: " + checkResult);
 
         if (Boolean.TRUE.equals(checkResult.get("success"))) {
@@ -345,24 +353,23 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         }
 
         // 2. 获取表和字段信息
-        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode(), relation.getBusinessCode());
         MetadataField slaveField = fieldMapper.selectByCode(relation.getSlaveTableCode(), relation.getSlaveFieldCode());
 
         if (slaveTable != null && slaveField != null) {
             // 3. 转换为实际表名
             String slaveTableName = convertToTableName(relation.getSlaveTableCode());
+            String slaveCatalog = businessCatalogResolver.resolveCatalog(slaveTable);
 
             // 4. 查找外键名称
-            // 注意：在删除关联关系时，我们只知道关联关系ID，不知道具体的外键名称
-            // 所以我们需要先查找该关联关系对应的外键名称
             String relationCode = relation.getRelationCode();
-            String fkName = findForeignKeyName(slaveTableName, slaveField.getFieldName(), relationCode);
+            String fkName = findForeignKeyName(slaveTableName, slaveField.getFieldName(), relationCode, slaveCatalog);
 
             // 5. 如果外键存在，删除物理外键
             if (fkName != null && !fkName.isEmpty()) {
                 // 删除外键约束
                 String dropFkSql = "ALTER TABLE `" + slaveTableName + "` DROP FOREIGN KEY `" + fkName + "`";
-                Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql, true);
+                Map<String, Object> dropResult = sqlExecuteService.executeSql(dropFkSql, true, slaveCatalog);
                 if (Boolean.TRUE.equals(dropResult.get("success"))) {
                     logService.logSuccess("admin", "DROP_FOREIGN_KEY", "删除外键约束: " + fkName);
                 } else {
@@ -464,14 +471,21 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
             return result;
         }
 
-        // 校验表是否存在
-        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
+        String businessCode = relation.getBusinessCode();
+        if (businessCode == null || businessCode.isEmpty()) {
+            MetadataTable temp = tableMapper.selectByCode(relation.getMainTableCode());
+            if (temp != null) {
+                businessCode = temp.getBusinessCode();
+            }
+        }
+
+        MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode(), businessCode);
         if (mainTable == null) {
             result.put("success", false);
             result.put("message", "主表不存在");
             return result;
         }
-        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+        MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode(), businessCode);
         if (slaveTable == null) {
             result.put("success", false);
             result.put("message", "从表不存在");
@@ -499,8 +513,10 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
         // 使用用户填写的关联编码作为外键名称
         String fkName = relation.getRelationCode();
 
+        String slaveCatalog = businessCatalogResolver.resolveCatalog(slaveTable);
+
         // 检查外键是否已经存在
-        String existingFkName = findForeignKeyName(slaveTableName, slaveField.getFieldName(), relation.getRelationCode());
+        String existingFkName = findForeignKeyName(slaveTableName, slaveField.getFieldName(), relation.getRelationCode(), slaveCatalog);
 
         if (existingFkName != null && !existingFkName.isEmpty()) {
             // 外键已经存在，直接返回成功
@@ -518,7 +534,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
 
         // 执行SQL
         try {
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql, true);
+            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql, true, slaveCatalog);
 
             if (Boolean.TRUE.equals(sqlResult.get("success"))) {
                 logService.logSuccess("admin", "CREATE_FOREIGN_KEY", "创建外键约束: " + fkName);
@@ -605,9 +621,9 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                 System.out.println("主字段: " + relation.getMainFieldCode() + ", 从字段: " + relation.getSlaveFieldCode());
 
                 try {
-                    // 校验表是否存在
-                    MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode());
-                    MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode());
+                    String bc = relation.getBusinessCode();
+                    MetadataTable mainTable = tableMapper.selectByCode(relation.getMainTableCode(), bc);
+                    MetadataTable slaveTable = tableMapper.selectByCode(relation.getSlaveTableCode(), bc);
                     if (mainTable == null || slaveTable == null) {
                         System.out.println("表不存在，跳过关联关系");
                         failCount++;
@@ -635,9 +651,11 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                     // 使用用户填写的关联编码作为外键名称
                     String fkName = relation.getRelationCode();
 
+                    String slaveCatalog = businessCatalogResolver.resolveCatalog(slaveTable);
+
                     // 检查外键是否已经存在
                     System.out.println("开始检查外键是否存在");
-                    String existingFkName = findForeignKeyName(slaveTableName, slaveField.getFieldName(), relation.getRelationCode());
+                    String existingFkName = findForeignKeyName(slaveTableName, slaveField.getFieldName(), relation.getRelationCode(), slaveCatalog);
                     System.out.println("外键检查结果: existingFkName = " + existingFkName);
 
                     if (existingFkName != null && !existingFkName.isEmpty()) {
@@ -655,7 +673,7 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
                     System.out.println("生成SQL: " + createFkSql);
 
                     // 执行SQL
-                    Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql, true);
+                    Map<String, Object> sqlResult = sqlExecuteService.executeSql(createFkSql, true, slaveCatalog);
 
                     System.out.println("SQL执行结果: " + sqlResult);
 

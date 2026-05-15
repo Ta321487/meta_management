@@ -1,6 +1,7 @@
 package com.metadata.service.impl;
 
 import com.metadata.entity.MetadataTable;
+import com.metadata.mapper.MetadataBusinessSystemMapper;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataTableMapper;
 import com.metadata.mapper.MetadataTableRelationMapper;
@@ -30,14 +31,27 @@ import java.util.regex.Pattern;
 @Service
 public class SqlExecuteServiceImpl implements SqlExecuteService {
 
+    private static final Pattern DROP_DATABASE_OR_SCHEMA_PATTERN = Pattern.compile(
+            "(?is)^\\s*DROP\\s+(?:DATABASE|SCHEMA)\\s+(?:IF\\s+EXISTS\\s+)?(?:`([^`]+)`|\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_$]+))");
+
+
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
+    @Autowired
+    private BusinessCatalogResolver businessCatalogResolver;
 
     @Autowired
     private OperationLogService logService;
 
     @Autowired
     private MetadataTableMapper tableMapper;
+
+    @Autowired
+    private MetadataBusinessSystemMapper businessSystemMapper;
 
     @Autowired
     private MetadataFieldMapper fieldMapper;
@@ -59,7 +73,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
      * @param skipSafetyCheck 是否跳过安全检查
      * @return 执行结果
      */
-    private Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck) {
+    private Map<String, Object> executeSqlInternal(String sql, boolean skipSafetyCheck, String targetCatalog) {
         Map<String, Object> result = new HashMap<>();
 
         if (sql == null || sql.trim().isEmpty()) {
@@ -103,7 +117,18 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
             }
         }
 
-        try (Connection connection = dataSource.getConnection();
+        String pendingDropCatalog = null;
+        if (skipSafetyCheck) {
+            pendingDropCatalog = tryParseDropDatabaseOrSchemaName(sql);
+            if (pendingDropCatalog != null && metadataReferencesPhysicalCatalog(pendingDropCatalog)) {
+                result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
+                result.put(SqlConstants.RESULT_KEY_MESSAGE,
+                        "该物理库仍被元数据引用（业务系统默认库名或表级库名），请先删除或调整对应业务系统/表元数据后再执行 DROP DATABASE / DROP SCHEMA。");
+                return result;
+            }
+        }
+
+        try (Connection connection = businessDataSourcePoolManager.getConnection(targetCatalog);
              Statement statement = connection.createStatement()) {
 
             // 使用策略模式执行SQL
@@ -111,6 +136,10 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
             // 转换为Map结果格式，保持接口兼容
             convertSqlResultToMap(sqlResult, result);
+
+            if (Boolean.TRUE.equals(result.get(SqlConstants.RESULT_KEY_SUCCESS)) && pendingDropCatalog != null) {
+                businessDataSourcePoolManager.evictCatalog(pendingDropCatalog);
+            }
 
             // 如果是 CREATE TABLE 或 ALTER TABLE 语句，自动同步字段到元数据系统
             if (upperSql.startsWith(SqlConstants.SQL_TYPE_CREATE + " TABLE") || upperSql.startsWith(SqlConstants.SQL_TYPE_ALTER + " TABLE")) {
@@ -243,7 +272,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
      */
     @Override
     public Map<String, Object> executeSql(String sql) {
-        return executeSqlInternal(sql, false);
+        return executeSqlInternal(sql, false, null);
     }
 
     /**
@@ -255,7 +284,12 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
      */
     @Override
     public Map<String, Object> executeSql(String sql, boolean skipSafetyCheck) {
-        return executeSqlInternal(sql, skipSafetyCheck);
+        return executeSqlInternal(sql, skipSafetyCheck, null);
+    }
+
+    @Override
+    public Map<String, Object> executeSql(String sql, boolean skipSafetyCheck, String targetCatalog) {
+        return executeSqlInternal(sql, skipSafetyCheck, targetCatalog);
     }
 
     /**
@@ -267,6 +301,12 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     @Override
     @Transactional
     public Map<String, Object> executeDropTable(String tableName) {
+        return executeDropTable(tableName, null);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> executeDropTable(String tableName, String targetCatalog) {
         if (tableName == null || tableName.trim().isEmpty()) {
             Map<String, Object> result = new HashMap<>();
             result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
@@ -278,7 +318,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         String safeTableName = tableName.trim().replace("`", "").replace("'", "").replace("\"", "");
         String dropSql = "DROP TABLE IF EXISTS `" + safeTableName + "`";
 
-        Map<String, Object> result = executeSqlInternal(dropSql, true);
+        Map<String, Object> result = executeSqlInternal(dropSql, true, targetCatalog);
 
         // 如果DROP TABLE执行成功，清理metadata_field表中的相关字段
         if ((Boolean) result.get(SqlConstants.RESULT_KEY_SUCCESS)) {
@@ -386,56 +426,52 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         int totalCreated = 0; // 总共创建的关联关系记录数
         List<String> messages = new ArrayList<>();
 
-        try (Connection connection = dataSource.getConnection()) {
+        try {
             if (tableCode != null && !tableCode.trim().isEmpty()) {
-                // 同步指定表
-                // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写
-                String tableName1 = metadataSyncService.convertToTableName(tableCode);
-                String tableName2 = tableCode.toLowerCase();
+                MetadataTable meta = tableMapper.selectByCode(tableCode);
+                String catalog = businessCatalogResolver.resolveCatalog(meta);
+                try (Connection connection = businessDataSourcePoolManager.getConnection(catalog)) {
+                    // 同步指定表
+                    String tableName1 = metadataSyncService.convertToTableName(tableCode);
+                    String tableName2 = tableCode.toLowerCase();
 
-                try {
-                    // 先尝试去掉_TABLE的格式
-                    int created = metadataSyncService.syncTableForeignKeys(tableName1, connection);
-                    successCount = 1;
-                    totalCreated += created;
-                    messages.add("表 " + tableCode + " 的外键同步成功，创建 " + created + " 条关联关系");
-                } catch (Exception e1) {
-                    // 如果失败，尝试直接转小写的格式
                     try {
-                        int created = metadataSyncService.syncTableForeignKeys(tableName2, connection);
+                        int created = metadataSyncService.syncTableForeignKeys(tableName1, connection);
                         successCount = 1;
                         totalCreated += created;
                         messages.add("表 " + tableCode + " 的外键同步成功，创建 " + created + " 条关联关系");
-                    } catch (Exception e2) {
-                        // 两种格式都失败
-                        failCount = 1;
-                        messages.add("表 " + tableCode + " 的外键同步失败: " + e2.getMessage());
-                        logService.logError("admin", SqlConstants.LOG_MODULE_SYNC_FOREIGN_KEY, "同步外键失败: " + tableCode, e2.getMessage());
+                    } catch (Exception e1) {
+                        try {
+                            int created = metadataSyncService.syncTableForeignKeys(tableName2, connection);
+                            successCount = 1;
+                            totalCreated += created;
+                            messages.add("表 " + tableCode + " 的外键同步成功，创建 " + created + " 条关联关系");
+                        } catch (Exception e2) {
+                            failCount = 1;
+                            messages.add("表 " + tableCode + " 的外键同步失败: " + e2.getMessage());
+                            logService.logError("admin", SqlConstants.LOG_MODULE_SYNC_FOREIGN_KEY, "同步外键失败: " + tableCode, e2.getMessage());
+                        }
                     }
                 }
             } else {
-                // 同步所有表
-                List<MetadataTable> tables = tableMapper.selectAll(null);
+                List<MetadataTable> tables = tableMapper.selectAll(null, null);
 
                 for (MetadataTable table : tables) {
-                    try {
-                        // 尝试多种表名格式：先尝试去掉_TABLE，再尝试直接转小写
+                    String catalog = businessCatalogResolver.resolveCatalog(table);
+                    try (Connection connection = businessDataSourcePoolManager.getConnection(catalog)) {
                         String tableName1 = metadataSyncService.convertToTableName(table.getTableCode());
                         String tableName2 = table.getTableCode().toLowerCase();
 
-                        // 先尝试去掉_TABLE的格式
                         try {
                             int created = metadataSyncService.syncTableForeignKeys(tableName1, connection);
                             successCount++;
                             totalCreated += created;
                         } catch (Exception e1) {
-                            // 如果失败，尝试直接转小写的格式
                             try {
                                 int created = metadataSyncService.syncTableForeignKeys(tableName2, connection);
                                 successCount++;
                                 totalCreated += created;
                             } catch (Exception e2) {
-                                // 两种格式都失败
                                 failCount++;
                                 messages.add("表 " + table.getTableCode() + " 的外键同步失败: " + e2.getMessage());
                                 logService.logError("admin", SqlConstants.LOG_MODULE_SYNC_FOREIGN_KEY, "同步外键失败: " + table.getTableCode(), e2.getMessage());
@@ -467,5 +503,26 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         }
 
         return result;
+    }
+
+    private static String tryParseDropDatabaseOrSchemaName(String sql) {
+        Matcher m = DROP_DATABASE_OR_SCHEMA_PATTERN.matcher(sql.trim());
+        if (!m.find()) {
+            return null;
+        }
+        for (int g = 1; g <= m.groupCount(); g++) {
+            if (m.group(g) != null) {
+                return m.group(g).trim();
+            }
+        }
+        return null;
+    }
+
+    private boolean metadataReferencesPhysicalCatalog(String catalog) {
+        if (catalog == null || catalog.isEmpty()) {
+            return false;
+        }
+        return businessSystemMapper.countByDatabaseName(catalog) > 0
+                || tableMapper.countByDatabaseName(catalog) > 0;
     }
 }

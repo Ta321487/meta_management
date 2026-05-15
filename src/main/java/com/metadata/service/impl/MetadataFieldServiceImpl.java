@@ -58,6 +58,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Autowired
     private MetadataBusinessRuleService businessRuleService;
 
+    @Autowired
+    private BusinessCatalogResolver businessCatalogResolver;
+
     /**
      * 从校验规则中提取message字段
      */
@@ -155,8 +158,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
         // 生成并执行ALTER TABLE ADD COLUMN语句
         try {
+            String phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), field.getBusinessCode());
             String alterSql = codeGeneratorService.generateAlterTableAddColumnSQL(field.getTableCode(), field);
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
+            Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                 throw new RuntimeException("执行ALTER TABLE ADD COLUMN失败: " + sqlResult.get("message"));
             }
@@ -189,6 +193,8 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         field.setFieldCode(existing.getFieldCode()); // 编码不可修改
         field.setTableCode(existing.getTableCode()); // 表编码不可修改
 
+        String phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), existing.getBusinessCode());
+
         // 保存用户新设置的校验规则的message字段（从用户提交的field中提取）
         String newMessage = extractMessageFromValidateRule(field.getValidateRule());
 
@@ -207,7 +213,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             // 先删除旧的CHECK约束（如果存在）
             String dropOldSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + oldConstraintName + "`";
             // 执行删除旧约束的SQL语句（忽略失败，因为约束可能不存在）
-            sqlExecuteService.executeSql(dropOldSql, true);
+            sqlExecuteService.executeSql(dropOldSql, true, phyCatalog);
         } catch (Exception e) {
             // 记录错误日志，但不影响主流程
             logService.logError("admin", "UPDATE_CHECK_CONSTRAINT", "删除旧CHECK约束失败", e.getMessage());
@@ -235,7 +241,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                     operationType = "ALTER_TABLE_MODIFY_COLUMN";
                 }
 
-                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
+                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
                 if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                     throw new RuntimeException("执行" + operationType + "失败: " + sqlResult.get("message"));
                 }
@@ -261,7 +267,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             // 生成删除新CHECK约束的SQL语句（以防万一，确保没有重复约束）
             String dropNewSql = "ALTER TABLE `" + tableName + "` DROP CHECK `" + newConstraintName + "`";
             // 执行删除新约束的SQL语句（忽略失败，因为约束可能不存在）
-            sqlExecuteService.executeSql(dropNewSql, true);
+            sqlExecuteService.executeSql(dropNewSql, true, phyCatalog);
 
             // 生成新的CHECK约束
             String checkConstraint = codeGeneratorService.generateCheckConstraint(field);
@@ -269,7 +275,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             // 如果有新的CHECK约束，执行添加新CHECK约束的SQL语句
             if (checkConstraint != null && !checkConstraint.isEmpty()) {
                 String addSql = "ALTER TABLE `" + tableName + "` ADD CONSTRAINT `" + newConstraintName + "` " + checkConstraint;
-                Map<String, Object> addResult = sqlExecuteService.executeSql(addSql, true);
+                Map<String, Object> addResult = sqlExecuteService.executeSql(addSql, true, phyCatalog);
                 if (Boolean.TRUE.equals(addResult.get("success"))) {
                     logService.logSuccess("admin", "UPDATE_CHECK_CONSTRAINT", "更新CHECK约束成功: " + newConstraintName);
                 } else {
@@ -335,8 +341,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
         // 生成并执行ALTER TABLE DROP COLUMN语句
         try {
+            String phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), field.getBusinessCode());
             String alterSql = codeGeneratorService.generateAlterTableDropColumnSQL(field.getTableCode(), field.getFieldName());
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true);
+            Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                 throw new RuntimeException("执行ALTER TABLE DROP COLUMN失败: " + sqlResult.get("message"));
             }
@@ -397,12 +404,15 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Override
     public List<Map<String, Object>> getConstraints(String tableCode) {
         List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
+        String businessCode = fields.isEmpty() ? "" : (fields.get(0).getBusinessCode() != null ? fields.get(0).getBusinessCode() : "");
+        MetadataTable metaTable = tableMapper.selectByCode(tableCode, businessCode);
+        String tableSchema = businessCatalogResolver.resolveCatalog(metaTable);
 
         // 获取表名
         String tableName = codeGeneratorService.convertToTableName(tableCode);
 
         // 获取所有类型约束
-        List<Map<String, Object>> allConstraints = fieldMapper.selectAllConstraints(tableName);
+        List<Map<String, Object>> allConstraints = fieldMapper.selectAllConstraints(tableName, tableSchema);
 
         // 将字段按字段名分组，便于查询
         Map<String, MetadataField> fieldMap = new java.util.HashMap<>();
@@ -548,6 +558,16 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             throw new RuntimeException("缺少必要的约束信息");
         }
 
+        String phyCatalog = null;
+        if (field != null) {
+            phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), field.getBusinessCode());
+        } else if (tableCode != null) {
+            List<MetadataField> fs = fieldMapper.selectByTableCode(tableCode);
+            String bc = fs.isEmpty() ? "" : (fs.get(0).getBusinessCode() != null ? fs.get(0).getBusinessCode() : "");
+            MetadataTable t = tableMapper.selectByCode(tableCode, bc);
+            phyCatalog = businessCatalogResolver.resolveCatalog(t);
+        }
+
         try {
             // 确定约束类型：先查询数据库获取实际约束类型
             String constraintType = null;
@@ -556,7 +576,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                     "WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' AND constraint_name = '" + constraintName + "'";
             
             // 执行查询获取约束类型
-            Map<String, Object> typeResult = sqlExecuteService.executeSql(querySql, false);
+            Map<String, Object> typeResult = sqlExecuteService.executeSql(querySql, false, phyCatalog);
             if (typeResult != null && Boolean.TRUE.equals(typeResult.get("success"))) {
                 List<Map<String, Object>> rows = (List<Map<String, Object>>) typeResult.get("data");
                 if (rows != null && !rows.isEmpty()) {
@@ -596,7 +616,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 // 查询字段的当前类型信息
                 String typeQuerySql = "SELECT COLUMN_TYPE FROM information_schema.columns " +
                         "WHERE table_schema = DATABASE() AND table_name = '" + tableName + "' AND column_name = '" + columnName + "'";
-                Map<String, Object> columnTypeResult = sqlExecuteService.executeSql(typeQuerySql, false);
+                Map<String, Object> columnTypeResult = sqlExecuteService.executeSql(typeQuerySql, false, phyCatalog);
                 
                 if (columnTypeResult != null && Boolean.TRUE.equals(columnTypeResult.get("success"))) {
                     List<Map<String, Object>> typeRows = (List<Map<String, Object>>) columnTypeResult.get("data");
@@ -619,7 +639,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             }
 
             // 删除数据库中的约束
-            Map<String, Object> result = sqlExecuteService.executeSql(dropSql, true);
+            Map<String, Object> result = sqlExecuteService.executeSql(dropSql, true, phyCatalog);
 
             // 如果有字段信息，则更新相关字段属性
             if (field != null) {

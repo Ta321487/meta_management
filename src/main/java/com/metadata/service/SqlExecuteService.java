@@ -23,11 +23,21 @@ public interface SqlExecuteService {
     Map<String, Object> executeSql(String sql, boolean skipSafetyCheck);
 
     /**
+     * 在指定 MySQL catalog（库名）上执行 SQL；catalog 为空则使用主数据源（元数据库）。
+     */
+    Map<String, Object> executeSql(String sql, boolean skipSafetyCheck, String targetCatalog);
+
+    /**
      * 执行DROP TABLE语句（仅供内部服务调用）
      * @param tableName 表名
      * @return 执行结果
      */
     Map<String, Object> executeDropTable(String tableName);
+
+    /**
+     * 在指定 catalog 上执行 DROP TABLE
+     */
+    Map<String, Object> executeDropTable(String tableName, String targetCatalog);
 
     /**
      * 执行多条SQL语句（用分号分隔）

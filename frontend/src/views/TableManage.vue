@@ -51,6 +51,7 @@
             <el-tag>{{ row.businessCode || '未关联' }}</el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="databaseName" label="物理库" width="140" show-overflow-tooltip />
         <el-table-column prop="pkStrategy" label="主键策略" width="120" />
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="isEnabled" label="状态" width="100">
@@ -121,6 +122,9 @@
               :value="system.businessCode"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item label="物理库名">
+          <el-input v-model="form.databaseName" placeholder="MySQL 库名，留空则用业务系统默认库" clearable />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" />
@@ -200,6 +204,7 @@ export default {
       pkStrategy: 'AUTO',
       description: '',
       businessCode: '',
+      databaseName: '',
       isEnabled: 1
     })
     const rules = {
@@ -277,7 +282,8 @@ export default {
         tableName: '',
         pkStrategy: 'AUTO',
         description: '',
-        businessCode: ''
+        businessCode: '',
+        databaseName: ''
       })
       dialogVisible.value = true
     }
@@ -290,7 +296,8 @@ export default {
         tableName: row.tableName,
         pkStrategy: row.pkStrategy,
         description: row.description,
-        businessCode: row.businessCode || ''
+        businessCode: row.businessCode || '',
+        databaseName: row.databaseName || ''
       })
       dialogVisible.value = true
     }

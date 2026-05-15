@@ -9,6 +9,7 @@
         <result column="description" property="description" />
         <result column="is_default" property="isDefault" />
         <result column="package_name" property="packageName" />
+        <result column="database_name" property="databaseName" />
         <result column="create_time" property="createTime" />
         <result column="update_time" property="updateTime" />
     </resultMap>
@@ -24,12 +25,22 @@
     <select id="selectDefault" resultMap="BaseResultMap">
         SELECT * FROM metadata_business_system WHERE is_default = 1
     </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM metadata_business_system WHERE id = #{id}
+    </select>
+
+    <select id="countByDatabaseName" resultType="int">
+        SELECT COUNT(*) FROM metadata_business_system
+        WHERE database_name IS NOT NULL AND TRIM(database_name) &lt;&gt; ''
+          AND LOWER(TRIM(database_name)) = LOWER(TRIM(#{databaseName}))
+    </select>
     
     <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessSystem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_business_system (
-            business_code, business_name, description, is_default, package_name
+            business_code, business_name, description, is_default, package_name, database_name
         ) VALUES (
-            #{businessCode}, #{businessName}, #{description}, #{isDefault}, #{packageName}
+            #{businessCode}, #{businessName}, #{description}, #{isDefault}, #{packageName}, #{databaseName, jdbcType=VARCHAR}
         )
     </insert>
     
@@ -38,7 +49,8 @@
             business_name = #{businessName},
             description = #{description},
             is_default = #{isDefault},
-            package_name = #{packageName}
+            package_name = #{packageName},
+            database_name = #{databaseName, jdbcType=VARCHAR}
         WHERE id = #{id}
     </update>
     

@@ -6,6 +6,7 @@ import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
+import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataModuleTableMapper;
 import com.metadata.mapper.MetadataTableMapper;
@@ -45,6 +46,12 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     private SqlExecuteService sqlExecuteService;
 
     @Autowired
+    private MetadataBusinessSystemService businessSystemService;
+
+    @Autowired
+    private BusinessCatalogResolver businessCatalogResolver;
+
+    @Autowired
     @Lazy
     private MetadataTableRelationService relationService;
 
@@ -66,6 +73,12 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 确保businessCode不为null，使用DEFAULT作为默认值
         if (table.getBusinessCode() == null || table.getBusinessCode().isEmpty()) {
             table.setBusinessCode("DEFAULT");
+        }
+        // 表级未指定物理库时，继承业务系统默认库名
+        MetadataBusinessSystem businessSystem = businessSystemService.getByCode(table.getBusinessCode());
+        if (businessSystem != null && (table.getDatabaseName() == null || table.getDatabaseName().trim().isEmpty())
+                && businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
+            table.setDatabaseName(businessSystem.getDatabaseName().trim());
         }
         // 先创建元数据记录
         tableMapper.insert(table);
@@ -118,7 +131,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 生成并执行CREATE TABLE SQL
         try {
             String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode());
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql);
+            String phyCatalog = businessCatalogResolver.resolveCatalog(table);
+            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                 throw new RuntimeException("创建数据库表失败: " + sqlResult.get("message"));
             }
@@ -185,7 +199,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                 }
                 // 生成ALTER TABLE COMMENT语句（安全操作，不包含DROP）
                 String alterSql = String.format("ALTER TABLE `%s` COMMENT = '%s'", tableName, escapeSqlString(comment));
-                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql);
+                String phyCatalog = businessCatalogResolver.resolveCatalog(existing);
+                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, false, phyCatalog);
                 if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                     // 更新注释失败不影响元数据更新，只记录日志
                     logService.logError("admin", "UPDATE_TABLE_COMMENT", "更新表注释失败: " + table.getTableCode(),
@@ -215,10 +230,11 @@ public class MetadataTableServiceImpl implements MetadataTableService {
 
         String tableCode = table.getTableCode();
         String tableName = convertToTableName(tableCode);
+        String phyCatalog = businessCatalogResolver.resolveCatalog(table);
 
         // 先执行DROP TABLE删除实际数据库表
         try {
-            Map<String, Object> dropResult = sqlExecuteService.executeDropTable(tableName);
+            Map<String, Object> dropResult = sqlExecuteService.executeDropTable(tableName, phyCatalog);
             if (Boolean.TRUE.equals(dropResult.get("success"))) {
                 logService.logSuccess("admin", "DROP_TABLE", "删除数据库表成功: " + tableCode);
             } else {

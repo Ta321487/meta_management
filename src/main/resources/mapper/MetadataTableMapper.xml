@@ -10,13 +10,14 @@
         <result column="description" property="description"/>
         <result column="is_enabled" property="isEnabled"/>
         <result column="business_code" property="businessCode"/>
+        <result column="database_name" property="databaseName"/>
         <result column="create_time" property="createTime"/>
         <result column="update_time" property="updateTime"/>
     </resultMap>
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataTable" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description, is_enabled, business_code)
-        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description}, #{isEnabled, jdbcType=INTEGER}, #{businessCode, jdbcType=VARCHAR})
+        INSERT INTO metadata_table (table_code, table_name, pk_strategy, description, is_enabled, business_code, database_name)
+        VALUES (#{tableCode}, #{tableName}, #{pkStrategy}, #{description}, #{isEnabled, jdbcType=INTEGER}, #{businessCode, jdbcType=VARCHAR}, #{databaseName, jdbcType=VARCHAR})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataTable">
@@ -25,7 +26,8 @@
             pk_strategy = #{pkStrategy},
             description = #{description},
             is_enabled = #{isEnabled},
-            business_code = #{businessCode}
+            business_code = #{businessCode},
+            database_name = #{databaseName, jdbcType=VARCHAR}
         WHERE id = #{id}
     </update>
 
@@ -114,6 +116,12 @@
             AND business_code = #{businessCode}
         </if>
         ORDER BY create_time DESC
+    </select>
+
+    <select id="countByDatabaseName" resultType="int">
+        SELECT COUNT(*) FROM metadata_table
+        WHERE database_name IS NOT NULL AND TRIM(database_name) &lt;&gt; ''
+          AND LOWER(TRIM(database_name)) = LOWER(TRIM(#{databaseName}))
     </select>
 
 </mapper>
