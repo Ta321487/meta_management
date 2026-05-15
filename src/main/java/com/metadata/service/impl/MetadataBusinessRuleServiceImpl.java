@@ -5,6 +5,8 @@ import com.alibaba.fastjson2.JSONObject;
 import com.alibaba.fastjson2.JSONArray;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
@@ -109,7 +111,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         // 获取模块关联的所有表
         List<MetadataTable> tables = tableService.listByModuleCode(rule.getModuleCode(), rule.getBusinessCode());
         if (tables.isEmpty()) {
-            throw new RuntimeException("模块未关联任何表");
+            throw BizException.of(AppErrorCodes.BUSINESS_RULE_MODULE_NO_TABLE, "模块未关联任何表");
         }
 
         // 获取所有表的字段
@@ -124,7 +126,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
         // 验证字段是否存在
         for (String fieldName : fieldsToValidate) {
             if (!allFieldNames.contains(fieldName)) {
-                throw new RuntimeException("字段名称不匹配：" + fieldName);
+                throw BizException.of(AppErrorCodes.BUSINESS_RULE_FIELD_MISMATCH, "字段名称不匹配：" + fieldName);
             }
         }
     }
@@ -246,7 +248,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
     @Transactional
     public void add(MetadataBusinessRule rule) {
         if (!CodeValidator.isValidCode(rule.getRuleCode())) {
-            throw new RuntimeException("规则编码格式不正确");
+            throw BizException.of(AppErrorCodes.BUSINESS_RULE_CODE_INVALID, "规则编码格式不正确");
         }
 
         // 验证规则中的字段
@@ -267,7 +269,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
     public void update(MetadataBusinessRule rule) {
         MetadataBusinessRule existing = ruleMapper.selectByCode(rule.getModuleCode(), rule.getRuleCode(), rule.getBusinessCode());
         if (existing == null) {
-            throw new RuntimeException("规则不存在");
+            throw BizException.of(AppErrorCodes.BUSINESS_RULE_NOT_FOUND, "规则不存在");
         }
 
         // 验证规则中的字段

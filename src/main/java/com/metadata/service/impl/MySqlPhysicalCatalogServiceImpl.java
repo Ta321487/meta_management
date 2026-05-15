@@ -1,6 +1,8 @@
 package com.metadata.service.impl;
 
+import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.entity.MetadataPhysicalDatabase;
+import com.metadata.exception.BizException;
 import com.metadata.mapper.MetadataPhysicalDatabaseMapper;
 import com.metadata.service.MySqlPhysicalCatalogService;
 import com.metadata.service.OperationLogService;
@@ -74,7 +76,8 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
         }
         String cat = catalogName.trim();
         if (!isValidCatalogName(cat)) {
-            throw new RuntimeException("物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CATALOG_INVALID,
+                    "物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
         }
         MetadataPhysicalDatabase reg = physicalDatabaseMapper.selectByCatalogName(cat);
         if (reg != null && StringUtils.hasText(reg.getCharsetName())) {
@@ -92,7 +95,8 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
         }
         String cat = catalogName.trim();
         if (!isValidCatalogName(cat)) {
-            throw new RuntimeException("物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CATALOG_INVALID,
+                    "物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
         }
         runEnsure(cat, charsetName, collationName);
     }
@@ -105,7 +109,8 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
         }
         String cat = catalogName.trim();
         if (!isValidCatalogName(cat)) {
-            throw new RuntimeException("物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CATALOG_INVALID,
+                    "物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
         }
         assertCatalogDroppable(cat);
         String escaped = cat.replace("`", "``");
@@ -115,17 +120,17 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
             statement.executeUpdate(ddl);
             logService.logSuccess("admin", SqlConstants.LOG_MODULE_SQL_EXECUTE, "删除服务器物理库: " + cat);
         } catch (Exception e) {
-            throw new RuntimeException("删除服务器物理库失败: " + e.getMessage(), e);
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_DROP_FAILED, "删除服务器物理库失败: " + e.getMessage(), e);
         }
     }
 
     private void assertCatalogDroppable(String catalogName) {
         String lower = catalogName.toLowerCase(Locale.ROOT);
         if (SYSTEM_CATALOGS.contains(lower)) {
-            throw new RuntimeException("不允许删除系统库: " + catalogName);
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_SYSTEM_CATALOG_PROTECTED, "不允许删除系统库: " + catalogName);
         }
         if (JdbcCatalogUrlRewriter.sameCatalog(datasourceUrl, catalogName)) {
-            throw new RuntimeException("不允许删除元数据管理库: " + catalogName);
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_METADATA_CATALOG_PROTECTED, "不允许删除元数据管理库: " + catalogName);
         }
     }
 
@@ -140,7 +145,7 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
             logService.logSuccess("admin", SqlConstants.LOG_MODULE_SQL_EXECUTE,
                     "确保物理库存在: " + catalogNameTrimmed + " (" + charset + "/" + collation + ")");
         } catch (Exception e) {
-            throw new RuntimeException("创建物理库失败: " + e.getMessage(), e);
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CREATE_FAILED, "创建物理库失败: " + e.getMessage(), e);
         }
     }
 

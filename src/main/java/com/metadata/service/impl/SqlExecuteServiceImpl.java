@@ -1,5 +1,8 @@
 package com.metadata.service.impl;
 
+import com.metadata.common.codes.ApiMessages;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataTable;
 import com.metadata.mapper.MetadataBusinessSystemMapper;
 import com.metadata.mapper.MetadataFieldMapper;
@@ -120,6 +123,9 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                     mySqlPhysicalCatalogService.ensureCatalogExists(createCatalog);
                     result.put(SqlConstants.RESULT_KEY_SUCCESS, true);
                     result.put(SqlConstants.RESULT_KEY_MESSAGE, "物理库已就绪（不存在则已创建）: " + createCatalog.trim());
+                } catch (BizException e) {
+                    result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
+                    result.put(SqlConstants.RESULT_KEY_MESSAGE, e.getMessage());
                 } catch (RuntimeException e) {
                     result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
                     result.put(SqlConstants.RESULT_KEY_MESSAGE, e.getMessage());
@@ -260,11 +266,11 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                 errorMessage = "添加NOT NULL约束失败: 现有数据中存在NULL值。建议先添加允许NULL的字段，更新数据后再修改为NOT NULL，或使用默认值。";
             } else {
                 // 其他ALTER TABLE错误
-                errorMessage = "执行ALTER TABLE语句失败: " + e.getMessage();
+                errorMessage = ApiMessages.alterTableError(e.getMessage());
             }
         } else {
             // 其他SQL错误
-            errorMessage = "SQL执行失败: " + e.getMessage();
+            errorMessage = ApiMessages.sqlExecuteError(e.getMessage());
         }
 
         result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
@@ -365,6 +371,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                 if (table != null) {
                     // 删除该表的所有字段
                     fieldMapper.deleteByTableCode(tableCode);
+                    relationMapper.deleteByTableCodeEitherSide(tableCode);
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "删除表字段: " + tableCode);
 
                     // 删除表记录
@@ -377,6 +384,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                         if (safeTableName.equalsIgnoreCase(t.getTableName())) {
                             // 删除该表的所有字段
                             fieldMapper.deleteByTableCode(t.getTableCode());
+                            relationMapper.deleteByTableCodeEitherSide(t.getTableCode());
                             logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "删除表字段: " + t.getTableCode());
 
                             // 删除表记录

@@ -28,7 +28,19 @@ public final class ApiMessages {
 
     public static final String SQL_EXECUTE_FAILED = "执行失败";
 
+    public static final String SQL_EXECUTE_ERROR_PREFIX = "SQL执行失败: ";
+
+    public static final String SQL_ALTER_TABLE_ERROR_PREFIX = "执行ALTER TABLE语句失败: ";
+
     public static final String FIELD_CODE_EXISTS = "字段编码已存在";
 
     public static final String FK_SYNC_FAILED_PREFIX = "同步外键失败: ";
+
+    public static String sqlExecuteError(String detail) {
+        return SQL_EXECUTE_ERROR_PREFIX + detail;
+    }
+
+    public static String alterTableError(String detail) {
+        return SQL_ALTER_TABLE_ERROR_PREFIX + detail;
+    }
 }

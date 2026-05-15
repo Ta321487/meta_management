@@ -3,6 +3,8 @@ package com.metadata.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.mapper.MetadataFunctionNodeMapper;
 import com.metadata.service.MetadataFunctionNodeService;
@@ -37,7 +39,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     @Transactional
     public void add(MetadataFunctionNode node) {
         if (!CodeValidator.isValidCode(node.getNodeCode())) {
-            throw new RuntimeException("节点编码格式不正确");
+            throw BizException.of(AppErrorCodes.FUNCTION_NODE_CODE_INVALID, "节点编码格式不正确");
         }
         node.setIsEnabled(1);
         nodeMapper.insert(node);
@@ -52,7 +54,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     public void update(MetadataFunctionNode node) {
         MetadataFunctionNode existing = nodeMapper.selectByCode(node.getModuleCode(), node.getNodeCode(), node.getBusinessCode());
         if (existing == null) {
-            throw new RuntimeException("节点不存在");
+            throw BizException.of(AppErrorCodes.FUNCTION_NODE_NOT_FOUND, "节点不存在");
         }
         node.setId(existing.getId());
         nodeMapper.update(node);

@@ -2,6 +2,8 @@ package com.metadata.service.impl;
 
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.entity.MetadataModule;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.mapper.MetadataBusinessSystemMapper;
 import com.metadata.mapper.MetadataModuleMapper;
 import com.metadata.service.MetadataBusinessSystemService;
@@ -109,7 +111,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     public void delete(Long id) {
         MetadataBusinessSystem defaultRow = businessSystemMapper.selectByCode("DEFAULT");
         if (defaultRow != null && defaultRow.getId().equals(id)) {
-            throw new RuntimeException("默认业务系统不能删除");
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_DEFAULT_CANNOT_DELETE, "默认业务系统不能删除");
         }
         MetadataBusinessSystem toRemove = businessSystemMapper.selectById(id);
         businessSystemMapper.delete(id);
@@ -125,7 +127,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Transactional
     public void associateModules(String businessCode, List<String> moduleCodes) {
         if (moduleCodes == null || moduleCodes.isEmpty()) {
-            throw new RuntimeException("模块编码列表不能为空");
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_MODULE_CODES_EMPTY, "模块编码列表不能为空");
         }
 
         // 批量更新模块的业务系统
@@ -140,7 +142,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Transactional
     public void disassociateModules(String businessCode, List<String> moduleCodes) {
         if (moduleCodes == null || moduleCodes.isEmpty()) {
-            throw new RuntimeException("模块编码列表不能为空");
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_MODULE_CODES_EMPTY, "模块编码列表不能为空");
         }
 
         // 将模块的业务系统设置为默认值

@@ -5,6 +5,7 @@ import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataOperationLog;
 import com.metadata.mapper.MetadataOperationLogMapper;
 import com.metadata.service.OperationLogService;
+import com.metadata.util.CurrentUserHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,7 +26,7 @@ public class OperationLogServiceImpl implements OperationLogService {
     @Override
     public void log(String operateUser, String operateType, String operateContent, Integer status, String errorMsg) {
         MetadataOperationLog log = new MetadataOperationLog();
-        log.setOperateUser(operateUser);
+        log.setOperateUser(CurrentUserHolder.resolveOperateUser(operateUser));
         log.setOperateType(operateType);
         log.setOperateContent(operateContent);
         log.setStatus(status);

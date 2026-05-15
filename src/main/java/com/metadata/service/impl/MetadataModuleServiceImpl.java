@@ -3,6 +3,8 @@ package com.metadata.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.entity.MetadataModule;
 import com.metadata.entity.MetadataModuleType;
@@ -55,15 +57,15 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     public void add(MetadataModule module, List<String> tableCodes) {
         // 校验模块对象是否为null
         if (module == null) {
-            throw new RuntimeException("模块对象不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_OBJECT_REQUIRED, "模块对象不能为空");
         }
         // 校验编码
         if (!CodeValidator.isValidCode(module.getModuleCode())) {
-            throw new RuntimeException("模块编码格式不正确");
+            throw BizException.of(AppErrorCodes.MODULE_CODE_INVALID, "模块编码格式不正确");
         }
         // 检查编码是否已存在
         if (moduleMapper.countByCode(module.getModuleCode()) > 0) {
-            throw new RuntimeException("模块编码已存在");
+            throw BizException.of(AppErrorCodes.MODULE_CODE_DUPLICATE, "模块编码已存在");
         }
         // 插入模块
         module.setStatus(1);
@@ -92,7 +94,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     public void update(MetadataModule module, List<String> tableCodes) {
         MetadataModule existing = moduleMapper.selectById(module.getId());
         if (existing == null) {
-            throw new RuntimeException("模块不存在");
+            throw BizException.of(AppErrorCodes.MODULE_NOT_FOUND, "模块不存在");
         }
         // 更新模块
         module.setModuleCode(existing.getModuleCode()); // 编码不可修改
@@ -126,7 +128,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     public void delete(Long id) {
         MetadataModule module = moduleMapper.selectById(id);
         if (module == null) {
-            throw new RuntimeException("模块不存在");
+            throw BizException.of(AppErrorCodes.MODULE_NOT_FOUND, "模块不存在");
         }
         // 删除关联表关系
         moduleTableMapper.deleteByModuleCode(module.getModuleCode());
@@ -142,7 +144,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     @Transactional
     public void batchDelete(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
-            throw new RuntimeException("删除ID列表不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_BATCH_IDS_EMPTY, "删除ID列表不能为空");
         }
         // 为每个ID调用单个删除方法，确保关联关系和日志记录正确
         for (Long id : ids) {
@@ -200,7 +202,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     public void updateStatus(Long id, Integer status) {
         MetadataModule module = moduleMapper.selectById(id);
         if (module == null) {
-            throw new RuntimeException("模块不存在");
+            throw BizException.of(AppErrorCodes.MODULE_NOT_FOUND, "模块不存在");
         }
 
         // 更新模块状态
@@ -223,7 +225,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     @Transactional
     public void batchUpdateStatus(List<Long> ids, Integer status) {
         if (ids == null || ids.isEmpty() || status == null) {
-            throw new RuntimeException("参数不能为空");
+            throw BizException.badRequest("参数不能为空");
         }
         int totalNodesUpdated = 0;
         for (Long id : ids) {
@@ -256,7 +258,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         // 获取模块，使用空字符串作为业务系统，查询所有业务系统的模块
         MetadataModule module = moduleMapper.selectByCode(moduleCode, "");
         if (module == null) {
-            throw new RuntimeException("模块不存在");
+            throw BizException.of(AppErrorCodes.MODULE_NOT_FOUND, "模块不存在");
         }
 
         // 更新模块的业务系统
@@ -280,7 +282,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
     @Transactional
     public void batchUpdateModuleBusinessSystem(List<String> moduleCodes, String businessCode) {
         if (moduleCodes == null || moduleCodes.isEmpty()) {
-            throw new RuntimeException("模块编码列表不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_CODE_LIST_EMPTY, "模块编码列表不能为空");
         }
 
         for (String moduleCode : moduleCodes) {
@@ -307,7 +309,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         // 获取模块详情
         MetadataModule module = getByCode(moduleCode);
         if (module == null) {
-            throw new RuntimeException("模块不存在：" + moduleCode);
+            throw BizException.of(AppErrorCodes.MODULE_NOT_FOUND, "模块不存在：" + moduleCode);
         }
 
         // 获取模块关联的表列表

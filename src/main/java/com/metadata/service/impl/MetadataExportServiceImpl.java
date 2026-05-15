@@ -1,7 +1,9 @@
 package com.metadata.service.impl;
 
 import com.alibaba.fastjson2.JSONObject;
+import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.entity.*;
+import com.metadata.exception.BizException;
 import com.metadata.mapper.*;
 import com.metadata.service.MetadataExportService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,7 +48,7 @@ public class MetadataExportServiceImpl implements MetadataExportService {
     public JSONObject exportModule(String moduleCode) {
         MetadataModule module = moduleMapper.selectByCode(moduleCode);
         if (module == null) {
-            throw new RuntimeException("模块不存在");
+            throw BizException.of(AppErrorCodes.MODULE_NOT_FOUND, "模块不存在");
         }
 
         JSONObject result = new JSONObject();
@@ -85,7 +87,7 @@ public class MetadataExportServiceImpl implements MetadataExportService {
     public JSONObject exportTable(String tableCode) {
         MetadataTable table = tableMapper.selectByCode(tableCode);
         if (table == null) {
-            throw new RuntimeException("表不存在");
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, "表不存在");
         }
 
         JSONObject result = new JSONObject();

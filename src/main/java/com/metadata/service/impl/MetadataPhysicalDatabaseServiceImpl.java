@@ -136,6 +136,8 @@ public class MetadataPhysicalDatabaseServiceImpl implements MetadataPhysicalData
     private void dropCatalogOnInstance(String catalogName) {
         try {
             mySqlPhysicalCatalogService.dropCatalogIfExists(catalogName);
+        } catch (BizException ex) {
+            throw ex;
         } catch (RuntimeException ex) {
             throw BizException.of(AppErrorCodes.PHYSICAL_DB_DROP_FAILED,
                     "元数据已删除，但删除服务器库失败: " + ex.getMessage(), ex);

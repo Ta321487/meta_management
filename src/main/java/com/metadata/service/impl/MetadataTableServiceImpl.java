@@ -3,6 +3,8 @@ package com.metadata.service.impl;
 import com.alibaba.fastjson2.JSON;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
@@ -68,10 +70,10 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     @Transactional
     public void add(MetadataTable table) {
         if (!CodeValidator.isValidCode(table.getTableCode())) {
-            throw new RuntimeException("表编码格式不正确");
+            throw BizException.of(AppErrorCodes.TABLE_CODE_INVALID, "表编码格式不正确");
         }
         if (tableMapper.countByCode(table.getTableCode()) > 0) {
-            throw new RuntimeException("表编码已存在");
+            throw BizException.of(AppErrorCodes.TABLE_CODE_DUPLICATE, "表编码已存在");
         }
         // 确保businessCode不为null，使用DEFAULT作为默认值
         if (table.getBusinessCode() == null || table.getBusinessCode().isEmpty()) {
@@ -140,13 +142,16 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode());
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw new RuntimeException("创建数据库表失败: " + sqlResult.get("message"));
+                throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED,
+                        "创建数据库表失败: " + sqlResult.get("message"));
             }
             logService.logSuccess("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL成功: " + table.getTableCode());
+        } catch (BizException e) {
+            throw e;
         } catch (Exception e) {
             // SQL执行失败，记录日志并抛出异常
             logService.logError("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL失败: " + table.getTableCode(), e.getMessage());
-            throw new RuntimeException("创建数据库表失败: " + e.getMessage());
+            throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED, "创建数据库表失败: " + e.getMessage(), e);
         }
 
         logService.logSuccess("admin", "ADD", "新增表：" + JSON.toJSONString(table));
@@ -160,13 +165,13 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     public void update(MetadataTable table) {
         MetadataTable existing = tableMapper.selectById(table.getId());
         if (existing == null) {
-            throw new RuntimeException("表不存在");
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, "表不存在");
         }
         table.setTableCode(existing.getTableCode()); // 编码不可修改
 
         // 检查主键生成策略是否变更
         if (table.getPkStrategy() != null && !existing.getPkStrategy().equals(table.getPkStrategy())) {
-            throw new RuntimeException("主键生成策略不允许修改，请删除表后重新创建");
+            throw BizException.of(AppErrorCodes.TABLE_PK_STRATEGY_IMMUTABLE, "主键生成策略不允许修改，请删除表后重新创建");
         }
 
         // 检查业务系统是否变更
@@ -231,7 +236,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     public void delete(Long id) {
         MetadataTable table = tableMapper.selectById(id);
         if (table == null) {
-            throw new RuntimeException("表不存在");
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, "表不存在");
         }
 
         String tableCode = table.getTableCode();
@@ -255,6 +260,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
 
         // 删除字段
         fieldMapper.deleteByTableCode(tableCode);
+        // 删除表关联关系
+        relationMapper.deleteByTableCodeEitherSide(tableCode);
         // 删除模块关联
         moduleTableMapper.deleteByTableCode(tableCode);
         // 删除表元数据
@@ -269,7 +276,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     @Transactional
     public void batchDelete(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
-            throw new RuntimeException("删除ID列表不能为空");
+            throw BizException.of(AppErrorCodes.TABLE_BATCH_IDS_EMPTY, "删除ID列表不能为空");
         }
         // 为每个ID调用单个删除方法，确保物理结构删除和关联关系处理正确
         for (Long id : ids) {
@@ -371,7 +378,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 获取表信息
         MetadataTable table = tableMapper.selectByCode(tableCode);
         if (table == null) {
-            throw new RuntimeException("表不存在");
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, "表不存在");
         }
 
         // 更新表的业务系统
@@ -397,7 +404,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     @Transactional
     public void batchUpdateTableBusinessSystem(List<String> tableCodes, String businessCode) {
         if (tableCodes == null || tableCodes.isEmpty()) {
-            throw new RuntimeException("表编码列表不能为空");
+            throw BizException.of(AppErrorCodes.TABLE_BATCH_CODES_EMPTY, "表编码列表不能为空");
         }
 
         for (String tableCode : tableCodes) {
@@ -423,7 +430,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     @Transactional
     public void batchUpdateStatus(List<Long> ids, Integer status) {
         if (ids == null || ids.isEmpty() || status == null) {
-            throw new RuntimeException("参数不能为空");
+            throw BizException.badRequest("参数不能为空");
         }
         for (Long id : ids) {
             MetadataTable table = tableMapper.selectById(id);

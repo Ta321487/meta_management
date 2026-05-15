@@ -29,6 +29,13 @@ public final class AppErrorCodes {
     // ---------- 表 10xx ----------
     /** 表在元数据中不存在或未登记 */
     public static final int TABLE_NOT_FOUND = 1001;
+    public static final int TABLE_CODE_INVALID = 1002;
+    public static final int TABLE_CODE_DUPLICATE = 1003;
+    public static final int TABLE_CREATE_DDL_FAILED = 1004;
+    public static final int TABLE_PK_STRATEGY_IMMUTABLE = 1005;
+    public static final int TABLE_BATCH_IDS_EMPTY = 1006;
+    public static final int TABLE_BATCH_CODES_EMPTY = 1007;
+    public static final int TABLE_PARAM_INVALID = 1008;
 
     // ---------- 字段 11xx ----------
     public static final int FIELD_CODE_INVALID = 1101;
@@ -53,20 +60,41 @@ public final class AppErrorCodes {
     /** 不允许禁用主键字段 */
     public static final int FIELD_PRIMARY_CANNOT_DISABLE = 1115;
 
-    // ---------- 业务系统 12xx（预留） ----------
+    // ---------- 业务系统 12xx ----------
     public static final int BIZ_SYSTEM_NOT_FOUND = 1201;
+    public static final int BIZ_SYSTEM_DEFAULT_CANNOT_DELETE = 1202;
+    public static final int BIZ_SYSTEM_MODULE_CODES_EMPTY = 1203;
 
-    // ---------- 模块 13xx（预留） ----------
+    // ---------- 模块 13xx ----------
     public static final int MODULE_NOT_FOUND = 1301;
+    public static final int MODULE_CODE_INVALID = 1302;
+    public static final int MODULE_CODE_DUPLICATE = 1303;
+    public static final int MODULE_OBJECT_REQUIRED = 1304;
+    public static final int MODULE_BATCH_IDS_EMPTY = 1305;
+    public static final int MODULE_CODE_LIST_EMPTY = 1306;
+    public static final int MODULE_TYPE_CODE_REQUIRED = 1311;
+    public static final int MODULE_TYPE_NAME_REQUIRED = 1312;
+    public static final int MODULE_TYPE_CODE_DUPLICATE = 1313;
+    public static final int MODULE_TYPE_ID_REQUIRED = 1314;
+    public static final int MODULE_TYPE_CODE_CONFLICT = 1315;
 
     // ---------- 关联 / 外键 14xx ----------
     /** 关联服务返回业务失败（success=false） */
     public static final int RELATION_OPERATION_FAILED = 1401;
     /** 外键同步过程异常 */
     public static final int RELATION_FK_SYNC_FAILED = 1402;
+    public static final int RELATION_NOT_FOUND = 1403;
+    public static final int RELATION_CODE_DUPLICATE = 1404;
+    public static final int RELATION_CODE_INVALID = 1405;
+    public static final int RELATION_BUSINESS_SYSTEM_NOT_CONFIGURED = 1406;
+    public static final int RELATION_CROSS_BUSINESS_SYSTEM = 1407;
+    public static final int RELATION_TABLE_NOT_FOUND = 1408;
+    public static final int RELATION_TABLE_DISABLED = 1409;
+    public static final int RELATION_FIELD_NOT_FOUND = 1410;
 
     // ---------- SQL 工具 15xx ----------
     public static final int SQL_TEXT_EMPTY = 1501;
+    public static final int SQL_EXECUTE_FAILED = 1502;
 
     // ---------- 物理库登记 16xx ----------
     /** 物理库登记记录不存在 */
@@ -80,6 +108,19 @@ public final class AppErrorCodes {
 
     /** 在实例上删除物理库失败 */
     public static final int PHYSICAL_DB_DROP_FAILED = 1605;
+    public static final int PHYSICAL_DB_SYSTEM_CATALOG_PROTECTED = 1606;
+    public static final int PHYSICAL_DB_METADATA_CATALOG_PROTECTED = 1607;
+    public static final int PHYSICAL_DB_CREATE_FAILED = 1608;
+
+    // ---------- 功能节点 17xx ----------
+    public static final int FUNCTION_NODE_CODE_INVALID = 1701;
+    public static final int FUNCTION_NODE_NOT_FOUND = 1702;
+
+    // ---------- 业务规则 18xx ----------
+    public static final int BUSINESS_RULE_CODE_INVALID = 1801;
+    public static final int BUSINESS_RULE_NOT_FOUND = 1802;
+    public static final int BUSINESS_RULE_MODULE_NO_TABLE = 1803;
+    public static final int BUSINESS_RULE_FIELD_MISMATCH = 1804;
 
     // ---------- 认证 90xx ----------
     public static final int AUTH_SESSION_REQUIRED = 9001;

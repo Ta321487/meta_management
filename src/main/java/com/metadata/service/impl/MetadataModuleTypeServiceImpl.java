@@ -1,6 +1,8 @@
 package com.metadata.service.impl;
 
+import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.entity.MetadataModuleType;
+import com.metadata.exception.BizException;
 import com.metadata.mapper.MetadataModuleTypeMapper;
 import com.metadata.service.MetadataModuleTypeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,16 +42,16 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
     public void add(MetadataModuleType type) {
         // 验证必填字段
         if (type.getTypeCode() == null || type.getTypeCode().trim().isEmpty()) {
-            throw new RuntimeException("模块类型编码不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_CODE_REQUIRED, "模块类型编码不能为空");
         }
         if (type.getTypeName() == null || type.getTypeName().trim().isEmpty()) {
-            throw new RuntimeException("模块类型名称不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_NAME_REQUIRED, "模块类型名称不能为空");
         }
 
         // 验证typeCode唯一性
         MetadataModuleType existing = typeMapper.selectByCode(type.getTypeCode());
         if (existing != null) {
-            throw new RuntimeException("模块类型编码已存在");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_CODE_DUPLICATE, "模块类型编码已存在");
         }
 
         // 插入数据
@@ -63,21 +65,21 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
     public void update(MetadataModuleType type) {
         // 验证id不能为空
         if (type.getId() == null) {
-            throw new RuntimeException("模块类型ID不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_ID_REQUIRED, "模块类型ID不能为空");
         }
 
         // 验证必填字段
         if (type.getTypeCode() == null || type.getTypeCode().trim().isEmpty()) {
-            throw new RuntimeException("模块类型编码不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_CODE_REQUIRED, "模块类型编码不能为空");
         }
         if (type.getTypeName() == null || type.getTypeName().trim().isEmpty()) {
-            throw new RuntimeException("模块类型名称不能为空");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_NAME_REQUIRED, "模块类型名称不能为空");
         }
 
         // 验证模块类型是否存在
         MetadataModuleType existing = typeMapper.selectByCode(type.getTypeCode());
         if (existing != null && !existing.getId().equals(type.getId())) {
-            throw new RuntimeException("模块类型编码已被其他记录使用");
+            throw BizException.of(AppErrorCodes.MODULE_TYPE_CODE_CONFLICT, "模块类型编码已被其他记录使用");
         }
 
         // 更新数据
