@@ -30,13 +30,10 @@ public class CodeGeneratorController {
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String sql = codeGeneratorService.generateCreateTableSQL(tableCode, businessCode);
-            return Result.success(sql);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String sql = codeGeneratorService.generateCreateTableSQL(tableCode, businessCode);
+        return Result.success(sql);
+
     }
 
     /**
@@ -49,13 +46,10 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example.entity") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateEntity(tableCode, packageName, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateEntity(tableCode, packageName, businessCode);
+        return Result.success(code);
+
     }
 
     /**
@@ -68,13 +62,10 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateController(tableCode, packageName, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateController(tableCode, packageName, businessCode);
+        return Result.success(code);
+
     }
 
     /**
@@ -87,13 +78,10 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateServiceInterface(tableCode, packageName, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateServiceInterface(tableCode, packageName, businessCode);
+        return Result.success(code);
+
     }
     
     /**
@@ -106,13 +94,10 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateServiceImpl(tableCode, packageName, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateServiceImpl(tableCode, packageName, businessCode);
+        return Result.success(code);
+
     }
     
     /**
@@ -127,13 +112,10 @@ public class CodeGeneratorController {
             @Parameter(description = "业务系统编码")
             @RequestParam(required = false) String businessCode,
             @Parameter(description = "是否使用接口，true:生成接口+实现类，false:生成传统Service类")
-            @RequestParam(defaultValue = "false") boolean useInterface) {
-        try {
-            String code = codeGeneratorService.generateService(tableCode, packageName, businessCode, useInterface);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "false") boolean useInterface) throws Exception {
+        String code = codeGeneratorService.generateService(tableCode, packageName, businessCode, useInterface);
+        return Result.success(code);
+
     }
 
     /**
@@ -146,13 +128,10 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateMapper(tableCode, packageName, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateMapper(tableCode, packageName, businessCode);
+        return Result.success(code);
+
     }
 
     /**
@@ -165,13 +144,10 @@ public class CodeGeneratorController {
             @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateMapperXml(tableCode, packageName, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateMapperXml(tableCode, packageName, businessCode);
+        return Result.success(code);
+
     }
 
     /**
@@ -183,13 +159,10 @@ public class CodeGeneratorController {
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateVueList(tableCode, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateVueList(tableCode, businessCode);
+        return Result.success(code);
+
     }
 
     /**
@@ -201,13 +174,10 @@ public class CodeGeneratorController {
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateVueForm(tableCode, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateVueForm(tableCode, businessCode);
+        return Result.success(code);
+
     }
     
     /**
@@ -217,13 +187,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成登录页")
     public Result<String> generateLoginPage(
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateLoginPage(businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateLoginPage(businessCode);
+        return Result.success(code);
+
     }
 
     /**
@@ -238,13 +205,10 @@ public class CodeGeneratorController {
             @Parameter(description = "业务系统编码")
             @RequestParam(required = false) String businessCode,
             @Parameter(description = "是否使用接口模式生成Service")
-            @RequestParam(defaultValue = "false") boolean useInterface) {
-        try {
-            Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface);
-            return Result.success(codeMap);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "false") boolean useInterface) throws Exception {
+        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface);
+        return Result.success(codeMap);
+
     }
 
     /**
@@ -256,13 +220,10 @@ public class CodeGeneratorController {
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateRoutes(tableCode, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateRoutes(tableCode, businessCode);
+        return Result.success(code);
+
     }
     
     /**
@@ -272,13 +233,10 @@ public class CodeGeneratorController {
     @Operation(description = "生成业务系统下所有表的整合路由配置")
     public Result<String> generateIntegratedRoutes(
             @Parameter(description = "业务系统编码")
-            @PathVariable String businessCode) {
-        try {
-            String code = codeGeneratorService.generateIntegratedRoutes(businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @PathVariable String businessCode) throws Exception {
+        String code = codeGeneratorService.generateIntegratedRoutes(businessCode);
+        return Result.success(code);
+
     }
     
     /**
@@ -291,13 +249,10 @@ public class CodeGeneratorController {
             @PathVariable String businessCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "是否使用接口模式生成Service")
-            @RequestParam(defaultValue = "false") boolean useInterface) {
-        try {
-            Map<String, Map<String, String>> codeMap = codeGeneratorService.generateAllByBusinessSystem(businessCode, packageName, useInterface);
-            return Result.success(codeMap);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "false") boolean useInterface) throws Exception {
+        Map<String, Map<String, String>> codeMap = codeGeneratorService.generateAllByBusinessSystem(businessCode, packageName, useInterface);
+        return Result.success(codeMap);
+
     }
     
     /**
@@ -307,13 +262,10 @@ public class CodeGeneratorController {
     @Operation(description = "生成业务系统下所有表的SQL")
     public Result<Map<String, String>> generateAllSQLByBusinessSystem(
             @Parameter(description = "业务系统编码")
-            @PathVariable String businessCode) {
-        try {
-            Map<String, String> sqlMap = codeGeneratorService.generateAllSQLByBusinessSystem(businessCode);
-            return Result.success(sqlMap);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @PathVariable String businessCode) throws Exception {
+        Map<String, String> sqlMap = codeGeneratorService.generateAllSQLByBusinessSystem(businessCode);
+        return Result.success(sqlMap);
+
     }
 
     /**
@@ -323,13 +275,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成Result统一响应结果类")
     public Result<String> generateResult(
             @Parameter(description = "包名")
-            @RequestParam(defaultValue = "com.example.common") String packageName) {
-        try {
-            String code = codeGeneratorService.generateResult(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "com.example.common") String packageName) throws Exception {
+        String code = codeGeneratorService.generateResult(packageName);
+        return Result.success(code);
+
     }
 
     /**
@@ -339,13 +288,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成PageRequest分页请求类")
     public Result<String> generatePageRequest(
             @Parameter(description = "包名")
-            @RequestParam(defaultValue = "com.example.common") String packageName) {
-        try {
-            String code = codeGeneratorService.generatePageRequest(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "com.example.common") String packageName) throws Exception {
+        String code = codeGeneratorService.generatePageRequest(packageName);
+        return Result.success(code);
+
     }
 
     /**
@@ -355,13 +301,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成PageResult分页结果类")
     public Result<String> generatePageResult(
             @Parameter(description = "包名")
-            @RequestParam(defaultValue = "com.example.common") String packageName) {
-        try {
-            String code = codeGeneratorService.generatePageResult(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "com.example.common") String packageName) throws Exception {
+        String code = codeGeneratorService.generatePageResult(packageName);
+        return Result.success(code);
+
     }
     
     /**
@@ -373,13 +316,10 @@ public class CodeGeneratorController {
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
             @Parameter(description = "业务系统编码")
-            @RequestParam(required = false) String businessCode) {
-        try {
-            String code = codeGeneratorService.generateApi(tableCode, businessCode);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(required = false) String businessCode) throws Exception {
+        String code = codeGeneratorService.generateApi(tableCode, businessCode);
+        return Result.success(code);
+
     }
     
     /**
@@ -387,13 +327,10 @@ public class CodeGeneratorController {
      */
     @GetMapping("/common/requestJs")
     @Operation(summary = "生成request.js工具类")
-    public Result<String> generateRequestJs() {
-        try {
-            String code = codeGeneratorService.generateRequestJs();
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+    public Result<String> generateRequestJs() throws Exception {
+        String code = codeGeneratorService.generateRequestJs();
+        return Result.success(code);
+
     }
     
     /**
@@ -401,13 +338,10 @@ public class CodeGeneratorController {
      */
     @GetMapping("/common/auth")
     @Operation(summary = "生成认证API文件")
-    public Result<String> generateAuth() {
-        try {
-            String code = codeGeneratorService.generateAuth();
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+    public Result<String> generateAuth() throws Exception {
+        String code = codeGeneratorService.generateAuth();
+        return Result.success(code);
+
     }
     
     /**
@@ -415,13 +349,10 @@ public class CodeGeneratorController {
      */
     @GetMapping("/common/env")
     @Operation(summary = "生成.env环境配置文件")
-    public Result<String> generateEnvFile() {
-        try {
-            String code = codeGeneratorService.generateEnvFile();
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+    public Result<String> generateEnvFile() throws Exception {
+        String code = codeGeneratorService.generateEnvFile();
+        return Result.success(code);
+
     }
     
     /**
@@ -431,13 +362,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成CORS配置类")
     public Result<String> generateCorsConfig(
             @Parameter(description = "包名")
-            @RequestParam(defaultValue = "com.example.config") String packageName) {
-        try {
-            String code = codeGeneratorService.generateCorsConfig(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam(defaultValue = "com.example.config") String packageName) throws Exception {
+        String code = codeGeneratorService.generateCorsConfig(packageName);
+        return Result.success(code);
+
     }
 
     /**
@@ -447,13 +375,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成Spring Boot启动类")
     public Result<String> generateApplication(
             @Parameter(description = "包名")
-            @RequestParam String packageName) {
-        try {
-            String code = codeGeneratorService.generateApplication(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam String packageName) throws Exception {
+        String code = codeGeneratorService.generateApplication(packageName);
+        return Result.success(code);
+
     }
 
     /**
@@ -463,13 +388,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成application.yml配置文件")
     public Result<String> generateApplicationYml(
             @Parameter(description = "包名")
-            @RequestParam String packageName) {
-        try {
-            String code = codeGeneratorService.generateApplicationConfig(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam String packageName) throws Exception {
+        String code = codeGeneratorService.generateApplicationConfig(packageName);
+        return Result.success(code);
+
     }
     
     /**
@@ -479,13 +401,10 @@ public class CodeGeneratorController {
     @Operation(summary = "生成MyBatis配置类")
     public Result<String> generateMyBatisConfig(
             @Parameter(description = "包名")
-            @RequestParam String packageName) {
-        try {
-            String code = codeGeneratorService.generateMyBatisConfig(packageName);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam String packageName) throws Exception {
+        String code = codeGeneratorService.generateMyBatisConfig(packageName);
+        return Result.success(code);
+
     }
     
     /**
@@ -495,17 +414,14 @@ public class CodeGeneratorController {
     @Operation(summary = "生成pom.xml配置文件")
     public Result<String> generatePomXml(
             @Parameter(description = "包名")
-            @RequestParam String packageName) {
-        try {
-            String groupId = packageName;
-            String artifactId = packageName.substring(packageName.lastIndexOf(".") + 1);
-            String name = artifactId.substring(0, 1).toUpperCase() + artifactId.substring(1);
-            String description = name;
-            String code = codeGeneratorService.generatePomXml(groupId, artifactId, name, description);
-            return Result.success(code);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+            @RequestParam String packageName) throws Exception {
+        String groupId = packageName;
+        String artifactId = packageName.substring(packageName.lastIndexOf(".") + 1);
+        String name = artifactId.substring(0, 1).toUpperCase() + artifactId.substring(1);
+        String description = name;
+        String code = codeGeneratorService.generatePomXml(groupId, artifactId, name, description);
+        return Result.success(code);
+
     }
     
 }

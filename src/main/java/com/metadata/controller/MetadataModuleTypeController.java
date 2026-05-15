@@ -31,12 +31,9 @@ public class MetadataModuleTypeController {
      */
     @PostMapping("/add")
     public Result<?> add(@RequestBody MetadataModuleType type) {
-        try {
-            typeService.add(type);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        typeService.add(type);
+        return Result.success();
+
     }
 
     /**
@@ -44,12 +41,9 @@ public class MetadataModuleTypeController {
      */
     @PostMapping("/update")
     public Result<?> update(@RequestBody MetadataModuleType type) {
-        try {
-            typeService.update(type);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        typeService.update(type);
+        return Result.success();
+
     }
 
     /**
@@ -57,12 +51,9 @@ public class MetadataModuleTypeController {
      */
     @DeleteMapping("/delete/{id}")
     public Result<?> delete(@PathVariable Long id) {
-        try {
-            typeService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        typeService.delete(id);
+        return Result.success();
+
     }
 }
 

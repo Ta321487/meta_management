@@ -2,6 +2,8 @@ package com.metadata.interceptor;
 
 import com.alibaba.fastjson2.JSON;
 import com.metadata.common.Result;
+import com.metadata.common.codes.ApiMessages;
+import com.metadata.common.codes.AppErrorCodes;
 import org.springframework.web.servlet.HandlerInterceptor;
 
 import javax.servlet.http.HttpServletRequest;
@@ -20,7 +22,7 @@ public class LoginInterceptor implements HandlerInterceptor {
             // 未登录，返回JSON响应
             response.setContentType("application/json;charset=UTF-8");
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            Result<Object> result = Result.error(401, "未登录，请先登录");
+            Result<Object> result = Result.error(AppErrorCodes.AUTH_SESSION_REQUIRED, ApiMessages.LOGIN_REQUIRED);
             response.getWriter().write(JSON.toJSONString(result));
             return false;
         }

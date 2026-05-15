@@ -23,12 +23,9 @@ public class MetadataExportController {
      */
     @GetMapping("/module/{moduleCode}")
     public Result<JSONObject> getModuleMetadata(@PathVariable String moduleCode) {
-        try {
-            JSONObject data = exportService.exportModule(moduleCode);
-            return Result.success(data);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        JSONObject data = exportService.exportModule(moduleCode);
+        return Result.success(data);
+
     }
 
     /**
@@ -36,12 +33,9 @@ public class MetadataExportController {
      */
     @GetMapping("/table/{tableCode}/fields")
     public Result<JSONObject> getTableFields(@PathVariable String tableCode) {
-        try {
-            JSONObject data = exportService.exportTable(tableCode);
-            return Result.success(data);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        JSONObject data = exportService.exportTable(tableCode);
+        return Result.success(data);
+
     }
 
     /**
@@ -49,12 +43,9 @@ public class MetadataExportController {
      */
     @GetMapping("/export/all")
     public Result<JSONObject> exportAll() {
-        try {
-            JSONObject data = exportService.exportAll();
-            return Result.success(data);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        JSONObject data = exportService.exportAll();
+        return Result.success(data);
+
     }
 }
 

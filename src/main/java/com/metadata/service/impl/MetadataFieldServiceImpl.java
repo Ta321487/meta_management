@@ -4,6 +4,10 @@ import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
+import com.metadata.common.codes.ApiMessages;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.common.codes.FieldMessages;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.entity.MetadataBusinessRule;
 import com.metadata.entity.MetadataField;
@@ -118,7 +122,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Transactional
     public void add(MetadataField field) {
         if (!CodeValidator.isValidCode(field.getFieldCode())) {
-            throw new RuntimeException("字段编码格式不正确");
+            throw BizException.of(AppErrorCodes.FIELD_CODE_INVALID, FieldMessages.FIELD_CODE_INVALID);
         }
         
         // 元数据操作使用大写的字段编码
@@ -143,7 +147,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         }
         // 检查字段编码是否已存在，传递业务系统编码
         if (fieldMapper.countByCode(field.getTableCode(), field.getFieldCode(), field.getBusinessCode()) > 0) {
-            throw new RuntimeException("字段编码已存在");
+            throw BizException.of(AppErrorCodes.FIELD_CODE_DUPLICATE, ApiMessages.FIELD_CODE_EXISTS);
         }
         // 设置isEnabled默认值
         if (field.getIsEnabled() == null) {
@@ -162,12 +166,15 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             String alterSql = codeGeneratorService.generateAlterTableAddColumnSQL(field.getTableCode(), field);
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw new RuntimeException("执行ALTER TABLE ADD COLUMN失败: " + sqlResult.get("message"));
+                throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + sqlResult.get("message"));
             }
             logService.logSuccess("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
         } catch (Exception e) {
             logService.logError("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN失败", e.getMessage());
-            throw new RuntimeException("执行ALTER TABLE ADD COLUMN失败: " + e.getMessage());
+            if (e instanceof BizException) {
+                throw (BizException) e;
+            }
+            throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + e.getMessage(), e);
         }
 
         // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息），传递业务系统编码
@@ -187,7 +194,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         String upperFieldCode = field.getFieldCode().toUpperCase();
         MetadataField existing = fieldMapper.selectByCode(field.getTableCode(), upperFieldCode);
         if (existing == null) {
-            throw new RuntimeException("字段不存在");
+            throw BizException.of(AppErrorCodes.FIELD_NOT_FOUND, FieldMessages.FIELD_NOT_FOUND);
         }
         field.setId(existing.getId());
         field.setFieldCode(existing.getFieldCode()); // 编码不可修改
@@ -243,7 +250,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
                 Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
                 if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                    throw new RuntimeException("执行" + operationType + "失败: " + sqlResult.get("message"));
+                    throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.alterNamedOpFailed(operationType, sqlResult.get("message")));
                 }
                 logService.logSuccess("admin", operationType, "执行" + operationType + "成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
             } else {
@@ -253,7 +260,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             }
         } catch (Exception e) {
             logService.logError("admin", "ALTER_TABLE_OPERATION", "执行ALTER TABLE操作失败", e.getMessage());
-            throw new RuntimeException("执行ALTER TABLE操作失败: " + e.getMessage());
+            if (e instanceof BizException) {
+                throw (BizException) e;
+            }
+            throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_TABLE_OP_FAILED_PREFIX + e.getMessage(), e);
         }
 
         // 每次编辑字段时都检查并处理CHECK约束
@@ -306,7 +316,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     public void delete(Long id) {
         MetadataField field = fieldMapper.selectById(id);
         if (field == null) {
-            throw new RuntimeException("字段不存在");
+            throw BizException.of(AppErrorCodes.FIELD_NOT_FOUND, FieldMessages.FIELD_NOT_FOUND);
         }
 
         // 增强主键字段判断：检查formComponent或字段名为id/uuid
@@ -330,13 +340,13 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         }
 
         if (isPrimaryKey) {
-            throw new RuntimeException("主键字段不允许删除");
+            throw BizException.of(AppErrorCodes.FIELD_PRIMARY_CANNOT_DELETE, FieldMessages.PRIMARY_KEY_CANNOT_DELETE);
         }
 
         // 检查表中字段数量，不能删除最后一个字段
         Long fieldCount = fieldMapper.countByTableCode(field.getTableCode());
         if (fieldCount <= 1) {
-            throw new RuntimeException("不能删除表中最后一个字段");
+            throw BizException.of(AppErrorCodes.FIELD_LAST_COLUMN_CANNOT_DELETE, FieldMessages.CANNOT_DELETE_LAST_FIELD);
         }
 
         // 生成并执行ALTER TABLE DROP COLUMN语句
@@ -345,12 +355,15 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             String alterSql = codeGeneratorService.generateAlterTableDropColumnSQL(field.getTableCode(), field.getFieldName());
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw new RuntimeException("执行ALTER TABLE DROP COLUMN失败: " + sqlResult.get("message"));
+                throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_DROP_COLUMN_FAILED_PREFIX + sqlResult.get("message"));
             }
             logService.logSuccess("admin", "ALTER_TABLE_DROP_COLUMN", "执行ALTER TABLE DROP COLUMN成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
         } catch (Exception e) {
             logService.logError("admin", "ALTER_TABLE_DROP_COLUMN", "执行ALTER TABLE DROP COLUMN失败", e.getMessage());
-            throw new RuntimeException("执行ALTER TABLE DROP COLUMN失败: " + e.getMessage());
+            if (e instanceof BizException) {
+                throw (BizException) e;
+            }
+            throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_DROP_COLUMN_FAILED_PREFIX + e.getMessage(), e);
         }
 
         fieldMapper.deleteById(id);
@@ -364,7 +377,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Transactional
     public void batchDelete(List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
-            throw new RuntimeException("删除ID列表不能为空");
+            throw BizException.of(AppErrorCodes.FIELD_BATCH_IDS_EMPTY, FieldMessages.BATCH_DELETE_IDS_EMPTY);
         }
         // 为每个ID调用单个删除方法，确保物理结构删除和日志记录正确
         for (Long id : ids) {
@@ -406,6 +419,9 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
         String businessCode = fields.isEmpty() ? "" : (fields.get(0).getBusinessCode() != null ? fields.get(0).getBusinessCode() : "");
         MetadataTable metaTable = tableMapper.selectByCode(tableCode, businessCode);
+        if (metaTable == null) {
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, FieldMessages.TABLE_NOT_FOUND);
+        }
         String tableSchema = businessCatalogResolver.resolveCatalog(metaTable);
 
         // 获取表名
@@ -513,7 +529,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             Long id = Long.valueOf(idObj.toString());
             field = fieldMapper.selectById(id);
             if (field == null) {
-                throw new RuntimeException("字段不存在");
+                throw BizException.of(AppErrorCodes.FIELD_NOT_FOUND, FieldMessages.FIELD_NOT_FOUND);
             }
             tableCode = field.getTableCode();
             tableName = codeGeneratorService.convertToTableName(tableCode);
@@ -555,7 +571,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
         // 验证必要参数
         if (tableName == null || constraintName == null) {
-            throw new RuntimeException("缺少必要的约束信息");
+            throw BizException.of(AppErrorCodes.FIELD_CONSTRAINT_PARAM_INCOMPLETE, FieldMessages.CONSTRAINT_INFO_INCOMPLETE);
         }
 
         String phyCatalog = null;
@@ -604,7 +620,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
             // 禁止删除主键约束
             if (constraintType.equals("PRIMARY KEY")) {
-                throw new RuntimeException("主键约束不能被直接删除，若要修改主键请重新设计表结构");
+                throw BizException.of(AppErrorCodes.FIELD_PRIMARY_CONSTRAINT_CANNOT_DROP, FieldMessages.PRIMARY_CONSTRAINT_CANNOT_DROP);
             }
 
             // 构建删除约束的SQL语句
@@ -625,10 +641,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                         // 构建修改字段允许NULL的SQL
                         dropSql = "ALTER TABLE `" + tableName + "` MODIFY COLUMN `" + columnName + "` " + columnType + " NULL";
                     } else {
-                        throw new RuntimeException("未找到字段信息，无法删除非空约束");
+                        throw BizException.of(AppErrorCodes.FIELD_NN_COLUMN_NOT_FOUND, FieldMessages.NN_COLUMN_NOT_FOUND);
                     }
                 } else {
-                    throw new RuntimeException("查询字段类型失败，无法删除非空约束");
+                    throw BizException.of(AppErrorCodes.FIELD_NN_TYPE_QUERY_FAILED, FieldMessages.NN_COLUMN_TYPE_QUERY_FAILED);
                 }
             } else if (constraintType.equals("UNIQUE")) {
                 // 删除唯一索引，使用DROP INDEX语法
@@ -802,7 +818,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             }
         } catch (Exception e) {
             logService.logError("admin", "DELETE_CONSTRAINT", "删除约束失败", e.getMessage());
-            throw new RuntimeException("删除约束失败: " + e.getMessage());
+            if (e instanceof BizException) {
+                throw (BizException) e;
+            }
+            throw BizException.of(AppErrorCodes.FIELD_DELETE_CONSTRAINT_FAILED, FieldMessages.DELETE_CONSTRAINT_FAILED_PREFIX + e.getMessage(), e);
         }
     }
 
@@ -823,7 +842,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Transactional
     public void batchUpdateFieldsBusinessSystem(List<String> tableCodes, String businessCode) {
         if (tableCodes == null || tableCodes.isEmpty()) {
-            throw new RuntimeException("表编码列表不能为空");
+            throw BizException.of(AppErrorCodes.FIELD_BATCH_TABLE_CODES_EMPTY, FieldMessages.TABLE_CODES_EMPTY);
         }
 
         fieldMapper.batchUpdateFieldsBusinessSystem(tableCodes, businessCode);
@@ -837,7 +856,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Transactional
     public void batchUpdateStatus(List<Long> ids, Integer status) {
         if (ids == null || ids.isEmpty() || status == null) {
-            throw new RuntimeException("参数不能为空");
+            throw BizException.of(AppErrorCodes.FIELD_BATCH_STATUS_PARAM_INVALID, FieldMessages.BATCH_STATUS_PARAM_EMPTY);
         }
         for (Long id : ids) {
             MetadataField field = fieldMapper.selectById(id);
@@ -845,7 +864,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                 // 检查是否为主键字段
                 if ("primary_key".equals(field.getFormComponent()) || "id".equals(field.getFieldName()) || "uuid".equals(field.getFieldName())) {
                     if (status == 0) {
-                        throw new RuntimeException("主键字段不允许禁用");
+                        throw BizException.of(AppErrorCodes.FIELD_PRIMARY_CANNOT_DISABLE, FieldMessages.PRIMARY_KEY_CANNOT_DISABLE);
                     }
                 }
                 // 更新字段状态

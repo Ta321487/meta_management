@@ -3,7 +3,10 @@ package com.metadata.controller;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
+import com.metadata.common.codes.ApiMessages;
+import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.entity.MetadataTableRelation;
+import com.metadata.exception.BizException;
 import com.metadata.service.MetadataTableRelationService;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,32 +28,20 @@ public class MetadataTableRelationController {
 
     @PostMapping("/add")
     public Result<?> add(@RequestBody MetadataTableRelation relation) {
-        try {
-            relationService.add(relation);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        relationService.add(relation);
+        return Result.success();
     }
 
     @PostMapping("/update")
     public Result<?> update(@RequestBody MetadataTableRelation relation) {
-        try {
-            relationService.update(relation);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        relationService.update(relation);
+        return Result.success();
     }
 
     @DeleteMapping("/delete/{id}")
     public Result<?> delete(@PathVariable Long id) {
-        try {
-            relationService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        relationService.delete(id);
+        return Result.success();
     }
 
     @GetMapping("/listByMain/{mainTableCode}")
@@ -94,16 +85,11 @@ public class MetadataTableRelationController {
 
     @PostMapping("/createForeignKey")
     public Result<?> createForeignKey(@RequestBody MetadataTableRelation relation) {
-        try {
-            Map<String, Object> result = relationService.createForeignKey(relation);
-            if (Boolean.TRUE.equals(result.get("success"))) {
-                return Result.success(result.get("message"));
-            } else {
-                return Result.error(result.get("message").toString());
-            }
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+        Map<String, Object> result = relationService.createForeignKey(relation);
+        if (Boolean.TRUE.equals(result.get("success"))) {
+            return Result.success(result.get("message"));
         }
+        throw BizException.of(AppErrorCodes.RELATION_OPERATION_FAILED, result.get("message").toString());
     }
 
     @PostMapping("/syncForeignKeys")
@@ -112,12 +98,13 @@ public class MetadataTableRelationController {
             Map<String, Object> result = relationService.syncForeignKeys(tableCode);
             if (Boolean.TRUE.equals(result.get("success"))) {
                 return Result.success(result.get("message"));
-            } else {
-                return Result.error(result.get("message").toString());
             }
+            throw BizException.of(AppErrorCodes.RELATION_OPERATION_FAILED, result.get("message").toString());
+        } catch (BizException e) {
+            throw e;
         } catch (Exception e) {
-            return Result.error("同步外键失败: " + e.getMessage());
+            String detail = e.getMessage() != null ? e.getMessage() : "";
+            throw BizException.of(AppErrorCodes.RELATION_FK_SYNC_FAILED, ApiMessages.FK_SYNC_FAILED_PREFIX + detail, e);
         }
     }
 }
-

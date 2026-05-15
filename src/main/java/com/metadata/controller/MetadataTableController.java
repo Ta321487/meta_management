@@ -32,12 +32,9 @@ public class MetadataTableController {
     @PostMapping("/add")
     @Operation(summary = "新增表", description = "添加新的元数据表")
     public Result<?> add(@Parameter(description = "表信息") @RequestBody MetadataTable table) {
-        try {
-            tableService.add(table);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        tableService.add(table);
+        return Result.success();
+
     }
 
     /**
@@ -46,12 +43,9 @@ public class MetadataTableController {
     @PostMapping("/update")
     @Operation(summary = "更新表", description = "更新元数据表信息")
     public Result<?> update(@Parameter(description = "表信息") @RequestBody MetadataTable table) {
-        try {
-            tableService.update(table);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        tableService.update(table);
+        return Result.success();
+
     }
 
     /**
@@ -60,12 +54,9 @@ public class MetadataTableController {
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除表", description = "根据ID删除元数据表")
     public Result<?> delete(@Parameter(description = "表ID") @PathVariable Long id) {
-        try {
-            tableService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        tableService.delete(id);
+        return Result.success();
+
     }
 
     /**
@@ -74,12 +65,9 @@ public class MetadataTableController {
     @PostMapping("/batchDelete")
     @Operation(summary = "批量删除表", description = "根据ID列表批量删除元数据表")
     public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request) {
-        try {
-            tableService.batchDelete(request.getIds());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        tableService.batchDelete(request.getIds());
+        return Result.success();
+
     }
 
     /**
@@ -133,12 +121,9 @@ public class MetadataTableController {
     @Operation(summary = "批量更新表状态", description = "批量更新表的启用/禁用状态")
     public Result<?> batchUpdateStatus(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request, 
                                       @Parameter(description = "目标状态，1-启用，0-禁用") @RequestParam Integer status) {
-        try {
-            tableService.batchUpdateStatus(request.getIds(), status);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        tableService.batchUpdateStatus(request.getIds(), status);
+        return Result.success();
+
     }
     
     /**
@@ -147,14 +132,11 @@ public class MetadataTableController {
     @PostMapping("/batchAssignBusinessSystem")
     @Operation(summary = "批量分配业务系统", description = "批量更新表的业务系统")
     public Result<?> batchAssignBusinessSystem(@Parameter(description = "表编码列表和业务系统编码") @RequestBody Map<String, Object> request) {
-        try {
-            List<String> tableCodes = (List<String>) request.get("tableCodes");
-            String businessCode = (String) request.get("businessCode");
-            tableService.batchUpdateTableBusinessSystem(tableCodes, businessCode);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        List<String> tableCodes = (List<String>) request.get("tableCodes");
+        String businessCode = (String) request.get("businessCode");
+        tableService.batchUpdateTableBusinessSystem(tableCodes, businessCode);
+        return Result.success();
+
     }
 }
 

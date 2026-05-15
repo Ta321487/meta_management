@@ -3,6 +3,9 @@ package com.metadata.controller;
 import com.metadata.common.ChangePasswordRequest;
 import com.metadata.common.LoginRequest;
 import com.metadata.common.Result;
+import com.metadata.common.codes.ApiMessages;
+import com.metadata.common.codes.AppErrorCodes;
+import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataAdmin;
 import com.metadata.service.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -39,7 +42,7 @@ public class AuthController {
         String password = loginRequest.getPassword();
         MetadataAdmin admin = authService.login(username, password);
         if (admin == null) {
-            return Result.error("用户名或密码错误");
+            throw BizException.of(AppErrorCodes.AUTH_LOGIN_FAILED, ApiMessages.LOGIN_FAILED);
         }
         HttpSession session = request.getSession();
         session.setAttribute("admin", admin);
@@ -69,16 +72,15 @@ public class AuthController {
         HttpSession session = request.getSession();
         MetadataAdmin admin = (MetadataAdmin) session.getAttribute("admin");
         if (admin == null) {
-            return Result.error(401, "未登录");
+            throw BizException.unauthorized(ApiMessages.NOT_LOGGED_IN);
         }
         String oldPassword = changePasswordRequest.getOldPassword();
         String newPassword = changePasswordRequest.getNewPassword();
         boolean success = authService.changePassword(admin.getUsername(), oldPassword, newPassword);
         if (success) {
             return Result.success();
-        } else {
-            return Result.error("原密码错误");
         }
+        throw BizException.of(AppErrorCodes.AUTH_PASSWORD_INCORRECT, ApiMessages.WRONG_OLD_PASSWORD);
     }
 }
 

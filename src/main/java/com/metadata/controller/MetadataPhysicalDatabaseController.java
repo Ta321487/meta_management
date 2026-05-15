@@ -28,44 +28,32 @@ public class MetadataPhysicalDatabaseController {
     @PostMapping("/add")
     @Operation(summary = "新增登记")
     public Result<?> add(@RequestBody MetadataPhysicalDatabase row) {
-        try {
-            physicalDatabaseService.add(row);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        physicalDatabaseService.add(row);
+        return Result.success();
+
     }
 
     @PostMapping("/update")
     @Operation(summary = "更新登记")
     public Result<?> update(@RequestBody MetadataPhysicalDatabase row) {
-        try {
-            physicalDatabaseService.update(row);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        physicalDatabaseService.update(row);
+        return Result.success();
+
     }
 
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除登记")
     public Result<?> delete(@Parameter(description = "主键") @PathVariable Long id) {
-        try {
-            physicalDatabaseService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        physicalDatabaseService.delete(id);
+        return Result.success();
+
     }
 
     @PostMapping("/sync/{id}")
     @Operation(summary = "在实例上创建库（若不存在）")
     public Result<?> sync(@PathVariable Long id) {
-        try {
-            physicalDatabaseService.syncToInstance(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        physicalDatabaseService.syncToInstance(id);
+        return Result.success();
+
     }
 }

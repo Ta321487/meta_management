@@ -29,12 +29,9 @@ public class MetadataBusinessSystemController {
     @PostMapping("/add")
     @Operation(summary = "新增业务系统", description = "添加新的业务系统")
     public Result<?> add(@Parameter(description = "业务系统信息") @RequestBody MetadataBusinessSystem businessSystem) {
-        try {
-            businessSystemService.add(businessSystem);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        businessSystemService.add(businessSystem);
+        return Result.success();
+
     }
 
     /**
@@ -43,12 +40,9 @@ public class MetadataBusinessSystemController {
     @PostMapping("/update")
     @Operation(summary = "更新业务系统", description = "更新业务系统信息")
     public Result<?> update(@Parameter(description = "业务系统信息") @RequestBody MetadataBusinessSystem businessSystem) {
-        try {
-            businessSystemService.update(businessSystem);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        businessSystemService.update(businessSystem);
+        return Result.success();
+
     }
 
     /**
@@ -57,12 +51,9 @@ public class MetadataBusinessSystemController {
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除业务系统", description = "根据ID删除业务系统")
     public Result<?> delete(@Parameter(description = "业务系统ID") @PathVariable Long id) {
-        try {
-            businessSystemService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        businessSystemService.delete(id);
+        return Result.success();
+
     }
 
     /**
@@ -101,12 +92,9 @@ public class MetadataBusinessSystemController {
     @PostMapping("/associateModules")
     @Operation(summary = "关联模块到业务系统", description = "将多个模块关联到指定业务系统")
     public Result<?> associateModules(@Parameter(description = "关联模块请求参数") @RequestBody AssociateModulesRequest request) {
-        try {
-            businessSystemService.associateModules(request.getBusinessCode(), request.getModuleCodes());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        businessSystemService.associateModules(request.getBusinessCode(), request.getModuleCodes());
+        return Result.success();
+
     }
 
     /**
@@ -115,12 +103,9 @@ public class MetadataBusinessSystemController {
     @PostMapping("/disassociateModules")
     @Operation(summary = "解除模块关联", description = "解除多个模块与指定业务系统的关联")
     public Result<?> disassociateModules(@Parameter(description = "解除模块关联请求参数") @RequestBody AssociateModulesRequest request) {
-        try {
-            businessSystemService.disassociateModules(request.getBusinessCode(), request.getModuleCodes());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        businessSystemService.disassociateModules(request.getBusinessCode(), request.getModuleCodes());
+        return Result.success();
+
     }
 
     /**
@@ -129,11 +114,8 @@ public class MetadataBusinessSystemController {
     @GetMapping("/associatedModules/{businessCode}")
     @Operation(summary = "获取已关联模块", description = "获取指定业务系统已关联的模块列表")
     public Result<List<String>> getAssociatedModules(@Parameter(description = "业务系统编码") @PathVariable String businessCode) {
-        try {
-            List<String> moduleCodes = businessSystemService.getAssociatedModules(businessCode);
-            return Result.success(moduleCodes);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        List<String> moduleCodes = businessSystemService.getAssociatedModules(businessCode);
+        return Result.success(moduleCodes);
+
     }
 }

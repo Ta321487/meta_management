@@ -1,5 +1,7 @@
 package com.metadata.common;
 
+import com.metadata.common.codes.ApiMessages;
+import com.metadata.common.codes.AppErrorCodes;
 import lombok.Data;
 import java.io.Serializable;
 
@@ -11,7 +13,7 @@ public class Result<T> implements Serializable {
     private static final long serialVersionUID = 1L;
 
     /**
-     * 响应码：200-成功，其他-失败
+     * 响应码：200 成功；其余为应用层四位业务码（见 com.metadata.common.codes.AppErrorCodes）
      */
     private Integer code;
     
@@ -38,28 +40,28 @@ public class Result<T> implements Serializable {
      * 成功响应（无数据）
      */
     public static <T> Result<T> success() {
-        return new Result<>(200, "操作成功", null);
+        return new Result<>(AppErrorCodes.SUCCESS, ApiMessages.OPERATION_SUCCESS, null);
     }
 
     /**
      * 成功响应（带数据）
      */
     public static <T> Result<T> success(T data) {
-        return new Result<>(200, "操作成功", data);
+        return new Result<>(AppErrorCodes.SUCCESS, ApiMessages.OPERATION_SUCCESS, data);
     }
 
     /**
      * 成功响应（自定义消息和数据）
      */
     public static <T> Result<T> success(String message, T data) {
-        return new Result<>(200, message, data);
+        return new Result<>(AppErrorCodes.SUCCESS, message, data);
     }
 
     /**
-     * 失败响应（默认500错误码）
+     * 失败响应（默认 9999 系统内部错误码）
      */
     public static <T> Result<T> error(String message) {
-        return new Result<>(500, message, null);
+        return new Result<>(AppErrorCodes.SYSTEM_INTERNAL, message, null);
     }
 
     /**
@@ -73,7 +75,7 @@ public class Result<T> implements Serializable {
      * 判断是否成功
      */
     public boolean isSuccess() {
-        return code != null && code == 200;
+        return AppErrorCodes.isSuccess(code);
     }
     
     /**

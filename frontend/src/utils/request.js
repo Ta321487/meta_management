@@ -1,6 +1,7 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '../router'
+import { RESULT_OK, isAuthFailureCode } from '../constants/resultCodes'
 
 const service = axios.create({
   baseURL: '/metadata-system/api',
@@ -27,7 +28,7 @@ service.interceptors.request.use(
 service.interceptors.response.use(
   response => {
     const res = response.data
-    if (res.code === 401) {
+    if (isAuthFailureCode(res.code)) {
       ElMessage.error('未登录，请先登录')
       // 清除过期的sessionStorage信息
       sessionStorage.removeItem('admin')
@@ -36,7 +37,7 @@ service.interceptors.response.use(
       return Promise.reject(new Error('未登录'))
     }
     // 不在这里自动显示错误消息，让各个组件自己处理
-    if (res.code !== 200) {
+    if (res.code !== RESULT_OK) {
       return Promise.reject(new Error(res.message || '请求失败'))
     }
     return res
@@ -55,4 +56,3 @@ service.interceptors.response.use(
 )
 
 export default service
-

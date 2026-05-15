@@ -32,96 +32,93 @@ public class CodeTestController {
     public Result<Map<String, Object>> testCode(
             @Parameter(description = "表编码") @PathVariable String tableCode,
             @RequestParam(defaultValue = "com.example") String packageName,
-            @RequestParam(required = false) String businessCode) {
-        try {
-            // 生成所有代码
-            Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, false);
+            @RequestParam(required = false) String businessCode) throws Exception {
+        // 生成所有代码
+        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, false);
 
-            // 构造测试结果
-            Map<String, Object> result = new HashMap<>();
-            List<Map<String, Object>> testResults = new ArrayList<>();
+        // 构造测试结果
+        Map<String, Object> result = new HashMap<>();
+        List<Map<String, Object>> testResults = new ArrayList<>();
 
-            // 定义测试项配置
-            Map<String, Map<String, String>> testConfigMap = new HashMap<>();
-            testConfigMap.put("create_table.sql", Map.of("name", "建表SQL", "type", "数据库脚本"));
-            testConfigMap.put("Entity.java", Map.of("name", "实体类", "type", "Java代码"));
-            testConfigMap.put("Controller.java", Map.of("name", "控制器", "type", "Java代码"));
-            testConfigMap.put("Service.java", Map.of("name", "服务层", "type", "Java代码"));
-            testConfigMap.put("Mapper.java", Map.of("name", "数据访问层", "type", "Java代码"));
-            testConfigMap.put("Mapper.xml", Map.of("name", "映射文件", "type", "XML配置"));
-            testConfigMap.put("Application.java", Map.of("name", "启动类", "type", "Java代码"));
-            testConfigMap.put("application.yml", Map.of("name", "配置文件", "type", "YAML配置"));
-            testConfigMap.put("List.vue", Map.of("name", "列表页", "type", "Vue组件"));
-            testConfigMap.put("Form.vue", Map.of("name", "表单页", "type", "Vue组件"));
-            testConfigMap.put("routes.js", Map.of("name", "路由配置", "type", "前端配置"));
+        // 定义测试项配置
+        Map<String, Map<String, String>> testConfigMap = new HashMap<>();
+        testConfigMap.put("create_table.sql", Map.of("name", "建表SQL", "type", "数据库脚本"));
+        testConfigMap.put("Entity.java", Map.of("name", "实体类", "type", "Java代码"));
+        testConfigMap.put("Controller.java", Map.of("name", "控制器", "type", "Java代码"));
+        testConfigMap.put("Service.java", Map.of("name", "服务层", "type", "Java代码"));
+        testConfigMap.put("Mapper.java", Map.of("name", "数据访问层", "type", "Java代码"));
+        testConfigMap.put("Mapper.xml", Map.of("name", "映射文件", "type", "XML配置"));
+        testConfigMap.put("Application.java", Map.of("name", "启动类", "type", "Java代码"));
+        testConfigMap.put("application.yml", Map.of("name", "配置文件", "type", "YAML配置"));
+        testConfigMap.put("List.vue", Map.of("name", "列表页", "type", "Vue组件"));
+        testConfigMap.put("Form.vue", Map.of("name", "表单页", "type", "Vue组件"));
+        testConfigMap.put("routes.js", Map.of("name", "路由配置", "type", "前端配置"));
 
-            // 验证生成的每种代码类型
-            for (Map.Entry<String, String> entry : codeMap.entrySet()) {
-                String codeType = entry.getKey();
-                String code = entry.getValue();
+        // 验证生成的每种代码类型
+        for (Map.Entry<String, String> entry : codeMap.entrySet()) {
+            String codeType = entry.getKey();
+            String code = entry.getValue();
 
-                Map<String, Object> testResult = new HashMap<>();
-                Map<String, String> testConfig = testConfigMap.getOrDefault(codeType, Map.of("name", codeType, "type", "未知类型"));
+            Map<String, Object> testResult = new HashMap<>();
+            Map<String, String> testConfig = testConfigMap.getOrDefault(codeType, Map.of("name", codeType, "type", "未知类型"));
 
-                // 基本信息
-                testResult.put("name", testConfig.get("name"));
-                testResult.put("type", testConfig.get("type"));
+            // 基本信息
+            testResult.put("name", testConfig.get("name"));
+            testResult.put("type", testConfig.get("type"));
 
-                // 验证代码是否生成成功
-                boolean isSuccess = code != null && !code.trim().isEmpty();
-                String status = isSuccess ? "success" : "danger";
-                String message = isSuccess ? "生成成功" : "生成失败：代码为空";
+            // 验证代码是否生成成功
+            boolean isSuccess = code != null && !code.trim().isEmpty();
+            String status = isSuccess ? "success" : "danger";
+            String message = isSuccess ? "生成成功" : "生成失败：代码为空";
 
-                List<String> errors = new ArrayList<>();
-                List<String> warnings = new ArrayList<>();
+            List<String> errors = new ArrayList<>();
+            List<String> warnings = new ArrayList<>();
 
-                if (!isSuccess) {
-                    errors.add("代码内容为空");
-                } else {
-                    // 验证模板之间的逻辑关系
-                    try {
-                        validateTemplateLogic(codeType, code, codeMap);
-                    } catch (Exception e) {
-                        warnings.add(e.getMessage());
-                        if (status.equals("success")) {
-                            status = "warning";
-                        }
+            if (!isSuccess) {
+                errors.add("代码内容为空");
+            } else {
+                // 验证模板之间的逻辑关系
+                try {
+                    validateTemplateLogic(codeType, code, codeMap);
+                } catch (Exception e) {
+                    warnings.add(e.getMessage());
+                    if (status.equals("success")) {
+                        status = "warning";
                     }
                 }
-
-                testResult.put("status", status);
-                testResult.put("message", message);
-                testResult.put("errors", errors);
-                testResult.put("warnings", warnings);
-                
-                // 处理API测试信息
-                List<Map<String, String>> apiTests = new ArrayList<>();
-                if (isSuccess) {
-                    apiTests = processApiTests(codeType, code, codeMap);
-                }
-                testResult.put("apiTests", apiTests);
-
-                testResults.add(testResult);
             }
 
-            // 计算测试统计
-            int total = testResults.size();
-            int successCount = (int) testResults.stream().filter(r -> "success".equals(r.get("status"))).count();
-            int failCount = (int) testResults.stream().filter(r -> "danger".equals(r.get("status"))).count();
-            boolean allSuccess = successCount == total;
+            testResult.put("status", status);
+            testResult.put("message", message);
+            testResult.put("errors", errors);
+            testResult.put("warnings", warnings);
+            
+            // 处理API测试信息
+            List<Map<String, String>> apiTests = new ArrayList<>();
+            if (isSuccess) {
+                apiTests = processApiTests(codeType, code, codeMap);
+            }
+            testResult.put("apiTests", apiTests);
 
-            result.put("testResults", testResults);
-            result.put("success", allSuccess);
-            result.put("message", allSuccess ? "所有代码生成测试通过！" : "部分代码生成测试失败，请检查");
-            result.put("total", total);
-            result.put("successCount", successCount);
-            result.put("failCount", failCount);
-            result.put("generatedCode", codeMap);
-
-            return Result.success(result);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+            testResults.add(testResult);
         }
+
+        // 计算测试统计
+        int total = testResults.size();
+        int successCount = (int) testResults.stream().filter(r -> "success".equals(r.get("status"))).count();
+        int failCount = (int) testResults.stream().filter(r -> "danger".equals(r.get("status"))).count();
+        boolean allSuccess = successCount == total;
+
+        result.put("testResults", testResults);
+        result.put("success", allSuccess);
+        result.put("message", allSuccess ? "所有代码生成测试通过！" : "部分代码生成测试失败，请检查");
+        result.put("total", total);
+        result.put("successCount", successCount);
+        result.put("failCount", failCount);
+        result.put("generatedCode", codeMap);
+
+        return Result.success(result);
+
     }
 
     /**

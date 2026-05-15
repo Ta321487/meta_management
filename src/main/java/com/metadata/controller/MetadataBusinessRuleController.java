@@ -27,34 +27,25 @@ public class MetadataBusinessRuleController {
     @PostMapping("/add")
     @Operation(description = "添加业务规则")
     public Result<?> add(@Parameter(description = "业务规则信息") @RequestBody MetadataBusinessRule rule) {
-        try {
-            ruleService.add(rule);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        ruleService.add(rule);
+        return Result.success();
+
     }
 
     @PostMapping("/update")
     @Operation(description = "更新业务规则")
     public Result<?> update(@Parameter(description = "业务规则信息") @RequestBody MetadataBusinessRule rule) {
-        try {
-            ruleService.update(rule);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        ruleService.update(rule);
+        return Result.success();
+
     }
 
     @DeleteMapping("/delete/{id}")
     @Operation(description = "根据id删除业务规则")
     public Result<?> delete(@Parameter(description = "业务规则信息") @PathVariable Long id) {
-        try {
-            ruleService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        ruleService.delete(id);
+        return Result.success();
+
     }
 
     @GetMapping("/list/{moduleCode}")

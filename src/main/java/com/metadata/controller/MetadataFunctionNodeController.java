@@ -31,42 +31,30 @@ public class MetadataFunctionNodeController {
 
     @PostMapping("/add")
     public Result<?> add(@RequestBody MetadataFunctionNode node) {
-        try {
-            nodeService.add(node);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        nodeService.add(node);
+        return Result.success();
+
     }
 
     @PostMapping("/update")
     public Result<?> update(@RequestBody MetadataFunctionNode node) {
-        try {
-            nodeService.update(node);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        nodeService.update(node);
+        return Result.success();
+
     }
 
     @DeleteMapping("/delete/{id}")
     public Result<?> delete(@PathVariable Long id) {
-        try {
-            nodeService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        nodeService.delete(id);
+        return Result.success();
+
     }
 
     @PostMapping("/batchDelete")
     public Result<?> batchDelete(@RequestBody BatchDeleteRequest request) {
-        try {
-            nodeService.batchDelete(request.getIds());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        nodeService.batchDelete(request.getIds());
+        return Result.success();
+
     }
 
     @GetMapping("/list/{moduleCode}")
@@ -99,12 +87,9 @@ public class MetadataFunctionNodeController {
 
     @PostMapping("/updateSort")
     public Result<?> updateSort(@RequestBody UpdateSortRequest request) {
-        try {
-            nodeService.updateSort(request.getId(), request.getSort());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        nodeService.updateSort(request.getId(), request.getSort());
+        return Result.success();
+
     }
 }
 

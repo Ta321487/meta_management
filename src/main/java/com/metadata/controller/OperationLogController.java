@@ -32,21 +32,18 @@ public class OperationLogController {
                           @RequestParam(required = false) String endTime,
                           @RequestParam(required = false) Integer current,
                           @RequestParam(required = false) Integer size) {
-        try {
-            // 如果传入了分页参数，使用分页查询
-            if (current != null && size != null) {
-                PageRequest pageRequest = new PageRequest();
-                pageRequest.setCurrent(current);
-                pageRequest.setSize(size);
-                PageResult<MetadataOperationLog> pageResult = logService.page(module, operateType, startTime, endTime, pageRequest);
-                return Result.success(pageResult);
-            }
-            // 否则使用非分页查询（兼容旧接口）
-            List<MetadataOperationLog> list = logService.list(module, operateType, startTime, endTime);
-            return Result.success(list);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
+        // 如果传入了分页参数，使用分页查询
+        if (current != null && size != null) {
+            PageRequest pageRequest = new PageRequest();
+            pageRequest.setCurrent(current);
+            pageRequest.setSize(size);
+            PageResult<MetadataOperationLog> pageResult = logService.page(module, operateType, startTime, endTime, pageRequest);
+            return Result.success(pageResult);
         }
+        // 否则使用非分页查询（兼容旧接口）
+        List<MetadataOperationLog> list = logService.list(module, operateType, startTime, endTime);
+        return Result.success(list);
+
     }
 }
 

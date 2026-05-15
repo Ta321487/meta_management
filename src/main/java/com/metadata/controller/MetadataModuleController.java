@@ -33,12 +33,9 @@ public class MetadataModuleController {
     @PostMapping("/add")
     @Operation(summary = "新增模块", description = "添加新的元数据模块")
     public Result<?> add(@Parameter(description = "模块请求信息") @RequestBody ModuleRequest request) {
-        try {
-            moduleService.add(request.toMetadataModule(), request.getTableCodes());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.add(request.toMetadataModule(), request.getTableCodes());
+        return Result.success();
+
     }
 
     /**
@@ -47,12 +44,9 @@ public class MetadataModuleController {
     @PostMapping("/update")
     @Operation(summary = "更新模块", description = "更新元数据模块信息")
     public Result<?> update(@Parameter(description = "模块请求信息") @RequestBody ModuleRequest request) {
-        try {
-            moduleService.update(request.toMetadataModule(), request.getTableCodes());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.update(request.toMetadataModule(), request.getTableCodes());
+        return Result.success();
+
     }
 
     /**
@@ -61,12 +55,9 @@ public class MetadataModuleController {
     @DeleteMapping("/delete/{id}")
     @Operation(summary = "删除模块", description = "根据ID删除元数据模块")
     public Result<?> delete(@Parameter(description = "模块ID") @PathVariable Long id) {
-        try {
-            moduleService.delete(id);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.delete(id);
+        return Result.success();
+
     }
 
     /**
@@ -75,12 +66,9 @@ public class MetadataModuleController {
     @PostMapping("/batchDelete")
     @Operation(summary = "批量删除模块", description = "根据ID列表批量删除元数据模块")
     public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request) {
-        try {
-            moduleService.batchDelete(request.getIds());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.batchDelete(request.getIds());
+        return Result.success();
+
     }
 
     /**
@@ -124,12 +112,9 @@ public class MetadataModuleController {
     @PostMapping("/updateStatus")
     @Operation(summary = "更新模块状态", description = "更新模块的启用/禁用状态")
     public Result<?> updateStatus(@Parameter(description = "包含id和status的参数") @RequestBody UpdateStatusRequest request) {
-        try {
-            moduleService.updateStatus(request.getId(), request.getStatus());
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.updateStatus(request.getId(), request.getStatus());
+        return Result.success();
+
     }
     
     /**
@@ -139,12 +124,9 @@ public class MetadataModuleController {
     @Operation(summary = "批量更新模块状态", description = "批量更新模块的启用/禁用状态")
     public Result<?> batchUpdateStatus(@Parameter(description = "包含ids列表和status的参数") @RequestBody BatchDeleteRequest request, 
                                       @Parameter(description = "目标状态，1-启用，0-禁用") @RequestParam Integer status) {
-        try {
-            moduleService.batchUpdateStatus(request.getIds(), status);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.batchUpdateStatus(request.getIds(), status);
+        return Result.success();
+
     }
 
     /**
@@ -153,12 +135,9 @@ public class MetadataModuleController {
     @PostMapping("/rebuildNodes/{moduleCode}")
     @Operation(summary = "重建模块功能节点", description = "根据模块类型的默认节点重新生成模块的功能节点")
     public Result<?> rebuildNodes(@Parameter(description = "模块编码") @PathVariable String moduleCode) {
-        try {
-            moduleService.rebuildNodes(moduleCode);
-            return Result.success();
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+        moduleService.rebuildNodes(moduleCode);
+        return Result.success();
+
     }
 }
 
