@@ -18,6 +18,10 @@
         :collapse-transition="false"
         class="sidebar-menu"
       >
+        <el-menu-item index="/physical-database">
+          <el-icon><Coin /></el-icon>
+          <template #title>库管理</template>
+        </el-menu-item>
         <el-menu-item index="/business-system">
           <el-icon><Setting /></el-icon>
           <template #title>业务系统管理</template>
@@ -182,6 +186,7 @@ import { logout, changePassword } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Setting,
+  Coin,
   Document,
   Grid,
   Menu,
@@ -198,6 +203,7 @@ export default {
   name: 'Layout',
   components: {
     Setting,
+    Coin,
     Document,
     Grid,
     Menu,
@@ -225,6 +231,7 @@ export default {
     const tabsRef = ref(null)
 
     const menuTitleMap = {
+      '/physical-database': '库管理',
       '/business-system': '业务系统管理',
       '/module-type': '模块类型管理',
       '/module': '模块管理',

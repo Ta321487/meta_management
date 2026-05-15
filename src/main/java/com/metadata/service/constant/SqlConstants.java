@@ -27,7 +27,7 @@ public class SqlConstants {
     // 安全检查相关
     public static final String[] DANGEROUS_SQL_PREFIXES = {
         "DROP", "TRUNCATE", "DELETE FROM", "SHOW", "DESC", "DESCRIBE",
-        "ALTER TABLE", "RENAME TABLE", "CREATE DATABASE", "DROP DATABASE",
+        "ALTER TABLE", "RENAME TABLE", "DROP DATABASE",
         "GRANT", "REVOKE", "FLUSH", "RESET", "LOAD DATA", "SELECT INTO OUTFILE"
     };
     

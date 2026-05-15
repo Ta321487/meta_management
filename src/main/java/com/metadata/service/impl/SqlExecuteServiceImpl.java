@@ -8,6 +8,7 @@ import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.OperationLogService;
 import com.metadata.service.SqlExecuteService;
 import com.metadata.service.MetadataSyncService;
+import com.metadata.service.MySqlPhysicalCatalogService;
 import com.metadata.service.constant.SqlConstants;
 import com.metadata.service.dto.SqlResult;
 import com.metadata.service.strategy.SqlTypeStrategyFactory;
@@ -33,6 +34,9 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
     private static final Pattern DROP_DATABASE_OR_SCHEMA_PATTERN = Pattern.compile(
             "(?is)^\\s*DROP\\s+(?:DATABASE|SCHEMA)\\s+(?:IF\\s+EXISTS\\s+)?(?:`([^`]+)`|\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_$]+))");
+
+    private static final Pattern CREATE_DATABASE_OR_SCHEMA_PATTERN = Pattern.compile(
+            "(?is)^\\s*CREATE\\s+(?:DATABASE|SCHEMA)(?:\\s+IF\\s+NOT\\s+EXISTS)?\\s+(?:`([^`]+)`|\"([^\"]+)\"|'([^']+)'|([a-zA-Z0-9_$]+))");
 
 
     @Autowired
@@ -64,6 +68,9 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
 
     @Autowired
     private MetadataSyncService metadataSyncService;
+
+    @Autowired
+    private MySqlPhysicalCatalogService mySqlPhysicalCatalogService;
 
     /**
      * 执行SQL语句（内部方法，允许执行DROP TABLE等危险操作）
@@ -97,6 +104,34 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         String upperSql = sql.toUpperCase().trim();
 
         if (!skipSafetyCheck) {
+            String createCatalog = tryParseCreateDatabaseOrSchemaName(sql);
+            if (createCatalog != null) {
+                if (!isSingleStatementAllowingTrailingSemicolon(sql)) {
+                    result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
+                    result.put(SqlConstants.RESULT_KEY_MESSAGE, "CREATE DATABASE/SCHEMA 仅支持单条语句，不要使用分号连接多条 SQL");
+                    return result;
+                }
+                if (!mySqlPhysicalCatalogService.isValidCatalogName(createCatalog)) {
+                    result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
+                    result.put(SqlConstants.RESULT_KEY_MESSAGE, "库名不符合安全规则：仅允许字母、数字、下划线、美元符号，长度 1–64");
+                    return result;
+                }
+                try {
+                    mySqlPhysicalCatalogService.ensureCatalogExists(createCatalog);
+                    result.put(SqlConstants.RESULT_KEY_SUCCESS, true);
+                    result.put(SqlConstants.RESULT_KEY_MESSAGE, "物理库已就绪（不存在则已创建）: " + createCatalog.trim());
+                } catch (RuntimeException e) {
+                    result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
+                    result.put(SqlConstants.RESULT_KEY_MESSAGE, e.getMessage());
+                }
+                return result;
+            }
+            if (upperSql.startsWith("CREATE DATABASE") || upperSql.startsWith("CREATE SCHEMA")) {
+                result.put(SqlConstants.RESULT_KEY_SUCCESS, false);
+                result.put(SqlConstants.RESULT_KEY_MESSAGE,
+                        "CREATE DATABASE/SCHEMA 语法无法识别，请使用单行，例如：CREATE DATABASE IF NOT EXISTS mydb 或 `mydb`");
+                return result;
+            }
             // 检查明显的危险操作
             if (isDangerousSql(upperSql)) {
                 // 特殊处理ALTER TABLE，只允许添加字段等安全操作
@@ -503,6 +538,24 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         }
 
         return result;
+    }
+
+    private static String tryParseCreateDatabaseOrSchemaName(String sql) {
+        Matcher m = CREATE_DATABASE_OR_SCHEMA_PATTERN.matcher(sql.trim());
+        if (!m.find()) {
+            return null;
+        }
+        for (int g = 1; g <= m.groupCount(); g++) {
+            if (m.group(g) != null) {
+                return m.group(g).trim();
+            }
+        }
+        return null;
+    }
+
+    private static boolean isSingleStatementAllowingTrailingSemicolon(String sql) {
+        String s = sql.trim().replaceAll(";\\s*$", "").trim();
+        return !s.contains(";");
     }
 
     private static String tryParseDropDatabaseOrSchemaName(String sql) {

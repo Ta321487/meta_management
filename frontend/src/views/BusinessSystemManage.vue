@@ -85,7 +85,19 @@
           <el-input v-model="form.packageName" placeholder="如：com.example" />
         </el-form-item>
         <el-form-item label="默认物理库" prop="databaseName">
-          <el-input v-model="form.databaseName" placeholder="MySQL 库名，如 libdemo_db（与 JDBC 同实例）" clearable />
+          <el-select
+            v-model="form.databaseName"
+            filterable
+            placeholder="请选择"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in catalogSelectOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入业务系统描述" />
@@ -144,7 +156,7 @@
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getBusinessSystemList, addBusinessSystem, updateBusinessSystem, deleteBusinessSystem, getModuleList, getAssociatedModules, associateModulesToBusinessSystem } from '../api'
+import { getBusinessSystemList, addBusinessSystem, updateBusinessSystem, deleteBusinessSystem, getModuleList, getAssociatedModules, associateModulesToBusinessSystem, getPhysicalDatabaseList } from '../api'
 import dayjs from 'dayjs'
 
 export default {
@@ -193,9 +205,45 @@ export default {
     // 表单验证规则
     const rules = {
       businessCode: [{ required: true, message: '请输入业务编码', trigger: 'blur' }],
-      businessName: [{ required: true, message: '请输入业务系统名称', trigger: 'blur' }]
+      businessName: [{ required: true, message: '请输入业务系统名称', trigger: 'blur' }],
+      databaseName: [{ required: true, message: '请选择默认物理库', trigger: 'change' }]
     }
     
+    const physicalDbRows = ref([])
+
+    const loadPhysicalCatalogs = async () => {
+      try {
+        const res = await getPhysicalDatabaseList()
+        if (res.code === 200) {
+          physicalDbRows.value = res.data || []
+        }
+      } catch {
+        physicalDbRows.value = []
+      }
+    }
+
+    const catalogSelectOptions = computed(() => {
+      const meta = { value: 'metadata_db', label: 'metadata_db（元数据）' }
+      const list = []
+      const seen = new Set()
+      list.push(meta)
+      seen.add('metadata_db')
+      const rows = physicalDbRows.value || []
+      for (const r of rows) {
+        if (r.isEnabled !== 1) continue
+        const name = r.catalogName
+        if (!name || seen.has(name)) continue
+        seen.add(name)
+        const label = r.displayName ? `${name}（${r.displayName}）` : name
+        list.push({ value: name, label })
+      }
+      const cur = form.databaseName
+      if (cur && !seen.has(cur)) {
+        list.push({ value: cur, label: `${cur}（当前值）` })
+      }
+      return list
+    })
+
     // 加载业务系统列表
     const loadData = async () => {
       loading.value = true
@@ -251,27 +299,29 @@ export default {
     }
     
     // 新增业务系统
-    const handleAdd = () => {
+    const handleAdd = async () => {
+      await loadPhysicalCatalogs()
       dialogVisible.value = true
       dialogTitle.value = '新增业务系统'
       form.id = null
       form.businessCode = ''
       form.businessName = ''
       form.packageName = ''
-      form.databaseName = ''
+      form.databaseName = 'metadata_db'
       form.description = ''
       form.isDefault = 0
     }
     
     // 编辑业务系统
-    const handleEdit = (row) => {
+    const handleEdit = async (row) => {
+      await loadPhysicalCatalogs()
       dialogVisible.value = true
       dialogTitle.value = '编辑业务系统'
       form.id = row.id
       form.businessCode = row.businessCode
       form.businessName = row.businessName
       form.packageName = row.packageName || ''
-      form.databaseName = row.databaseName || ''
+      form.databaseName = row.databaseName && String(row.databaseName).trim() !== '' ? row.databaseName : 'metadata_db'
       form.description = row.description
       form.isDefault = row.isDefault
     }
@@ -430,6 +480,7 @@ export default {
     // 初始化
     onMounted(() => {
       loadData()
+      loadPhysicalCatalogs()
     })
     
     return {
@@ -445,6 +496,7 @@ export default {
       pagination,
       form,
       rules,
+      catalogSelectOptions,
       formatDate,
       handleSearch,
       handleReset,

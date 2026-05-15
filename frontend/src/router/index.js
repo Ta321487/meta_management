@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
 import Layout from '../views/Layout.vue'
+import PhysicalDatabaseManage from '../views/PhysicalDatabaseManage.vue'
 import BusinessSystemManage from '../views/BusinessSystemManage.vue'
 import ModuleManage from '../views/ModuleManage.vue'
 import ModuleTypeManage from '../views/ModuleTypeManage.vue'
@@ -29,6 +30,11 @@ const routes = [
         path: '/welcome',
         name: 'Welcome',
         component: Welcome
+      },
+      {
+        path: '/physical-database',
+        name: 'PhysicalDatabaseManage',
+        component: PhysicalDatabaseManage
       },
       {
         path: '/business-system',

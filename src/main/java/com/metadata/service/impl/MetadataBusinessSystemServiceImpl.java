@@ -6,6 +6,7 @@ import com.metadata.mapper.MetadataBusinessSystemMapper;
 import com.metadata.mapper.MetadataModuleMapper;
 import com.metadata.service.MetadataBusinessSystemService;
 import com.metadata.service.MetadataModuleService;
+import com.metadata.service.MySqlPhysicalCatalogService;
 import com.metadata.util.SpringContextUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
 
     @Autowired
     private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
+    @Autowired
+    private MySqlPhysicalCatalogService mySqlPhysicalCatalogService;
 
     /**
      * 查询所有业务系统
@@ -64,6 +68,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
                 businessSystemMapper.update(defaultSystem);
             }
         }
+        if (businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
+            mySqlPhysicalCatalogService.ensureCatalogExists(businessSystem.getDatabaseName().trim());
+        }
         businessSystemMapper.insert(businessSystem);
     }
 
@@ -81,6 +88,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
                 defaultSystem.setIsDefault(0);
                 businessSystemMapper.update(defaultSystem);
             }
+        }
+        if (businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
+            mySqlPhysicalCatalogService.ensureCatalogExists(businessSystem.getDatabaseName().trim());
         }
         businessSystemMapper.update(businessSystem);
         if (old != null && old.getDatabaseName() != null && !old.getDatabaseName().trim().isEmpty()) {

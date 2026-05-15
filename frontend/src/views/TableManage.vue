@@ -124,7 +124,7 @@
           </el-select>
         </el-form-item>
         <el-form-item label="物理库名">
-          <el-input v-model="form.databaseName" placeholder="MySQL 库名，留空则用业务系统默认库" clearable />
+          <el-input v-model="form.databaseName" placeholder="留空则用业务系统默认库；填写则保存/建表前自动建库（若不存在）" clearable />
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" />

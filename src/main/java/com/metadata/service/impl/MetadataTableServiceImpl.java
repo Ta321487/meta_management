@@ -52,6 +52,9 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     private BusinessCatalogResolver businessCatalogResolver;
 
     @Autowired
+    private MySqlPhysicalCatalogService mySqlPhysicalCatalogService;
+
+    @Autowired
     @Lazy
     private MetadataTableRelationService relationService;
 
@@ -130,8 +133,11 @@ public class MetadataTableServiceImpl implements MetadataTableService {
 
         // 生成并执行CREATE TABLE SQL
         try {
-            String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode());
             String phyCatalog = businessCatalogResolver.resolveCatalog(table);
+            if (phyCatalog != null && !phyCatalog.isEmpty()) {
+                mySqlPhysicalCatalogService.ensureCatalogExists(phyCatalog);
+            }
+            String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode());
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                 throw new RuntimeException("创建数据库表失败: " + sqlResult.get("message"));

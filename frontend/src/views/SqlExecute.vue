@@ -5,7 +5,7 @@
         <div class="card-header">
           <span>SQL执行</span>
           <el-alert
-            title="提示：支持执行INSERT、UPDATE、CREATE TABLE等语句，禁止执行DROP、TRUNCATE、DELETE等危险操作"
+            title="提示：支持 SELECT/INSERT/UPDATE、CREATE TABLE、单行 CREATE DATABASE/SCHEMA（自动 utf8mb4）；禁止 DROP/TRUNCATE/DELETE 等危险操作"
             type="warning"
             :closable="false"
             style="margin-top: 10px"

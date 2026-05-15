@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.metadata.mapper.MetadataPhysicalDatabaseMapper">
+
+    <resultMap id="BaseResultMap" type="com.metadata.entity.MetadataPhysicalDatabase">
+        <id column="id" property="id"/>
+        <result column="catalog_name" property="catalogName"/>
+        <result column="display_name" property="displayName"/>
+        <result column="description" property="description"/>
+        <result column="charset_name" property="charsetName"/>
+        <result column="collation_name" property="collationName"/>
+        <result column="sync_to_instance" property="syncToInstance"/>
+        <result column="is_enabled" property="isEnabled"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+    </resultMap>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM metadata_physical_database ORDER BY create_time DESC
+    </select>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM metadata_physical_database WHERE id = #{id}
+    </select>
+
+    <select id="selectByCatalogName" resultMap="BaseResultMap">
+        SELECT * FROM metadata_physical_database WHERE catalog_name = #{catalogName}
+    </select>
+
+    <select id="countByCatalogName" resultType="int">
+        SELECT COUNT(*) FROM metadata_physical_database WHERE catalog_name = #{catalogName}
+    </select>
+
+    <insert id="insert" parameterType="com.metadata.entity.MetadataPhysicalDatabase" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO metadata_physical_database (
+            catalog_name, display_name, description, charset_name, collation_name, sync_to_instance, is_enabled
+        ) VALUES (
+            #{catalogName}, #{displayName, jdbcType=VARCHAR}, #{description, jdbcType=VARCHAR},
+            #{charsetName, jdbcType=VARCHAR}, #{collationName, jdbcType=VARCHAR},
+            #{syncToInstance, jdbcType=INTEGER}, #{isEnabled, jdbcType=INTEGER}
+        )
+    </insert>
+
+    <update id="update" parameterType="com.metadata.entity.MetadataPhysicalDatabase">
+        UPDATE metadata_physical_database SET
+            display_name = #{displayName, jdbcType=VARCHAR},
+            description = #{description, jdbcType=VARCHAR},
+            charset_name = #{charsetName, jdbcType=VARCHAR},
+            collation_name = #{collationName, jdbcType=VARCHAR},
+            sync_to_instance = #{syncToInstance, jdbcType=INTEGER},
+            is_enabled = #{isEnabled, jdbcType=INTEGER}
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM metadata_physical_database WHERE id = #{id}
+    </delete>
+</mapper>

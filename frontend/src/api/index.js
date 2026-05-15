@@ -118,8 +118,15 @@ export const getBusinessSystemByCode = (businessCode) => request.get(`/businessS
 export const getDefaultBusinessSystem = () => request.get('/businessSystem/default')
 export const addBusinessSystem = (data) => request.post('/businessSystem/add', data)
 export const updateBusinessSystem = (data) => request.post('/businessSystem/update', data)
-export const deleteBusinessSystem = (data) => request.post('/businessSystem/delete', data)
+export const deleteBusinessSystem = (data) => request.delete(`/businessSystem/delete/${data.id}`)
 export const associateModulesToBusinessSystem = (data) => request.post('/businessSystem/associateModules', data)
 export const disassociateModulesFromBusinessSystem = (data) => request.post('/businessSystem/disassociateModules', data)
 export const getAssociatedModules = (businessCode) => request.get(`/businessSystem/associatedModules/${businessCode}`)
+
+// 物理库登记
+export const getPhysicalDatabaseList = () => request.get('/physicalDatabase/list')
+export const addPhysicalDatabase = (data) => request.post('/physicalDatabase/add', data)
+export const updatePhysicalDatabase = (data) => request.post('/physicalDatabase/update', data)
+export const deletePhysicalDatabase = (data) => request.delete(`/physicalDatabase/delete/${data.id}`)
+export const syncPhysicalDatabase = (id) => request.post(`/physicalDatabase/sync/${id}`)
 

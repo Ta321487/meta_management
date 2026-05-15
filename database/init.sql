@@ -3,7 +3,23 @@ CREATE DATABASE IF NOT EXISTS `metadata_db` DEFAULT CHARACTER SET utf8mb4 COLLAT
 
 USE `metadata_db`;
 
--- 1. 业务系统表
+-- 1. 物理库登记（MySQL 业务库元数据，建议先于业务系统维护）
+CREATE TABLE IF NOT EXISTS `metadata_physical_database` (
+  `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键',
+  `catalog_name` varchar(64) NOT NULL COMMENT 'MySQL 库名(schema)',
+  `display_name` varchar(100) DEFAULT NULL COMMENT '展示名称',
+  `description` varchar(500) DEFAULT NULL COMMENT '说明',
+  `charset_name` varchar(64) NOT NULL DEFAULT 'utf8mb4' COMMENT '字符集(登记说明，实例创建当前固定 utf8mb4)',
+  `collation_name` varchar(64) NOT NULL DEFAULT 'utf8mb4_unicode_ci' COMMENT '排序规则(登记说明)',
+  `sync_to_instance` tinyint NOT NULL DEFAULT 1 COMMENT '保存时是否在实例执行 CREATE IF NOT EXISTS：1-是 0-否',
+  `is_enabled` tinyint NOT NULL DEFAULT 1 COMMENT '1启用 0停用',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_catalog_name` (`catalog_name`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='物理库登记表';
+
+-- 2. 业务系统表
 CREATE TABLE IF NOT EXISTS `metadata_business_system` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `business_code` varchar(50) NOT NULL COMMENT '业务系统编码',
@@ -18,7 +34,7 @@ CREATE TABLE IF NOT EXISTS `metadata_business_system` (
   UNIQUE KEY `uk_business_code` (`business_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务系统表';
 
--- 2. 模块表（抽象模块）
+-- 3. 模块表（抽象模块）
 CREATE TABLE IF NOT EXISTS `metadata_module` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `module_code` varchar(50) NOT NULL COMMENT '模块唯一编码（如MODULE_001）',
@@ -40,7 +56,7 @@ CREATE TABLE IF NOT EXISTS `metadata_module` (
   INDEX idx_status (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='抽象模块表';
 
--- 3. 模块类型表（预设+自定义）
+-- 4. 模块类型表（预设+自定义）
 CREATE TABLE IF NOT EXISTS `metadata_module_type` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `type_code` varchar(50) NOT NULL COMMENT '类型编码（如DATA_MANAGE）',
@@ -51,7 +67,7 @@ CREATE TABLE IF NOT EXISTS `metadata_module_type` (
   UNIQUE KEY `uk_type_code` (`type_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='模块类型表';
 
--- 4. 抽象表表
+-- 5. 抽象表表
 CREATE TABLE IF NOT EXISTS `metadata_table` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `table_code` varchar(50) NOT NULL COMMENT '表唯一编码（如TABLE_001）',
@@ -67,7 +83,7 @@ CREATE TABLE IF NOT EXISTS `metadata_table` (
   UNIQUE KEY `uk_table_code` (`table_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='抽象表结构表';
 
--- 5. 模块与表关联表
+-- 6. 模块与表关联表
 CREATE TABLE IF NOT EXISTS `metadata_module_table` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `module_code` varchar(50) NOT NULL COMMENT '模块编码',
@@ -77,7 +93,7 @@ CREATE TABLE IF NOT EXISTS `metadata_module_table` (
   UNIQUE KEY `uk_module_table` (`module_code`,`table_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='模块与表关联表';
 
--- 6. 抽象字段表
+-- 7. 抽象字段表
 CREATE TABLE IF NOT EXISTS `metadata_field` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `field_code` varchar(50) NOT NULL COMMENT '字段唯一编码（如FIELD_001）',
@@ -97,7 +113,7 @@ CREATE TABLE IF NOT EXISTS `metadata_field` (
   UNIQUE KEY `uk_table_field` (`table_code`,`field_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='抽象字段表';
 
--- 7. 功能节点表
+-- 8. 功能节点表
 CREATE TABLE IF NOT EXISTS `metadata_function_node` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `node_code` varchar(50) NOT NULL COMMENT '节点编码',
@@ -115,7 +131,7 @@ CREATE TABLE IF NOT EXISTS `metadata_function_node` (
   UNIQUE KEY `uk_module_node` (`module_code`,`node_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='功能节点表';
 
--- 8. 业务规则表
+-- 9. 业务规则表
 CREATE TABLE IF NOT EXISTS `metadata_business_rule` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `rule_code` varchar(50) NOT NULL COMMENT '规则编码',
@@ -130,7 +146,7 @@ CREATE TABLE IF NOT EXISTS `metadata_business_rule` (
   UNIQUE KEY `uk_module_rule` (`module_code`,`rule_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务规则表';
 
--- 9. 表关联关系表
+-- 10. 表关联关系表
 CREATE TABLE IF NOT EXISTS `metadata_table_relation` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `relation_code` varchar(50) NOT NULL COMMENT '关联编码',
@@ -148,7 +164,7 @@ CREATE TABLE IF NOT EXISTS `metadata_table_relation` (
   UNIQUE KEY `uk_relation_code` (`relation_code`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='表关联关系表';
 
--- 10. 管理员表
+-- 11. 管理员表
 CREATE TABLE IF NOT EXISTS `metadata_admin` (
   `id` int NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `username` varchar(50) NOT NULL DEFAULT 'admin' COMMENT '登录用户名',
@@ -158,7 +174,7 @@ CREATE TABLE IF NOT EXISTS `metadata_admin` (
   UNIQUE KEY `uk_username` (`username`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员表';
 
--- 11. 操作日志表
+-- 12. 操作日志表
 CREATE TABLE IF NOT EXISTS `metadata_operation_log` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '主键ID',
   `operate_user` varchar(50) NOT NULL COMMENT '操作人（admin）',
