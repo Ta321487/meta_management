@@ -1,11 +1,13 @@
 package com.metadata.service.impl;
 
+import com.metadata.common.FillBusinessSystemCatalogRequest;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.entity.MetadataModule;
 import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.exception.BizException;
 import com.metadata.mapper.MetadataBusinessSystemMapper;
 import com.metadata.mapper.MetadataModuleMapper;
+import com.metadata.mapper.MetadataTableMapper;
 import com.metadata.service.MetadataBusinessSystemService;
 import com.metadata.service.MetadataModuleService;
 import com.metadata.service.MySqlPhysicalCatalogService;
@@ -14,6 +16,7 @@ import com.metadata.util.SpringContextUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.util.List;
 
@@ -31,6 +34,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
 
     @Autowired
     private MySqlPhysicalCatalogService mySqlPhysicalCatalogService;
+
+    @Autowired
+    private MetadataTableMapper tableMapper;
 
     /**
      * 查询所有业务系统
@@ -62,6 +68,16 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Override
     @Transactional
     public void add(MetadataBusinessSystem businessSystem) {
+        if (!StringUtils.hasText(businessSystem.getDatabaseName())) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_REQUIRED,
+                    "默认物理库不能为空，请先在「库管理」登记目标库并在本处选择");
+        }
+        String catalog = businessSystem.getDatabaseName().trim();
+        if (!mySqlPhysicalCatalogService.isValidCatalogName(catalog)) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_INVALID,
+                    "物理库名不符合安全规则：仅允许字母、数字、下划线、美元符号，长度 1–64");
+        }
+        businessSystem.setDatabaseName(catalog);
         // 如果设置为默认系统，先将其他系统设置为非默认
         if (businessSystem.getIsDefault() != null && businessSystem.getIsDefault() == 1) {
             MetadataBusinessSystem defaultSystem = getDefault();
@@ -70,9 +86,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
                 businessSystemMapper.update(defaultSystem);
             }
         }
-        if (businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
-            mySqlPhysicalCatalogService.ensureCatalogExists(businessSystem.getDatabaseName().trim());
-        }
+        mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
         businessSystemMapper.insert(businessSystem);
     }
 
@@ -82,6 +96,16 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Override
     @Transactional
     public void update(MetadataBusinessSystem businessSystem) {
+        if (!StringUtils.hasText(businessSystem.getDatabaseName())) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_REQUIRED,
+                    "默认物理库不能为空，请先在「库管理」登记目标库并在本处选择");
+        }
+        String catalog = businessSystem.getDatabaseName().trim();
+        if (!mySqlPhysicalCatalogService.isValidCatalogName(catalog)) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_INVALID,
+                    "物理库名不符合安全规则：仅允许字母、数字、下划线、美元符号，长度 1–64");
+        }
+        businessSystem.setDatabaseName(catalog);
         MetadataBusinessSystem old = businessSystemMapper.selectByCode(businessSystem.getBusinessCode());
         // 如果设置为默认系统，先将其他系统设置为非默认
         if (businessSystem.getIsDefault() != null && businessSystem.getIsDefault() == 1) {
@@ -91,9 +115,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
                 businessSystemMapper.update(defaultSystem);
             }
         }
-        if (businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
-            mySqlPhysicalCatalogService.ensureCatalogExists(businessSystem.getDatabaseName().trim());
-        }
+        mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
         businessSystemMapper.update(businessSystem);
         if (old != null && old.getDatabaseName() != null && !old.getDatabaseName().trim().isEmpty()) {
             businessDataSourcePoolManager.evictCatalog(old.getDatabaseName());
@@ -158,5 +180,45 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
         MetadataModuleMapper moduleMapper = SpringContextUtil.getBean(MetadataModuleMapper.class);
         List<MetadataModule> modules = moduleMapper.selectByBusinessCode(businessCode);
         return modules.stream().map(MetadataModule::getModuleCode).collect(java.util.stream.Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public int fillDefaultPhysicalCatalog(FillBusinessSystemCatalogRequest request) {
+        if (request == null || !StringUtils.hasText(request.getBusinessCode())) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_NOT_FOUND, "业务系统编码不能为空");
+        }
+        String businessCode = request.getBusinessCode().trim();
+        if (!StringUtils.hasText(request.getDatabaseName())) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_REQUIRED, "请选择要补充的物理库名称");
+        }
+        String catalog = request.getDatabaseName().trim();
+        if (!mySqlPhysicalCatalogService.isValidCatalogName(catalog)) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_INVALID,
+                    "物理库名不符合安全规则：仅允许字母、数字、下划线、美元符号，长度 1–64");
+        }
+
+        MetadataBusinessSystem bs = businessSystemMapper.selectByCode(businessCode);
+        if (bs == null) {
+            throw BizException.of(AppErrorCodes.BIZ_SYSTEM_NOT_FOUND, "业务系统不存在: " + businessCode);
+        }
+
+        String oldCat = bs.getDatabaseName() != null ? bs.getDatabaseName().trim() : null;
+
+        mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+        bs.setDatabaseName(catalog);
+        businessSystemMapper.update(bs);
+
+        if (StringUtils.hasText(oldCat) && !oldCat.equalsIgnoreCase(catalog)) {
+            businessDataSourcePoolManager.evictCatalog(oldCat);
+        }
+        businessDataSourcePoolManager.evictCatalog(catalog);
+
+        boolean backfill = request.getBackfillEmptyTableCatalog() == null
+                || Boolean.TRUE.equals(request.getBackfillEmptyTableCatalog());
+        if (!backfill) {
+            return 0;
+        }
+        return tableMapper.updateEmptyDatabaseNameByBusinessCode(businessCode, catalog);
     }
 }

@@ -26,6 +26,9 @@ export const batchDeleteTable = (data) => request.post('/table/batchDelete', dat
 export const batchUpdateTableStatus = (ids, status) => request.post('/table/batchUpdateStatus', { ids }, { params: { status } })
 export const getTablesByModule = (moduleCode, params) => request.get(`/table/listByModule/${moduleCode}`, { params })
 export const batchAssignBusinessSystem = (data) => request.post('/table/batchAssignBusinessSystem', data)
+/** 按元数据在目标物理库中为缺失表执行 CREATE TABLE（已存在则跳过） */
+export const ensureMissingPhysicalTables = (businessCode) =>
+  request.post('/table/ensureMissingPhysicalTables', null, { params: { businessCode } })
 
 // 字段相关
 export const getFieldList = (tableCode, params) => request.get(`/field/list/${tableCode}`, { params })
@@ -125,6 +128,8 @@ export const deleteBusinessSystem = (data) => request.delete(`/businessSystem/de
 export const associateModulesToBusinessSystem = (data) => request.post('/businessSystem/associateModules', data)
 export const disassociateModulesFromBusinessSystem = (data) => request.post('/businessSystem/disassociateModules', data)
 export const getAssociatedModules = (businessCode) => request.get(`/businessSystem/associatedModules/${businessCode}`)
+/** 事后补充业务系统默认物理库，并可回填表级物理库为空的表 */
+export const fillBusinessSystemPhysicalCatalog = (data) => request.post('/businessSystem/fillPhysicalCatalog', data)
 
 // 物理库
 export const getPhysicalDatabaseList = () => request.get('/physicalDatabase/list')

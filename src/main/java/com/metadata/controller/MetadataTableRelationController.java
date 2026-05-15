@@ -8,6 +8,8 @@ import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.exception.BizException;
 import com.metadata.service.MetadataTableRelationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -27,40 +29,49 @@ public class MetadataTableRelationController {
     private MetadataTableRelationService relationService;
 
     @PostMapping("/add")
-    public Result<?> add(@RequestBody MetadataTableRelation relation) {
+    @Operation(summary = "新增表关联", description = "在元数据中新增主从表关联关系")
+    public Result<?> add(@Parameter(description = "关联关系信息") @RequestBody MetadataTableRelation relation) {
         relationService.add(relation);
         return Result.success();
     }
 
     @PostMapping("/update")
-    public Result<?> update(@RequestBody MetadataTableRelation relation) {
+    @Operation(summary = "更新表关联", description = "修改表关联关系配置")
+    public Result<?> update(@Parameter(description = "关联关系信息") @RequestBody MetadataTableRelation relation) {
         relationService.update(relation);
         return Result.success();
     }
 
     @DeleteMapping("/delete/{id}")
-    public Result<?> delete(@PathVariable Long id) {
+    @Operation(summary = "删除表关联", description = "根据主键 ID 删除关联关系")
+    public Result<?> delete(@Parameter(description = "关联 ID") @PathVariable Long id) {
         relationService.delete(id);
         return Result.success();
     }
 
     @GetMapping("/listByMain/{mainTableCode}")
-    public Result<List<MetadataTableRelation>> listByMainTableCode(@PathVariable String mainTableCode) {
+    @Operation(summary = "按主表查询关联", description = "查询指定主表下的全部关联关系")
+    public Result<List<MetadataTableRelation>> listByMainTableCode(
+            @Parameter(description = "主表编码") @PathVariable String mainTableCode) {
         List<MetadataTableRelation> list = relationService.listByMainTableCode(mainTableCode);
         return Result.success(list);
     }
 
     @GetMapping("/listBySlave/{slaveTableCode}")
-    public Result<List<MetadataTableRelation>> listBySlaveTableCode(@PathVariable String slaveTableCode, @RequestParam(required = false) String businessCode) {
+    @Operation(summary = "按从表查询关联", description = "查询指定从表上的关联关系，可按业务系统过滤")
+    public Result<List<MetadataTableRelation>> listBySlaveTableCode(
+            @Parameter(description = "从表编码") @PathVariable String slaveTableCode,
+            @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode) {
         List<MetadataTableRelation> list = relationService.listBySlaveTableCode(slaveTableCode, businessCode);
         return Result.success(list);
     }
 
     @GetMapping("/list")
-    public Result<?> listAll(@RequestParam(required = false) Integer current,
-                             @RequestParam(required = false) Integer size,
-                             @RequestParam(required = false) String businessCode) {
-        // 如果传入了分页参数，使用分页查询
+    @Operation(summary = "查询关联列表", description = "查询全部关联；传入 current、size 时分页，可按 businessCode 过滤")
+    public Result<?> listAll(
+            @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
+            @Parameter(description = "每页条数") @RequestParam(required = false) Integer size,
+            @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode) {
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
@@ -73,7 +84,6 @@ public class MetadataTableRelationController {
             }
             return Result.success(pageResult);
         }
-        // 否则使用非分页查询（兼容旧接口）
         List<MetadataTableRelation> list;
         if (businessCode != null && !businessCode.isEmpty()) {
             list = relationService.listAll(businessCode);
@@ -84,7 +94,8 @@ public class MetadataTableRelationController {
     }
 
     @PostMapping("/createForeignKey")
-    public Result<?> createForeignKey(@RequestBody MetadataTableRelation relation) {
+    @Operation(summary = "创建外键", description = "根据关联配置在物理库创建外键约束")
+    public Result<?> createForeignKey(@Parameter(description = "关联关系信息") @RequestBody MetadataTableRelation relation) {
         Map<String, Object> result = relationService.createForeignKey(relation);
         if (Boolean.TRUE.equals(result.get("success"))) {
             return Result.success(result.get("message"));
@@ -93,7 +104,9 @@ public class MetadataTableRelationController {
     }
 
     @PostMapping("/syncForeignKeys")
-    public Result<?> syncForeignKeys(@RequestParam(required = false) String tableCode) {
+    @Operation(summary = "同步外键", description = "从物理库同步外键到元数据；tableCode 为空时同步全部表")
+    public Result<?> syncForeignKeys(
+            @Parameter(description = "表编码，可选") @RequestParam(required = false) String tableCode) {
         try {
             Map<String, Object> result = relationService.syncForeignKeys(tableCode);
             if (Boolean.TRUE.equals(result.get("success"))) {

@@ -131,5 +131,12 @@
         ORDER BY id ASC
     </select>
 
+    <update id="updateEmptyDatabaseNameByBusinessCode">
+        UPDATE metadata_table
+        SET database_name = #{databaseName}
+        WHERE business_code = #{businessCode}
+          AND (database_name IS NULL OR TRIM(database_name) = '')
+    </update>
+
 </mapper>
 

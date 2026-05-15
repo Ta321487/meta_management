@@ -121,6 +121,11 @@ import ListPreview from '../components/ListPreview.vue'
 import FormPreview from '../components/FormPreview.vue'
 import LoginPreview from '../components/LoginPreview.vue'
 import DeploymentGuide from '../components/DeploymentGuide.vue'
+import {
+  applyAuthExtensionBundle,
+  applyGeneratedCodeBundle,
+  findTableCodeBundle
+} from '../utils/codeGeneratorUtils'
 
 // 更新表单数据
 const updateForm = (newForm) => {
@@ -492,8 +497,7 @@ const handleGenerate = async (type) => {
       case 'authController':
         let resAuthExt = await generateAuthExtension(form.packageName, form.captchaEnabled)
         if (resAuthExt.code === 200 && resAuthExt.data) {
-          codeMap.authController = resAuthExt.data['AuthController.java'] || ''
-          codeMap.captchaService = resAuthExt.data['CaptchaService.java'] || ''
+          applyAuthExtensionBundle(codeMap, resAuthExt.data)
         }
         break
       case 'env':
@@ -525,34 +529,7 @@ const handleGenerateCurrentTable = async () => {
   try {
     const res = await generateAll(form.tableCode, form.packageName, form.businessCode, form.useInterface, form.captchaEnabled)
     if (res.code === 200 && res.data) {
-      const data = res.data
-      codeMap.sql = data['create_table.sql'] || ''
-      codeMap.entity = data['Entity.java'] || ''
-      codeMap.controller = data['Controller.java'] || ''
-      codeMap.service = data['Service.java'] || ''
-      codeMap.serviceInterface = data['ServiceInterface.java'] || ''
-      codeMap.serviceImpl = data['ServiceImpl.java'] || ''
-      codeMap.mapper = data['Mapper.java'] || ''
-      codeMap.application = data['Application.java'] || ''
-      codeMap.applicationYml = data['application.yml'] || ''
-      codeMap.mybatisConfig = data['MyBatisConfig.java'] || ''
-      codeMap.corsConfig = data['CorsConfig.java'] || ''
-      codeMap.mapperxml = data['Mapper.xml'] || ''
-      codeMap.vueList = data['List.vue'] || ''
-      codeMap.vueForm = data['Form.vue'] || ''
-      codeMap.login = data['Login.vue'] || ''
-      codeMap.routes = data['routes.js'] || data['routes'] || ''
-      codeMap.api = data['api.js'] || ''
-      codeMap.requestJs = data['request.js'] || ''
-      codeMap.env = data['.env'] || ''
-      codeMap.result = data['Result.java'] || ''
-      codeMap.pageRequest = data['PageRequest.java'] || ''
-      codeMap.pageResult = data['PageResult.java'] || ''
-      codeMap.pomXml = data['pom.xml'] || ''
-      codeMap.auth = data['auth.js'] || codeMap.auth
-      codeMap.captchaInput = data['CaptchaInput.vue'] || ''
-      codeMap.authController = data['AuthController.java'] || ''
-      codeMap.captchaService = data['CaptchaService.java'] || ''
+      applyGeneratedCodeBundle(codeMap, res.data)
       ElMessage.success('代码生成成功')
     }
   } catch (error) {
@@ -573,20 +550,20 @@ const handleGenerateAllTables = async () => {
     // 生成业务系统下所有表的SQL
     const sqlRes = await generateAllSQLByBusinessSystem(form.businessCode)
     if (sqlRes.code === 200 && sqlRes.data) {
-      const sqlKeys = Object.keys(sqlRes.data)
-      
+      const sqlFiles = sqlRes.data.sqlFiles || []
+
       if (form.tableCode) {
-        const targetSqlKey = form.tableCode + '.sql'
-        if (targetSqlKey && sqlRes.data[targetSqlKey]) {
-          codeMap.sql = sqlRes.data[targetSqlKey]
+        const target = sqlFiles.find((f) => f.tableCode === form.tableCode)
+        if (target) {
+          codeMap.sql = target.sql || ''
         }
-      } else if (sqlKeys.length > 0) {
+      } else if (sqlFiles.length > 0) {
         let allSql = ''
-        sqlKeys.forEach(sqlKey => {
+        sqlFiles.forEach((file) => {
           allSql += `-- ------------------------------\n`
-          allSql += `-- ${sqlKey}\n`
+          allSql += `-- ${file.tableCode}.sql\n`
           allSql += `-- ------------------------------\n`
-          allSql += sqlRes.data[sqlKey]
+          allSql += file.sql
           allSql += `\n\n`
         })
         codeMap.sql = allSql
@@ -600,26 +577,10 @@ const handleGenerateAllTables = async () => {
     if (form.tableCode) {
       const allCodeRes = await generateAllByBusinessSystem(form.businessCode, form.packageName, form.useInterface)
       if (allCodeRes.code === 200 && allCodeRes.data) {
-        const tableCodes = Object.keys(allCodeRes.data)
         const targetTableCode = form.tableCode
-        
-        if (targetTableCode && allCodeRes.data[targetTableCode]) {
-          const tableCodeMap = allCodeRes.data[targetTableCode]
-          codeMap.entity = tableCodeMap['Entity.java'] || ''
-          codeMap.controller = tableCodeMap['Controller.java'] || ''
-          codeMap.service = tableCodeMap['Service.java'] || ''
-          codeMap.serviceInterface = tableCodeMap['ServiceInterface.java'] || ''
-          codeMap.serviceImpl = tableCodeMap['ServiceImpl.java'] || ''
-          codeMap.mapper = tableCodeMap['Mapper.java'] || ''
-          codeMap.application = tableCodeMap['Application.java'] || ''
-          codeMap.applicationYml = tableCodeMap['application.yml'] || ''
-          codeMap.mapperxml = tableCodeMap['Mapper.xml'] || ''
-          codeMap.vueList = tableCodeMap['List.vue'] || ''
-          codeMap.vueForm = tableCodeMap['Form.vue'] || ''
-          codeMap.routes = tableCodeMap['routes.js'] || ''
-          codeMap.result = tableCodeMap['Result.java'] || ''
-          codeMap.pageRequest = tableCodeMap['PageRequest.java'] || ''
-          codeMap.pageResult = tableCodeMap['PageResult.java'] || ''
+        const bundle = findTableCodeBundle(allCodeRes.data.tables, targetTableCode)
+        if (bundle) {
+          applyGeneratedCodeBundle(codeMap, bundle)
           console.log('Generated code for table:', targetTableCode)
         }
       } else {

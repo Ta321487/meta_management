@@ -9,6 +9,8 @@ import com.metadata.entity.MetadataFunctionNode;
 import com.metadata.entity.MetadataModule;
 import com.metadata.service.MetadataFunctionNodeService;
 import com.metadata.service.MetadataModuleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -30,37 +32,43 @@ public class MetadataFunctionNodeController {
     private MetadataModuleService moduleService;
 
     @PostMapping("/add")
-    public Result<?> add(@RequestBody MetadataFunctionNode node) {
+    @Operation(summary = "新增功能节点", description = "在指定模块下新增菜单/页面等功能节点")
+    public Result<?> add(@Parameter(description = "功能节点信息") @RequestBody MetadataFunctionNode node) {
         nodeService.add(node);
         return Result.success();
 
     }
 
     @PostMapping("/update")
-    public Result<?> update(@RequestBody MetadataFunctionNode node) {
+    @Operation(summary = "更新功能节点", description = "修改功能节点名称、路由、排序等信息")
+    public Result<?> update(@Parameter(description = "功能节点信息") @RequestBody MetadataFunctionNode node) {
         nodeService.update(node);
         return Result.success();
 
     }
 
     @DeleteMapping("/delete/{id}")
-    public Result<?> delete(@PathVariable Long id) {
+    @Operation(summary = "删除功能节点", description = "根据主键 ID 删除功能节点")
+    public Result<?> delete(@Parameter(description = "节点 ID") @PathVariable Long id) {
         nodeService.delete(id);
         return Result.success();
 
     }
 
     @PostMapping("/batchDelete")
-    public Result<?> batchDelete(@RequestBody BatchDeleteRequest request) {
+    @Operation(summary = "批量删除功能节点", description = "根据 ID 列表批量删除")
+    public Result<?> batchDelete(@Parameter(description = "包含 ids 列表") @RequestBody BatchDeleteRequest request) {
         nodeService.batchDelete(request.getIds());
         return Result.success();
 
     }
 
     @GetMapping("/list/{moduleCode}")
-    public Result<?> listByModuleCode(@PathVariable String moduleCode,
-                                      @RequestParam(required = false) Integer current,
-                                      @RequestParam(required = false) Integer size) {
+    @Operation(summary = "查询功能节点列表", description = "按模块编码查询节点；传入 current、size 时分页返回")
+    public Result<?> listByModuleCode(
+            @Parameter(description = "模块编码") @PathVariable String moduleCode,
+            @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
+            @Parameter(description = "每页条数") @RequestParam(required = false) Integer size) {
         // 获取模块信息，用于获取业务系统编码
         MetadataModule module = moduleService.getByCode(moduleCode);
         String businessCode = "DEFAULT"; // 默认业务系统
@@ -86,7 +94,8 @@ public class MetadataFunctionNodeController {
     }
 
     @PostMapping("/updateSort")
-    public Result<?> updateSort(@RequestBody UpdateSortRequest request) {
+    @Operation(summary = "更新节点排序", description = "调整单个功能节点的 sort 值")
+    public Result<?> updateSort(@Parameter(description = "节点 ID 与排序值") @RequestBody UpdateSortRequest request) {
         nodeService.updateSort(request.getId(), request.getSort());
         return Result.success();
 

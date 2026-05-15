@@ -64,6 +64,10 @@ public final class AppErrorCodes {
     public static final int BIZ_SYSTEM_NOT_FOUND = 1201;
     public static final int BIZ_SYSTEM_DEFAULT_CANNOT_DELETE = 1202;
     public static final int BIZ_SYSTEM_MODULE_CODES_EMPTY = 1203;
+    /** 补充物理库时未选择库名 */
+    public static final int BIZ_SYSTEM_PHYSICAL_CATALOG_REQUIRED = 1204;
+    /** 物理库名不符合安全规则 */
+    public static final int BIZ_SYSTEM_PHYSICAL_CATALOG_INVALID = 1205;
 
     // ---------- 模块 13xx ----------
     public static final int MODULE_NOT_FOUND = 1301;

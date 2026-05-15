@@ -1,5 +1,6 @@
 package com.metadata.controller;
 
+import com.metadata.common.BatchAssignBusinessSystemRequest;
 import com.metadata.common.BatchDeleteRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
@@ -131,12 +132,21 @@ public class MetadataTableController {
      */
     @PostMapping("/batchAssignBusinessSystem")
     @Operation(summary = "批量分配业务系统", description = "批量更新表的业务系统")
-    public Result<?> batchAssignBusinessSystem(@Parameter(description = "表编码列表和业务系统编码") @RequestBody Map<String, Object> request) {
-        List<String> tableCodes = (List<String>) request.get("tableCodes");
-        String businessCode = (String) request.get("businessCode");
-        tableService.batchUpdateTableBusinessSystem(tableCodes, businessCode);
+    public Result<?> batchAssignBusinessSystem(
+            @Parameter(description = "表编码列表和业务系统编码") @RequestBody BatchAssignBusinessSystemRequest request) {
+        tableService.batchUpdateTableBusinessSystem(request.getTableCodes(), request.getBusinessCode());
         return Result.success();
 
+    }
+
+    /**
+     * 在物理库中补齐缺失的表（按元数据生成 CREATE TABLE，已存在则跳过）。
+     */
+    @PostMapping("/ensureMissingPhysicalTables")
+    @Operation(summary = "补齐缺失物理表", description = "遍历指定业务系统下已启用的元数据表，在解析到的物理库中为缺失表执行建表 SQL")
+    public Result<Map<String, Object>> ensureMissingPhysicalTables(
+            @Parameter(description = "业务系统编码") @RequestParam String businessCode) {
+        return Result.success(tableService.ensureMissingPhysicalTables(businessCode));
     }
 }
 

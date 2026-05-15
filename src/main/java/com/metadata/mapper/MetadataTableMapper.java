@@ -83,5 +83,13 @@ public interface MetadataTableMapper {
      * 表级物理库名与参数一致（忽略大小写、首尾空格）的表列表
      */
     List<MetadataTable> selectByDatabaseName(@Param("databaseName") String databaseName);
+
+    /**
+     * 将指定业务系统下表级物理库名为空的记录写入给定库名。
+     *
+     * @return 更新行数
+     */
+    int updateEmptyDatabaseNameByBusinessCode(@Param("businessCode") String businessCode,
+                                              @Param("databaseName") String databaseName);
 }
 

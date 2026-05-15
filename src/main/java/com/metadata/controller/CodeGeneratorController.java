@@ -1,14 +1,17 @@
 package com.metadata.controller;
 
+import com.metadata.common.AuthExtensionCodeBundle;
+import com.metadata.common.BusinessSystemSqlExportPayload;
+import com.metadata.common.BusinessSystemTableCodesPayload;
+import com.metadata.common.GeneratedCodeBundleMapper;
 import com.metadata.common.Result;
+import com.metadata.common.TableGeneratedCodeBundle;
 import com.metadata.service.CodeGeneratorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * 代码生成控制器
@@ -199,8 +202,8 @@ public class CodeGeneratorController {
      * 生成所有代码
      */
     @GetMapping("/all/{tableCode}")
-    @Operation(description = "一次性生成SQL、Controller、Service、Mapper、MapperXML、Vue列表、Vue表单")
-    public Result<Map<String, String>> generateAll(
+    @Operation(summary = "生成单表全部代码", description = "一次性生成建表 SQL、后端 Java、前端 Vue、路由及配置文件等，返回固定字段结构的代码包")
+    public Result<TableGeneratedCodeBundle> generateAll(
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
             @RequestParam String packageName,
@@ -210,8 +213,8 @@ public class CodeGeneratorController {
             @RequestParam(defaultValue = "false") boolean useInterface,
             @Parameter(description = "是否生成验证码认证扩展包")
             @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
-        Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled);
-        return Result.success(codeMap);
+        return Result.success(GeneratedCodeBundleMapper.fromMap(
+                codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled)));
 
     }
 
@@ -219,7 +222,7 @@ public class CodeGeneratorController {
      * 生成路由配置（单独接口）
      */
     @GetMapping("/routes/{tableCode}")
-    @Operation(description = "生成路由配置")
+    @Operation(summary = "生成路由配置", description = "生成单表对应的前端 routes.js")
     public Result<String> generateRoutes(
             @Parameter(description = "表编码")
             @PathVariable String tableCode,
@@ -234,7 +237,7 @@ public class CodeGeneratorController {
      * 生成业务系统下所有表的整合路由配置
      */
     @GetMapping("/routes/integrated/{businessCode}")
-    @Operation(description = "生成业务系统下所有表的整合路由配置")
+    @Operation(summary = "生成整合路由配置", description = "生成业务系统下所有表的整合 routes.js")
     public Result<String> generateIntegratedRoutes(
             @Parameter(description = "业务系统编码")
             @PathVariable String businessCode) throws Exception {
@@ -247,15 +250,15 @@ public class CodeGeneratorController {
      * 生成业务系统下所有表的完整代码包
      */
     @GetMapping("/allByBusinessSystem/{businessCode}")
-    @Operation(description = "生成业务系统下所有表的代码")
-    public Result<Map<String, Map<String, String>>> generateAllByBusinessSystem(
+    @Operation(summary = "按业务系统生成全部表代码", description = "为业务系统下所有启用表分别生成完整代码包，按 tables 列表返回")
+    public Result<BusinessSystemTableCodesPayload> generateAllByBusinessSystem(
             @Parameter(description = "业务系统编码")
             @PathVariable String businessCode,
             @RequestParam(defaultValue = "com.example") String packageName,
             @Parameter(description = "是否使用接口模式生成Service")
             @RequestParam(defaultValue = "false") boolean useInterface) throws Exception {
-        Map<String, Map<String, String>> codeMap = codeGeneratorService.generateAllByBusinessSystem(businessCode, packageName, useInterface);
-        return Result.success(codeMap);
+        return Result.success(GeneratedCodeBundleMapper.tableCodesFromMap(
+                codeGeneratorService.generateAllByBusinessSystem(businessCode, packageName, useInterface)));
 
     }
     
@@ -263,12 +266,12 @@ public class CodeGeneratorController {
      * 生成业务系统下所有表的建表SQL
      */
     @GetMapping("/sqlByBusinessSystem/{businessCode}")
-    @Operation(description = "生成业务系统下所有表的SQL")
-    public Result<Map<String, String>> generateAllSQLByBusinessSystem(
+    @Operation(summary = "按业务系统生成全部建表 SQL", description = "为业务系统下所有启用表生成建表语句，按 sqlFiles 列表返回")
+    public Result<BusinessSystemSqlExportPayload> generateAllSQLByBusinessSystem(
             @Parameter(description = "业务系统编码")
             @PathVariable String businessCode) throws Exception {
-        Map<String, String> sqlMap = codeGeneratorService.generateAllSQLByBusinessSystem(businessCode);
-        return Result.success(sqlMap);
+        return Result.success(GeneratedCodeBundleMapper.sqlExportFromMap(
+                codeGeneratorService.generateAllSQLByBusinessSystem(businessCode)));
 
     }
 
@@ -363,11 +366,12 @@ public class CodeGeneratorController {
      * 生成认证扩展包（后端）
      */
     @GetMapping("/auth-extension")
-    @Operation(summary = "生成认证扩展包（验证码 + Session 登录）")
-    public Result<Map<String, String>> generateAuthExtension(
+    @Operation(summary = "生成认证扩展包", description = "生成验证码与 Session 登录相关后端源码（CaptchaService、AuthController 等）")
+    public Result<AuthExtensionCodeBundle> generateAuthExtension(
             @RequestParam String packageName,
             @RequestParam(defaultValue = "true") boolean captchaEnabled) throws Exception {
-        return Result.success(codeGeneratorService.generateAuthExtension(packageName, captchaEnabled));
+        return Result.success(GeneratedCodeBundleMapper.authFromMap(
+                codeGeneratorService.generateAuthExtension(packageName, captchaEnabled)));
     }
     
     /**

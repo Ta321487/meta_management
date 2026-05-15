@@ -1,16 +1,17 @@
 package com.metadata.controller;
 
 import com.metadata.common.Result;
+import com.metadata.common.SqlExecuteMultipleResultPayload;
 import com.metadata.common.SqlExecuteRequest;
+import com.metadata.common.SqlExecuteSingleResultPayload;
 import com.metadata.common.codes.ApiMessages;
 import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.exception.BizException;
 import com.metadata.service.SqlExecuteService;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 /**
  * SQL执行控制器
@@ -27,25 +28,25 @@ public class SqlExecuteController {
      * 执行SQL语句
      */
     @PostMapping("/execute")
-    public Result<?> executeSql(@RequestBody SqlExecuteRequest request) {
+    @Operation(summary = "执行单条 SQL", description = "执行一条 SQL，返回是否成功、影响行数或查询结果集等")
+    public Result<SqlExecuteSingleResultPayload> executeSql(@RequestBody SqlExecuteRequest request) {
         String sql = request.getSql();
         if (sql == null || sql.trim().isEmpty()) {
             throw BizException.of(AppErrorCodes.SQL_TEXT_EMPTY, ApiMessages.SQL_REQUIRED);
         }
-        Map<String, Object> result = sqlExecuteService.executeSql(sql);
-        return Result.success(result);
+        return Result.success(SqlExecuteSingleResultPayload.fromMap(sqlExecuteService.executeSql(sql)));
     }
 
     /**
      * 执行多条SQL语句
      */
     @PostMapping("/executeMultiple")
-    public Result<?> executeMultipleSql(@RequestBody SqlExecuteRequest request) {
+    @Operation(summary = "批量执行 SQL", description = "按分号分隔执行多条 SQL，返回每条明细及汇总统计")
+    public Result<SqlExecuteMultipleResultPayload> executeMultipleSql(@RequestBody SqlExecuteRequest request) {
         String sqls = request.getSql();
         if (sqls == null || sqls.trim().isEmpty()) {
             throw BizException.of(AppErrorCodes.SQL_TEXT_EMPTY, ApiMessages.SQL_REQUIRED);
         }
-        Map<String, Object> result = sqlExecuteService.executeMultipleSql(sqls);
-        return Result.success(result);
+        return Result.success(SqlExecuteMultipleResultPayload.fromMap(sqlExecuteService.executeMultipleSql(sqls)));
     }
 }

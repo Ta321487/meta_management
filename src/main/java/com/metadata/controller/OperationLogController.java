@@ -5,6 +5,8 @@ import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataOperationLog;
 import com.metadata.service.OperationLogService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -22,17 +24,15 @@ public class OperationLogController {
     @Autowired
     private OperationLogService logService;
 
-    /**
-     * 查询操作日志列表
-     */
     @GetMapping("/list")
-    public Result<?> list(@RequestParam(required = false) String module,
-                          @RequestParam(required = false) String operateType,
-                          @RequestParam(required = false) String startTime,
-                          @RequestParam(required = false) String endTime,
-                          @RequestParam(required = false) Integer current,
-                          @RequestParam(required = false) Integer size) {
-        // 如果传入了分页参数，使用分页查询
+    @Operation(summary = "查询操作日志", description = "按模块、操作类型、时间范围查询；传入 current、size 时分页返回")
+    public Result<?> list(
+            @Parameter(description = "模块名称") @RequestParam(required = false) String module,
+            @Parameter(description = "操作类型") @RequestParam(required = false) String operateType,
+            @Parameter(description = "开始时间") @RequestParam(required = false) String startTime,
+            @Parameter(description = "结束时间") @RequestParam(required = false) String endTime,
+            @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
+            @Parameter(description = "每页条数") @RequestParam(required = false) Integer size) {
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
@@ -40,10 +40,7 @@ public class OperationLogController {
             PageResult<MetadataOperationLog> pageResult = logService.page(module, operateType, startTime, endTime, pageRequest);
             return Result.success(pageResult);
         }
-        // 否则使用非分页查询（兼容旧接口）
         List<MetadataOperationLog> list = logService.list(module, operateType, startTime, endTime);
         return Result.success(list);
-
     }
 }
-

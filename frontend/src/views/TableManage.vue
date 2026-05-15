@@ -40,6 +40,16 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item>
+          <el-button
+            type="warning"
+            :disabled="!searchForm.businessCode"
+            :loading="ensurePhysicalSubmitting"
+            @click="handleEnsurePhysicalTables"
+          >
+            补齐缺失物理表
+          </el-button>
+        </el-form-item>
       </el-form>
 
       <el-table :data="tableData" border style="width: 100%" ref="tableRef" @selection-change="handleSelectionChange">
@@ -171,7 +181,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList, batchAssignBusinessSystem } from '../api'
+import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList, batchAssignBusinessSystem, ensureMissingPhysicalTables } from '../api'
 
 export default {
   name: 'TableManage',
@@ -201,6 +211,7 @@ export default {
       tableName: '',
       businessCode: ''
     })
+    const ensurePhysicalSubmitting = ref(false)
     const form = reactive({
       id: null,
       tableCode: '',
@@ -276,6 +287,48 @@ export default {
       searchForm.businessCode = ''
       pagination.current = 1
       loadData()
+    }
+
+    const handleEnsurePhysicalTables = async () => {
+      if (!searchForm.businessCode) {
+        ElMessage.warning('请先在筛选中选择业务系统')
+        return
+      }
+      try {
+        await ElMessageBox.confirm(
+          '为已启用且物理库中不存在的表执行建表；无字段时自动加主键，已有表跳过。是否继续？',
+          '补齐缺失物理表',
+          { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+      ensurePhysicalSubmitting.value = true
+      try {
+        const res = await ensureMissingPhysicalTables(searchForm.businessCode)
+        if (res.code === 200 && res.data) {
+          const d = res.data
+          const c = d.createdCount ?? (d.created && d.created.length) ?? 0
+          const s = d.skippedCount ?? (d.skipped && d.skipped.length) ?? 0
+          const f = d.failedCount ?? (d.failed && d.failed.length) ?? 0
+          let msg = `新建 ${c} 张，跳过 ${s}，失败 ${f}`
+          if (f > 0 && Array.isArray(d.failed) && d.failed.length) {
+            const tail = d.failed.map((x) => `${x.tableCode}: ${x.message}`).join('；')
+            if (tail.length < 400) {
+              msg += '。' + tail
+            } else {
+              msg += '（详见控制台）'
+              console.warn('ensureMissingPhysicalTables failed:', d.failed)
+            }
+          }
+          ElMessage.success(msg)
+          loadData()
+        }
+      } catch (error) {
+        ElMessage.error(error.response?.data?.message || error.message || '请求失败')
+      } finally {
+        ensurePhysicalSubmitting.value = false
+      }
     }
 
     const handleAdd = () => {
@@ -462,31 +515,48 @@ export default {
       assignDialogVisible.value = true
     }
 
+    const normalizeBusinessCode = (code) => (code == null ? '' : String(code)).trim()
+
+    /** 未填写业务系统（库中为空）：尚未关联任何业务系统 */
+    const isBlankBusinessCode = (code) => normalizeBusinessCode(code) === ''
+
+    /** 平台默认业务系统编码（与「未填」不同：表示已挂在 DEFAULT 域下） */
+    const isDefaultBusinessCode = (code) => normalizeBusinessCode(code) === 'DEFAULT'
+
     // 批量分配业务系统提交
     const handleAssignSubmit = async () => {
       try {
         // 先验证表单
         await assignFormRef.value.validate()
-        
-        // 检查选中的表是否已有业务系统
-        const tablesWithBusinessSystem = selectedRows.value.filter(row => {
-          return row.businessCode && row.businessCode !== 'DEFAULT'
+
+        const targetCode = normalizeBusinessCode(assignForm.businessCode)
+
+        // 按业务系统编码判断：空、DEFAULT 均允许改挂到目标；仅「已挂在其他具体编码」且与目标不一致时拦截
+        const tablesWithOtherBusinessSystem = selectedRows.value.filter((row) => {
+          const existing = normalizeBusinessCode(row.businessCode)
+          if (isBlankBusinessCode(existing)) return false
+          if (isDefaultBusinessCode(existing)) return false
+          if (existing === targetCode) return false
+          return true
         })
-        
-        if (tablesWithBusinessSystem.length > 0) {
-          let warningMessage = '部分选中的表已存在业务系统，不可分配其他业务系统：'
-          
-          // 限制显示的表名数量，最多显示5个
+
+        if (tablesWithOtherBusinessSystem.length > 0) {
+          let warningMessage =
+            '以下表已关联其他业务系统（与当前所选业务系统编码不一致），无法批量分配：'
+
+          // 限制显示的表名数量，最多显示5个；附带当前编码便于核对
           const maxDisplayCount = 5
-          const displayTables = tablesWithBusinessSystem.slice(0, maxDisplayCount)
-          const tableNames = displayTables.map(row => row.tableName).join('、')
-          
-          if (tablesWithBusinessSystem.length > maxDisplayCount) {
-            warningMessage += `${tableNames} 等 ${tablesWithBusinessSystem.length} 个表`
+          const displayTables = tablesWithOtherBusinessSystem.slice(0, maxDisplayCount)
+          const tableNames = displayTables
+            .map((row) => `${row.tableName}（${normalizeBusinessCode(row.businessCode)}）`)
+            .join('、')
+
+          if (tablesWithOtherBusinessSystem.length > maxDisplayCount) {
+            warningMessage += `${tableNames} 等 ${tablesWithOtherBusinessSystem.length} 个表`
           } else {
             warningMessage += tableNames
           }
-          
+
           ElMessage.warning(warningMessage)
           return
         }
@@ -523,9 +593,11 @@ export default {
       selectedRows,
       pagination,
       searchForm,
+      ensurePhysicalSubmitting,
       form,
       rules,
       handleSearch,
+      handleEnsurePhysicalTables,
       handleReset,
       handleSizeChange,
       handleCurrentChange,

@@ -1,5 +1,6 @@
 package com.metadata.service;
 
+import com.metadata.common.FillBusinessSystemCatalogRequest;
 import com.metadata.entity.MetadataBusinessSystem;
 
 import java.util.List;
@@ -62,4 +63,11 @@ public interface MetadataBusinessSystemService {
      * @return 模块编码列表
      */
     List<String> getAssociatedModules(String businessCode);
+
+    /**
+     * 写入业务系统默认物理库，并可选择回填本系统下表级物理库名为空的表。
+     *
+     * @return 被回填的表行数（未勾选回填时为 0）
+     */
+    int fillDefaultPhysicalCatalog(FillBusinessSystemCatalogRequest request);
 }

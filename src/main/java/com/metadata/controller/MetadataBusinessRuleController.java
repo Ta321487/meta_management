@@ -25,7 +25,7 @@ public class MetadataBusinessRuleController {
     private MetadataBusinessRuleService ruleService;
 
     @PostMapping("/add")
-    @Operation(description = "添加业务规则")
+    @Operation(summary = "新增业务规则", description = "添加业务规则")
     public Result<?> add(@Parameter(description = "业务规则信息") @RequestBody MetadataBusinessRule rule) {
         ruleService.add(rule);
         return Result.success();
@@ -33,7 +33,7 @@ public class MetadataBusinessRuleController {
     }
 
     @PostMapping("/update")
-    @Operation(description = "更新业务规则")
+    @Operation(summary = "更新业务规则", description = "更新业务规则")
     public Result<?> update(@Parameter(description = "业务规则信息") @RequestBody MetadataBusinessRule rule) {
         ruleService.update(rule);
         return Result.success();
@@ -41,16 +41,16 @@ public class MetadataBusinessRuleController {
     }
 
     @DeleteMapping("/delete/{id}")
-    @Operation(description = "根据id删除业务规则")
-    public Result<?> delete(@Parameter(description = "业务规则信息") @PathVariable Long id) {
+    @Operation(summary = "删除业务规则", description = "根据 ID 删除业务规则")
+    public Result<?> delete(@Parameter(description = "规则 ID") @PathVariable Long id) {
         ruleService.delete(id);
         return Result.success();
 
     }
 
     @GetMapping("/list/{moduleCode}")
-    @Operation(description = "通过模块唯一代码分页查询")
-    public Result<?> listByModuleCode(@Parameter(description = "模块唯一代码") @PathVariable String moduleCode,
+    @Operation(summary = "查询业务规则列表", description = "按模块编码查询；传入 current、size 时分页")
+    public Result<?> listByModuleCode(@Parameter(description = "模块编码") @PathVariable String moduleCode,
                                       @Parameter(description = "当前页",required = true)
                                       @RequestParam(required = false) Integer current,
                                       @Parameter(description = "每页显示数量")

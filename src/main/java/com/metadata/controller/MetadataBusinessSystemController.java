@@ -1,6 +1,7 @@
 package com.metadata.controller;
 
 import com.metadata.common.AssociateModulesRequest;
+import com.metadata.common.FillBusinessSystemCatalogRequest;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.service.MetadataBusinessSystemService;
@@ -10,7 +11,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 业务系统控制器
@@ -43,6 +46,19 @@ public class MetadataBusinessSystemController {
         businessSystemService.update(businessSystem);
         return Result.success();
 
+    }
+
+    /**
+     * 补充默认物理库（可选事后补录），并可回填本系统下表级物理库名为空的表。
+     */
+    @PostMapping("/fillPhysicalCatalog")
+    @Operation(summary = "补充业务系统物理库", description = "写入业务系统默认物理库；可选将表级物理库名为空的表一并写入同一库名")
+    public Result<Map<String, Object>> fillPhysicalCatalog(
+            @Parameter(description = "补充物理库参数") @RequestBody FillBusinessSystemCatalogRequest request) {
+        int backfilled = businessSystemService.fillDefaultPhysicalCatalog(request);
+        Map<String, Object> data = new HashMap<>(2);
+        data.put("backfilledTableCount", backfilled);
+        return Result.success(data);
     }
 
     /**

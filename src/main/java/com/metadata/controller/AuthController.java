@@ -2,6 +2,7 @@ package com.metadata.controller;
 
 import com.metadata.common.ChangePasswordRequest;
 import com.metadata.common.LoginRequest;
+import com.metadata.common.LoginResponseData;
 import com.metadata.common.Result;
 import com.metadata.common.codes.ApiMessages;
 import com.metadata.common.codes.AppErrorCodes;
@@ -16,8 +17,6 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpSession;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 认证控制器
@@ -34,8 +33,8 @@ public class AuthController {
      * 登录
      */
     @PostMapping("/login")
-    @Operation(summary = "用户登录", description = "用户登录认证，返回用户信息")
-    public Result<Map<String, Object>> login(
+    @Operation(summary = "用户登录", description = "校验用户名密码，登录成功后将管理员信息写入 Session，并返回用户名")
+    public Result<LoginResponseData> login(
             @Parameter(description = "登录参数，包含username和password",required = true) @RequestBody LoginRequest loginRequest,
             HttpServletRequest request) {
         String username = loginRequest.getUsername();
@@ -46,9 +45,7 @@ public class AuthController {
         }
         HttpSession session = request.getSession();
         session.setAttribute("admin", admin);
-        Map<String, Object> data = new HashMap<>();
-        data.put("username", admin.getUsername());
-        return Result.success(data);
+        return Result.success(new LoginResponseData(admin.getUsername()));
     }
 
     /**

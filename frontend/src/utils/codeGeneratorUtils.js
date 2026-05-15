@@ -124,3 +124,61 @@ export function getFileContentType(filename) {
   
   return contentTypeMap[ext] || 'text/plain';
 }
+
+/**
+ * 将后端「单表完整代码包」写入页面 codeMap
+ * @param {Object} codeMap 页面各 Tab 展示的源码对象
+ * @param {Object} bundle 接口 data（TableGeneratedCodeBundle）
+ */
+export function applyGeneratedCodeBundle(codeMap, bundle) {
+  if (!bundle || !codeMap) return
+  codeMap.sql = bundle.createTableSql || ''
+  codeMap.entity = bundle.entityJava || ''
+  codeMap.controller = bundle.controllerJava || ''
+  codeMap.service = bundle.serviceJava || ''
+  codeMap.serviceInterface = bundle.serviceInterfaceJava || ''
+  codeMap.serviceImpl = bundle.serviceImplJava || ''
+  codeMap.mapper = bundle.mapperJava || ''
+  codeMap.mapperxml = bundle.mapperXml || ''
+  codeMap.result = bundle.resultJava || ''
+  codeMap.pageRequest = bundle.pageRequestJava || ''
+  codeMap.pageResult = bundle.pageResultJava || ''
+  codeMap.vueList = bundle.listVue || ''
+  codeMap.vueForm = bundle.formVue || ''
+  codeMap.login = bundle.loginVue || ''
+  codeMap.auth = bundle.authJs || codeMap.auth
+  codeMap.captchaInput = bundle.captchaInputVue || ''
+  codeMap.authController = bundle.authControllerJava || ''
+  codeMap.captchaService = bundle.captchaServiceJava || ''
+  codeMap.routes = bundle.routesJs || ''
+  codeMap.api = bundle.apiJs || ''
+  codeMap.requestJs = bundle.requestJs || ''
+  codeMap.env = bundle.envFile || ''
+  codeMap.application = bundle.applicationJava || ''
+  codeMap.applicationYml = bundle.applicationYml || ''
+  codeMap.mybatisConfig = bundle.myBatisConfigJava || ''
+  codeMap.corsConfig = bundle.corsConfigJava || ''
+  codeMap.pomXml = bundle.pomXml || ''
+}
+
+/**
+ * 从业务系统代码包列表中按表编码取 files
+ * @param {Array} tables data.tables
+ * @param {string} tableCode 表编码
+ */
+export function findTableCodeBundle(tables, tableCode) {
+  if (!tables || !tableCode) return null
+  const entry = tables.find((t) => t.tableCode === tableCode)
+  return entry ? entry.files : null
+}
+
+/**
+ * 将认证扩展包写入 codeMap
+ * @param {Object} codeMap 页面源码对象
+ * @param {Object} ext 接口 data（AuthExtensionCodeBundle）
+ */
+export function applyAuthExtensionBundle(codeMap, ext) {
+  if (!ext || !codeMap) return
+  codeMap.authController = ext.authControllerJava || ''
+  codeMap.captchaService = ext.captchaServiceJava || ''
+}

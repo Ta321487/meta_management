@@ -5,6 +5,7 @@ import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataTable;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * 表服务接口
@@ -85,4 +86,12 @@ public interface MetadataTableService {
      * @param status 目标状态，1-启用，0-禁用
      */
     void batchUpdateStatus(List<Long> ids, Integer status);
+
+    /**
+     * 在各自解析到的物理库中，为「元数据已登记但 MySQL 中不存在」的表执行建表 SQL；已存在的表跳过。
+     *
+     * @param businessCode 仅处理该业务系统下的表
+     * @return 含 created、skipped、failed 列表及计数的 Map，便于前端展示
+     */
+    Map<String, Object> ensureMissingPhysicalTables(String businessCode);
 }

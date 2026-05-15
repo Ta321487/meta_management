@@ -21,7 +21,11 @@
         <el-table-column prop="businessCode" label="业务编码" width="150" />
         <el-table-column prop="businessName" label="业务系统名称" />
         <el-table-column prop="packageName" label="包名" show-overflow-tooltip />
-        <el-table-column prop="databaseName" label="默认物理库" width="140" show-overflow-tooltip />
+        <el-table-column prop="databaseName" label="默认物理库" width="160" show-overflow-tooltip>
+          <template #default="{ row }">
+            <span>{{ row.databaseName && String(row.databaseName).trim() !== '' ? row.databaseName : '—' }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="isDefault" label="是否默认" width="120">
           <template #default="{ row }">
@@ -42,7 +46,7 @@
         </el-table-column>
         <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
-            <el-space>
+            <el-space wrap>
               <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
               <el-button type="success" size="small" @click="handleSetDefault(row)" :disabled="row.isDefault === 1">设为默认</el-button>
               <el-button type="info" size="small" @click="handleAssociateModules(row)">关联模块</el-button>
@@ -71,7 +75,7 @@
       close-on-press-escape="false"
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="500px"
+      width="560px"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
@@ -88,7 +92,9 @@
           <el-select
             v-model="form.databaseName"
             filterable
-            placeholder="请选择"
+            allow-create
+            default-first-option
+            placeholder="必选：须先在「库管理」登记（全链路模拟为 demo_erp）"
             style="width: 100%"
           >
             <el-option
@@ -98,6 +104,14 @@
               :value="opt.value"
             />
           </el-select>
+        </el-form-item>
+        <el-form-item v-if="form.id" label="同步">
+          <div class="backfill-block">
+            <el-checkbox v-model="syncAfterSave">启用</el-checkbox>
+            <p class="backfill-hint">
+              保存成功后：先回补本系统下表级物理库为空的元数据（不覆盖已填库名），再为缺表在对应库建表；无字段自动加主键，物理表已存在则跳过。
+            </p>
+          </div>
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入业务系统描述" />
@@ -156,7 +170,7 @@
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getBusinessSystemList, addBusinessSystem, updateBusinessSystem, deleteBusinessSystem, getModuleList, getAssociatedModules, associateModulesToBusinessSystem, getPhysicalDatabaseList } from '../api'
+import { getBusinessSystemList, addBusinessSystem, updateBusinessSystem, deleteBusinessSystem, getModuleList, getAssociatedModules, associateModulesToBusinessSystem, getPhysicalDatabaseList, fillBusinessSystemPhysicalCatalog, ensureMissingPhysicalTables } from '../api'
 import dayjs from 'dayjs'
 
 export default {
@@ -206,10 +220,36 @@ export default {
     const rules = {
       businessCode: [{ required: true, message: '请输入业务编码', trigger: 'blur' }],
       businessName: [{ required: true, message: '请输入业务系统名称', trigger: 'blur' }],
-      databaseName: [{ required: true, message: '请选择默认物理库', trigger: 'change' }]
+      databaseName: [{ required: true, message: '请选择默认物理库（须与库管理登记一致）', trigger: 'change' }]
     }
     
     const physicalDbRows = ref([])
+
+    const buildCatalogSelectOptions = (currentValue) => {
+      const list = []
+      const seen = new Set()
+      list.push({ value: 'metadata_db', label: 'metadata_db（元数据）' })
+      seen.add('metadata_db')
+      const rows = physicalDbRows.value || []
+      for (const r of rows) {
+        if (r.isEnabled !== 1) continue
+        const name = r.catalogName
+        if (!name || seen.has(name)) continue
+        seen.add(name)
+        const label = r.displayName ? `${name}（${r.displayName}）` : name
+        list.push({ value: name, label })
+      }
+      const cur = currentValue && String(currentValue).trim()
+      if (cur && !seen.has(cur)) {
+        list.push({ value: cur, label: `${cur}（当前/待写入）` })
+      }
+      return list
+    }
+
+    const catalogSelectOptions = computed(() => buildCatalogSelectOptions(form.databaseName))
+
+    /** 仅编辑保存：同步执行表级库名回填 + 缺失物理表建表 */
+    const syncAfterSave = ref(false)
 
     const loadPhysicalCatalogs = async () => {
       try {
@@ -221,28 +261,6 @@ export default {
         physicalDbRows.value = []
       }
     }
-
-    const catalogSelectOptions = computed(() => {
-      const meta = { value: 'metadata_db', label: 'metadata_db（元数据）' }
-      const list = []
-      const seen = new Set()
-      list.push(meta)
-      seen.add('metadata_db')
-      const rows = physicalDbRows.value || []
-      for (const r of rows) {
-        if (r.isEnabled !== 1) continue
-        const name = r.catalogName
-        if (!name || seen.has(name)) continue
-        seen.add(name)
-        const label = r.displayName ? `${name}（${r.displayName}）` : name
-        list.push({ value: name, label })
-      }
-      const cur = form.databaseName
-      if (cur && !seen.has(cur)) {
-        list.push({ value: cur, label: `${cur}（当前值）` })
-      }
-      return list
-    })
 
     // 加载业务系统列表
     const loadData = async () => {
@@ -307,34 +325,31 @@ export default {
       form.businessCode = ''
       form.businessName = ''
       form.packageName = ''
-      form.databaseName = 'metadata_db'
+      form.databaseName = ''
       form.description = ''
       form.isDefault = 0
+      syncAfterSave.value = false
     }
     
     // 编辑业务系统
     const handleEdit = async (row) => {
       await loadPhysicalCatalogs()
+      syncAfterSave.value = false
       dialogVisible.value = true
       dialogTitle.value = '编辑业务系统'
       form.id = row.id
       form.businessCode = row.businessCode
       form.businessName = row.businessName
       form.packageName = row.packageName || ''
-      form.databaseName = row.databaseName && String(row.databaseName).trim() !== '' ? row.databaseName : 'metadata_db'
+      form.databaseName = row.databaseName && String(row.databaseName).trim() !== '' ? row.databaseName : ''
       form.description = row.description
       form.isDefault = row.isDefault
     }
-    
+
     // 设为默认
     const handleSetDefault = async (row) => {
       try {
-        await updateBusinessSystem({
-          id: row.id,
-          businessName: row.businessName,
-          description: row.description,
-          isDefault: 1
-        })
+        await updateBusinessSystem({ ...row, isDefault: 1 })
         ElMessage.success('设置成功')
         loadData()
       } catch (error) {
@@ -389,15 +404,46 @@ export default {
           submitting.value = true
           try {
             if (form.id) {
-              // 更新
               await updateBusinessSystem(form)
-              ElMessage.success('更新成功')
+              let msg = '更新成功'
+              if (syncAfterSave.value) {
+                let backfillCount = 0
+                let createdCount = 0
+                let failedPhysical = 0
+                try {
+                  const res = await fillBusinessSystemPhysicalCatalog({
+                    businessCode: form.businessCode,
+                    databaseName: String(form.databaseName).trim(),
+                    backfillEmptyTableCatalog: true
+                  })
+                  if (res.code === 200 && res.data && res.data.backfilledTableCount != null) {
+                    backfillCount = res.data.backfilledTableCount
+                  }
+                } catch (e2) {
+                  ElMessage.warning('业务系统已保存，但表级库名回填失败：' + (e2.message || '未知错误'))
+                }
+                try {
+                  const res2 = await ensureMissingPhysicalTables(form.businessCode)
+                  if (res2.code === 200 && res2.data) {
+                    const d = res2.data
+                    createdCount = d.createdCount ?? (d.created && d.created.length) ?? 0
+                    failedPhysical = d.failedCount ?? 0
+                  }
+                } catch (e3) {
+                  ElMessage.warning('业务系统已保存，但补齐物理表失败：' + (e3.message || '未知错误'))
+                }
+                msg += `，已同步：表级库名回填 ${backfillCount} 张，物理新建 ${createdCount} 张`
+                if (failedPhysical > 0) {
+                  msg += `（${failedPhysical} 张失败，可到表管理处理）`
+                }
+              }
+              ElMessage.success(msg)
             } else {
-              // 新增
               await addBusinessSystem(form)
               ElMessage.success('新增成功')
             }
             dialogVisible.value = false
+            syncAfterSave.value = false
             loadData()
           } catch (error) {
             ElMessage.error('操作失败: ' + (error.message || '未知错误'))
@@ -410,6 +456,7 @@ export default {
     
     // 对话框关闭
     const handleDialogClose = () => {
+      syncAfterSave.value = false
       if (formRef.value) {
         formRef.value.resetFields()
       }
@@ -505,6 +552,7 @@ export default {
       handleSelectionChange,
       handleAdd,
       handleEdit,
+      syncAfterSave,
       handleSetDefault,
       handleDelete,
       handleBatchDelete,
@@ -534,5 +582,31 @@ export default {
 
 .search-form {
   margin-bottom: 20px;
+}
+
+.backfill-block {
+  width: 100%;
+  max-width: 100%;
+}
+
+.backfill-block :deep(.el-checkbox__label) {
+  white-space: normal;
+  line-height: 1.45;
+}
+
+.backfill-hint {
+  margin: 8px 0 0 0;
+  padding-left: 24px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: normal;
+}
+
+/* 避免表单项内容区在窄弹窗里把长文案挤成单行截断 */
+.business-system-manage :deep(.el-dialog__body .el-form-item__content) {
+  flex-wrap: wrap;
+  min-width: 0;
 }
 </style>

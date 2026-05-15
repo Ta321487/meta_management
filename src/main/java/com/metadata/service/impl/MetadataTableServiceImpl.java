@@ -19,7 +19,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 
 /**
@@ -63,6 +68,9 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     @Autowired
     private MetadataTableRelationMapper relationMapper;
 
+    @Autowired
+    private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
     /**
      * 新增表
      */
@@ -88,50 +96,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         // 先创建元数据记录
         tableMapper.insert(table);
 
-        // 检查是否有字段配置
-        List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
-
-        // 如果没有字段，根据主键策略自动创建一个主键字段
-        if (fields.isEmpty()) {
-            MetadataField primaryKeyField = new MetadataField();
-            primaryKeyField.setFieldCode("ID");
-            primaryKeyField.setTableCode(table.getTableCode());
-            // 根据主键策略设置不同的字段名
-            if ("UUID".equals(table.getPkStrategy())) {
-                primaryKeyField.setFieldName("uuid");
-                primaryKeyField.setLabel("主键UUID");
-            } else {
-                primaryKeyField.setFieldName("id");
-                primaryKeyField.setLabel("主键ID");
-            }
-            primaryKeyField.setSort(0);
-
-            // 根据主键策略设置字段类型和表单组件
-            if ("AUTO".equals(table.getPkStrategy())) {
-                // 自增主键：不需要表单组件，但在数据库层面是必填的
-                primaryKeyField.setFieldType("BIGINT");
-                primaryKeyField.setFormComponent("primary_key"); // 自增字段使用primary_key表单组件
-                primaryKeyField.setIsRequired(1); // 主键在数据库层面必须是必填的
-            } else if ("UUID".equals(table.getPkStrategy())) {
-                primaryKeyField.setFieldType("VARCHAR(36)");
-                primaryKeyField.setFormComponent("primary_key"); // UUID字段使用primary_key表单组件
-                primaryKeyField.setIsRequired(1);
-                // UUID默认值通过SQL模板设置，这里不需要额外设置
-            } else {
-                // 默认使用 BIGINT
-                primaryKeyField.setFieldType("BIGINT");
-                primaryKeyField.setFormComponent("primary_key"); // 其他主键使用primary_key表单组件
-                primaryKeyField.setIsRequired(1);
-            }
-            // 启用主键字段
-            primaryKeyField.setIsEnabled(1);
-            // 设置业务系统编码，与表保持一致
-            primaryKeyField.setBusinessCode(table.getBusinessCode());
-
-            // 插入主键字段
-            fieldMapper.insert(primaryKeyField);
-            logService.logSuccess("admin", "AUTO_CREATE_PK_FIELD", "自动创建主键字段: " + table.getTableCode());
-        }
+        ensureDefaultPrimaryKeyFieldIfMissing(table);
 
         // 生成并执行CREATE TABLE SQL
         try {
@@ -139,7 +104,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             if (phyCatalog != null && !phyCatalog.isEmpty()) {
                 mySqlPhysicalCatalogService.ensureCatalogExists(phyCatalog);
             }
-            String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode());
+            String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode(), table.getBusinessCode());
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog);
             if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
                 throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED,
@@ -441,6 +406,132 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             }
         }
         logService.logSuccess("admin", "BATCH_EDIT", "批量更新表状态：ids=" + ids + ", status=" + status);
+    }
+
+    @Override
+    public Map<String, Object> ensureMissingPhysicalTables(String businessCode) {
+        if (!StringUtils.hasText(businessCode)) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "业务系统编码不能为空");
+        }
+        List<MetadataTable> tables = tableMapper.selectAll(null, businessCode);
+        if (tables == null) {
+            tables = Collections.emptyList();
+        }
+        List<String> created = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        List<Map<String, String>> failed = new ArrayList<>();
+
+        for (MetadataTable table : tables) {
+            if (table.getIsEnabled() != null && table.getIsEnabled() == 0) {
+                skipped.add(table.getTableCode() + "（已禁用，跳过）");
+                continue;
+            }
+            String catalog = businessCatalogResolver.resolveCatalog(table);
+            if (!StringUtils.hasText(catalog)) {
+                failed.add(singleFailRow(table.getTableCode(), "无法解析物理库，请检查业务系统默认库或表级物理库"));
+                continue;
+            }
+            catalog = catalog.trim();
+            if (!mySqlPhysicalCatalogService.isValidCatalogName(catalog)) {
+                failed.add(singleFailRow(table.getTableCode(), "物理库名不合法: " + catalog));
+                continue;
+            }
+            String physicalName = CodeGenUtils.convertToTableName(table.getTableCode());
+            try {
+                if (physicalTableExists(catalog, physicalName)) {
+                    skipped.add(table.getTableCode() + "（物理表已存在）");
+                    continue;
+                }
+                mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+                ensureDefaultPrimaryKeyFieldIfMissing(table);
+                String ddl = codeGeneratorService.generateCreateTableSQL(table.getTableCode(), businessCode);
+                Map<String, Object> exec = sqlExecuteService.executeSql(ddl, false, catalog);
+                if (Boolean.TRUE.equals(exec.get("success"))) {
+                    created.add(table.getTableCode());
+                    logService.logSuccess("admin", "ENSURE_PHYSICAL_TABLE", "缺失物理表已创建: " + table.getTableCode() + " @ " + catalog);
+                } else {
+                    Object msg = exec.get("message");
+                    failed.add(singleFailRow(table.getTableCode(), msg != null ? msg.toString() : "DDL 执行失败"));
+                }
+            } catch (Exception e) {
+                failed.add(singleFailRow(table.getTableCode(), e.getMessage()));
+                logService.logError("admin", "ENSURE_PHYSICAL_TABLE", "创建物理表失败: " + table.getTableCode(), e.getMessage());
+            }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("created", created);
+        out.put("skipped", skipped);
+        out.put("failed", failed);
+        out.put("createdCount", created.size());
+        out.put("skippedCount", skipped.size());
+        out.put("failedCount", failed.size());
+        return out;
+    }
+
+    /**
+     * 若元数据表下没有任何字段，则按主键策略自动插入一条主键字段（与「新增表」行为一致），便于直接生成建表 SQL。
+     */
+    private void ensureDefaultPrimaryKeyFieldIfMissing(MetadataTable table) {
+        List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
+        if (fields != null && !fields.isEmpty()) {
+            return;
+        }
+        String pkStrategy = table.getPkStrategy();
+        if (pkStrategy == null || pkStrategy.isEmpty()) {
+            pkStrategy = "AUTO";
+        }
+        MetadataField primaryKeyField = new MetadataField();
+        primaryKeyField.setFieldCode("ID");
+        primaryKeyField.setTableCode(table.getTableCode());
+        if ("UUID".equals(pkStrategy)) {
+            primaryKeyField.setFieldName("uuid");
+            primaryKeyField.setLabel("主键UUID");
+        } else {
+            primaryKeyField.setFieldName("id");
+            primaryKeyField.setLabel("主键ID");
+        }
+        primaryKeyField.setSort(0);
+        if ("AUTO".equals(pkStrategy)) {
+            primaryKeyField.setFieldType("BIGINT");
+            primaryKeyField.setFormComponent("primary_key");
+            primaryKeyField.setIsRequired(1);
+        } else if ("UUID".equals(pkStrategy)) {
+            primaryKeyField.setFieldType("VARCHAR(36)");
+            primaryKeyField.setFormComponent("primary_key");
+            primaryKeyField.setIsRequired(1);
+        } else {
+            primaryKeyField.setFieldType("BIGINT");
+            primaryKeyField.setFormComponent("primary_key");
+            primaryKeyField.setIsRequired(1);
+        }
+        primaryKeyField.setIsEnabled(1);
+        String bc = table.getBusinessCode();
+        if (bc == null || bc.isEmpty()) {
+            bc = "DEFAULT";
+        }
+        primaryKeyField.setBusinessCode(bc);
+        fieldMapper.insert(primaryKeyField);
+        logService.logSuccess("admin", "AUTO_CREATE_PK_FIELD", "自动创建主键字段: " + table.getTableCode());
+    }
+
+    private static Map<String, String> singleFailRow(String tableCode, String message) {
+        Map<String, String> m = new LinkedHashMap<>();
+        m.put("tableCode", tableCode);
+        m.put("message", message);
+        return m;
+    }
+
+    private boolean physicalTableExists(String catalog, String physicalTableName) throws SQLException {
+        try (Connection c = businessDataSourcePoolManager.getConnection(catalog)) {
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT 1 FROM information_schema.tables WHERE LOWER(table_schema) = LOWER(?) AND LOWER(table_name) = LOWER(?) LIMIT 1")) {
+                ps.setString(1, catalog);
+                ps.setString(2, physicalTableName);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        }
     }
 
     /**

@@ -1,6 +1,10 @@
 package com.metadata.controller;
 
+import com.alibaba.fastjson2.JSON;
+import com.metadata.common.CodeTestReport;
+import com.metadata.common.GeneratedCodeBundleMapper;
 import com.metadata.common.Result;
+import com.metadata.common.TableGeneratedCodeBundle;
 import com.metadata.service.CodeGeneratorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -28,13 +32,13 @@ public class CodeTestController {
      * 测试代码生成
      */
     @GetMapping("/codetest/test/{tableCode}")
-    @Operation(description = "测试代码生成")
-    public Result<Map<String, Object>> testCode(
+    @Operation(summary = "代码生成自测", description = "生成指定表全部代码并校验各产出物是否完整、模板引用是否正确")
+    public Result<CodeTestReport> testCode(
             @Parameter(description = "表编码") @PathVariable String tableCode,
-            @RequestParam(defaultValue = "com.example") String packageName,
-            @RequestParam(required = false) String businessCode,
-            @RequestParam(defaultValue = "false") boolean useInterface,
-            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+            @Parameter(description = "Java 包名") @RequestParam(defaultValue = "com.example") String packageName,
+            @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode,
+            @Parameter(description = "是否使用 Service 接口模式") @RequestParam(defaultValue = "false") boolean useInterface,
+            @Parameter(description = "是否生成验证码认证扩展") @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
         // 生成所有代码（与代码生成页开关一致，便于测试验证码扩展包）
         Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled);
 
@@ -126,9 +130,10 @@ public class CodeTestController {
         result.put("total", total);
         result.put("successCount", successCount);
         result.put("failCount", failCount);
-        result.put("generatedCode", codeMap);
+        TableGeneratedCodeBundle bundle = GeneratedCodeBundleMapper.fromMap(codeMap);
+        result.put("generatedCode", bundle);
 
-        return Result.success(result);
+        return Result.success(JSON.parseObject(JSON.toJSONString(result), CodeTestReport.class));
 
     }
 

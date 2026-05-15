@@ -5,6 +5,7 @@ import com.metadata.common.DeleteConstraintRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
+import com.metadata.common.TableConstraintItem;
 import com.metadata.entity.MetadataField;
 import com.metadata.service.MetadataFieldService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 字段控制器
@@ -95,10 +97,10 @@ public class MetadataFieldController {
      */
     @GetMapping("/constraint/list/{tableCode}")
     @Operation(summary = "获取约束列表", description = "根据表编码查询约束列表")
-    public Result<?> getConstraints(
+    public Result<List<TableConstraintItem>> getConstraints(
             @Parameter(description = "表编码") @PathVariable String tableCode) {
         List<Map<String, Object>> constraints = fieldService.getConstraints(tableCode);
-        return Result.success(constraints);
+        return Result.success(constraints.stream().map(TableConstraintItem::fromMap).collect(Collectors.toList()));
     }
 
     /**
