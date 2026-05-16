@@ -22,15 +22,25 @@ public interface MetadataTableMapper {
         return selectByCode(tableCode, "");
     }
     MetadataTable selectById(Long id);
-    List<MetadataTable> selectAll(@Param("tableName") String tableName, @Param("businessCode") String businessCode);
-    
+
+    /**
+     * @param includeDisabled 为 true 时不按业务系统/物理库/表启用状态过滤（管理端）
+     */
+    List<MetadataTable> selectAll(@Param("tableName") String tableName,
+                                  @Param("businessCode") String businessCode,
+                                  @Param("includeDisabled") Boolean includeDisabled);
+
+    default List<MetadataTable> selectAll(@Param("tableName") String tableName, @Param("businessCode") String businessCode) {
+        return selectAll(tableName, businessCode, null);
+    }
+
     /**
      * 查询所有表（默认业务系统）
      */
     default List<MetadataTable> selectAll(@Param("tableName") String tableName) {
-        return selectAll(tableName, "");
+        return selectAll(tableName, "", null);
     }
-    
+
     int countByCode(String tableCode);
     List<MetadataTable> selectByModuleCode(@Param("moduleCode") String moduleCode, @Param("businessCode") String businessCode);
     
@@ -41,37 +51,56 @@ public interface MetadataTableMapper {
         return selectByModuleCode(moduleCode, "");
     }
     
-    Long count(@Param("tableName") String tableName, @Param("businessCode") String businessCode);
-    
+    Long count(@Param("tableName") String tableName,
+               @Param("businessCode") String businessCode,
+               @Param("includeDisabled") Boolean includeDisabled);
+
+    default Long count(@Param("tableName") String tableName, @Param("businessCode") String businessCode) {
+        return count(tableName, businessCode, null);
+    }
+
     /**
      * 统计表数量（默认业务系统）
      */
     default Long count(@Param("tableName") String tableName) {
-        return count(tableName, "");
+        return count(tableName, "", null);
     }
-    
-    List<MetadataTable> selectPage(@Param("tableName") String tableName, 
-                                    @Param("businessCode") String businessCode,
-                                    @Param("pageRequest") PageRequest pageRequest);
-    
+
+    List<MetadataTable> selectPage(@Param("tableName") String tableName,
+                                   @Param("businessCode") String businessCode,
+                                   @Param("pageRequest") PageRequest pageRequest,
+                                   @Param("includeDisabled") Boolean includeDisabled);
+
+    default List<MetadataTable> selectPage(@Param("tableName") String tableName,
+                                           @Param("businessCode") String businessCode,
+                                           @Param("pageRequest") PageRequest pageRequest) {
+        return selectPage(tableName, businessCode, pageRequest, null);
+    }
+
     /**
      * 分页查询表（默认业务系统）
      */
-    default List<MetadataTable> selectPage(@Param("tableName") String tableName, 
-                                    @Param("pageRequest") PageRequest pageRequest) {
-        return selectPage(tableName, "", pageRequest);
+    default List<MetadataTable> selectPage(@Param("tableName") String tableName,
+                                           @Param("pageRequest") PageRequest pageRequest) {
+        return selectPage(tableName, "", pageRequest, null);
     }
-    
+
     /**
-     * 根据表编码列表查询表
+     * 根据表编码列表查询表；includeDisabled 为 true 时不按启用链路过滤。
      */
-    List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes, @Param("businessCode") String businessCode);
-    
+    List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes,
+                                      @Param("businessCode") String businessCode,
+                                      @Param("includeDisabled") Boolean includeDisabled);
+
+    default List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes, @Param("businessCode") String businessCode) {
+        return selectByCodes(tableCodes, businessCode, null);
+    }
+
     /**
      * 根据表编码列表查询表（默认业务系统）
      */
     default List<MetadataTable> selectByCodes(@Param("tableCodes") List<String> tableCodes) {
-        return selectByCodes(tableCodes, "");
+        return selectByCodes(tableCodes, "", null);
     }
 
     /**

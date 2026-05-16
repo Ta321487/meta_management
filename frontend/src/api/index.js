@@ -29,6 +29,8 @@ export const batchAssignBusinessSystem = (data) => request.post('/table/batchAss
 /** 按元数据在目标物理库中为缺失表执行 CREATE TABLE（已存在则跳过） */
 export const ensureMissingPhysicalTables = (businessCode) =>
   request.post('/table/ensureMissingPhysicalTables', null, { params: { businessCode } })
+export const importMissingMetadataTables = (businessCode) =>
+  request.post('/table/importMissingMetadataTables', null, { params: { businessCode } })
 
 // 字段相关
 export const getFieldList = (tableCode, params) => request.get(`/field/list/${tableCode}`, { params })
@@ -132,7 +134,7 @@ export const getAssociatedModules = (businessCode) => request.get(`/businessSyst
 export const fillBusinessSystemPhysicalCatalog = (data) => request.post('/businessSystem/fillPhysicalCatalog', data)
 
 // 物理库
-export const getPhysicalDatabaseList = () => request.get('/physicalDatabase/list')
+export const getPhysicalDatabaseList = (params) => request.get('/physicalDatabase/list', { params })
 export const addPhysicalDatabase = (data) => request.post('/physicalDatabase/add', data)
 export const updatePhysicalDatabase = (data) => request.post('/physicalDatabase/update', data)
 export const deletePhysicalDatabase = (id, dropOnInstance = false) =>

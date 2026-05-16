@@ -3,20 +3,19 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
 
-// 创建axios实例
+const baseURL = (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_BASE_API)
+  || (typeof process !== 'undefined' && process.env && process.env.VUE_APP_BASE_API)
+  || '/api'
+
 const request = axios.create({
-  baseURL: process.env.VUE_APP_BASE_API || '/api', // API请求的baseURL
-  timeout: 5000 // 请求超时时间
+  baseURL,
+  timeout: 30000,
+  withCredentials: true
 })
 
-// 请求拦截器
 request.interceptors.request.use(
   config => {
-    // 在发送请求之前做些什么，例如添加token
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = 'Bearer ' + token
-    }
+    config.withCredentials = true
     return config
   },
   error => {

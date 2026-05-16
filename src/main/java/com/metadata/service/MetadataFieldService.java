@@ -33,19 +33,30 @@ public interface MetadataFieldService {
     void batchDelete(List<Long> ids);
 
     /**
-     * 查询表的所有字段
+     * 查询表的所有字段。includeDisabled 为 true 时不按上级启用链路过滤（字段管理页传 true）。
      */
-    List<MetadataField> listByTableCode(String tableCode);
+    List<MetadataField> listByTableCode(String tableCode, String businessCode, Boolean includeDisabled);
 
-    /**
-     * 查询表的所有字段（按业务系统）
-     */
-    List<MetadataField> listByTableCode(String tableCode, String businessCode);
+    default List<MetadataField> listByTableCode(String tableCode) {
+        return listByTableCode(tableCode, "", null);
+    }
+
+    default List<MetadataField> listByTableCode(String tableCode, String businessCode) {
+        return listByTableCode(tableCode, businessCode, null);
+    }
 
     /**
      * 分页查询表的字段
      */
-    PageResult<MetadataField> pageByTableCode(String tableCode, PageRequest pageRequest);
+    PageResult<MetadataField> pageByTableCode(String tableCode, String businessCode, PageRequest pageRequest, Boolean includeDisabled);
+
+    default PageResult<MetadataField> pageByTableCode(String tableCode, PageRequest pageRequest, Boolean includeDisabled) {
+        return pageByTableCode(tableCode, "", pageRequest, includeDisabled);
+    }
+
+    default PageResult<MetadataField> pageByTableCode(String tableCode, PageRequest pageRequest) {
+        return pageByTableCode(tableCode, "", pageRequest, null);
+    }
 
     /**
      * 获取表的约束列表

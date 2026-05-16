@@ -18,6 +18,7 @@ import com.metadata.service.strategy.SqlTypeStrategyFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -189,7 +190,8 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                     String tableName = metadataSyncService.extractTableName(sql);
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_NAME, "提取到表名: " + tableName);
                     if (tableName != null) {
-                        metadataSyncService.syncTableFields(tableName, connection);
+                        String syncBusinessCode = businessCatalogResolver.resolveBusinessCodeByCatalog(targetCatalog);
+                        metadataSyncService.syncTableFields(tableName, connection, syncBusinessCode, targetCatalog);
                         // 同步外键关联关系
                         metadataSyncService.syncTableForeignKeys(tableName, connection);
                         logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_COMPLETE, "元数据同步完成: " + tableName);
@@ -379,7 +381,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE, "删除表记录: " + tableCode);
                 } else {
                     // 尝试通过表名查找
-                    List<MetadataTable> tables = tableMapper.selectAll(null);
+                    List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
                     for (MetadataTable t : tables) {
                         if (safeTableName.equalsIgnoreCase(t.getTableName())) {
                             // 删除该表的所有字段
@@ -412,6 +414,12 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
     @Override
     @Transactional
     public Map<String, Object> executeMultipleSql(String sqls) {
+        return executeMultipleSql(sqls, null);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> executeMultipleSql(String sqls, String targetCatalog) {
         Map<String, Object> result = new HashMap<>();
         List<Map<String, Object>> results = new ArrayList<>();
 
@@ -432,7 +440,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                 continue;
             }
 
-            Map<String, Object> singleResult = executeSql(sql);
+            Map<String, Object> singleResult = executeSql(sql, false, targetCatalog);
             singleResult.put(SqlConstants.RESULT_KEY_SQL, sql);
             results.add(singleResult);
 
@@ -444,8 +452,9 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
         }
 
         result.put(SqlConstants.RESULT_KEY_SUCCESS, failCount == 0);
-        result.put(SqlConstants.RESULT_KEY_MESSAGE, String.format("共执行%d条SQL，成功%d条，失败%d条",
-                results.size(), successCount, failCount));
+        String catalogHint = StringUtils.hasText(targetCatalog) ? "（库: " + targetCatalog.trim() + "）" : "";
+        result.put(SqlConstants.RESULT_KEY_MESSAGE, String.format("共执行%d条SQL，成功%d条，失败%d条%s",
+                results.size(), successCount, failCount, catalogHint));
         result.put(SqlConstants.RESULT_KEY_RESULTS, results);
         result.put(SqlConstants.RESULT_KEY_TOTAL_COUNT, results.size());
         result.put(SqlConstants.RESULT_KEY_SUCCESS_COUNT, successCount);
@@ -497,7 +506,7 @@ public class SqlExecuteServiceImpl implements SqlExecuteService {
                     }
                 }
             } else {
-                List<MetadataTable> tables = tableMapper.selectAll(null, null);
+                List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
 
                 for (MetadataTable table : tables) {
                     String catalog = businessCatalogResolver.resolveCatalog(table);

@@ -13,9 +13,9 @@ import java.util.List;
 public interface MetadataBusinessSystemMapper {
     
     /**
-     * 查询所有业务系统
+     * 查询业务系统列表。includeDisabled 为 true 时含停用系统（管理端）；否则仅启用。
      */
-    List<MetadataBusinessSystem> selectAll();
+    List<MetadataBusinessSystem> selectAll(@Param("includeDisabled") Boolean includeDisabled);
     
     /**
      * 根据编码查询业务系统

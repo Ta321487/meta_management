@@ -172,7 +172,7 @@ export default {
     const loadData = async () => {
       loading.value = true
       try {
-        const res = await getPhysicalDatabaseList()
+        const res = await getPhysicalDatabaseList({ includeDisabled: true })
         if (res.code === 200) {
           tableData.value = res.data || []
         }

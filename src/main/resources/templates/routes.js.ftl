@@ -11,6 +11,7 @@ export default [
       <#if route.meta.nodeCode?has_content>nodeCode: '${route.meta.nodeCode}',</#if>
       relatedTableCode: '${route.meta.relatedTableCode}',
       isMenuVisible: ${route.meta.isMenuVisible},
+      <#if route.meta.title?has_content>title: ${route.meta.title?json_string},</#if>
       <#if route.meta.icon?has_content>icon: '${route.meta.icon}',</#if>
       businessCode: '${businessCode}'
     }

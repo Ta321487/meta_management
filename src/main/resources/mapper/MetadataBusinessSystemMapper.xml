@@ -10,12 +10,19 @@
         <result column="is_default" property="isDefault" />
         <result column="package_name" property="packageName" />
         <result column="database_name" property="databaseName" />
+        <result column="is_enabled" property="isEnabled" />
         <result column="create_time" property="createTime" />
         <result column="update_time" property="updateTime" />
     </resultMap>
     
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT * FROM metadata_business_system ORDER BY create_time DESC
+        SELECT * FROM metadata_business_system
+        <where>
+            <if test="includeDisabled == null or includeDisabled == false">
+                is_enabled = 1
+            </if>
+        </where>
+        ORDER BY create_time DESC
     </select>
     
     <select id="selectByCode" parameterType="string" resultMap="BaseResultMap">
@@ -45,9 +52,10 @@
     
     <insert id="insert" parameterType="com.metadata.entity.MetadataBusinessSystem" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_business_system (
-            business_code, business_name, description, is_default, package_name, database_name
+            business_code, business_name, description, is_default, package_name, database_name, is_enabled
         ) VALUES (
-            #{businessCode}, #{businessName}, #{description}, #{isDefault}, #{packageName}, #{databaseName, jdbcType=VARCHAR}
+            #{businessCode}, #{businessName}, #{description}, #{isDefault}, #{packageName}, #{databaseName, jdbcType=VARCHAR},
+            #{isEnabled, jdbcType=INTEGER}
         )
     </insert>
     
@@ -57,7 +65,8 @@
             description = #{description},
             is_default = #{isDefault},
             package_name = #{packageName},
-            database_name = #{databaseName, jdbcType=VARCHAR}
+            database_name = #{databaseName, jdbcType=VARCHAR},
+            is_enabled = #{isEnabled, jdbcType=INTEGER}
         WHERE id = #{id}
     </update>
     

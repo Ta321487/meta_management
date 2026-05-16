@@ -10,10 +10,84 @@ function generateRandomDigitString(length) {
   return result;
 }
 
+function parseValidateRuleInput(field) {
+  if (!field) return null
+  if (field.validationRules && typeof field.validationRules === 'object') {
+    return field.validationRules
+  }
+  const raw = field.validateRule
+  if (!raw) return null
+  if (typeof raw === 'object') return raw
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function pickFromValidationRules(vr) {
+  if (!vr) return null
+  if (vr.operator === 'IN' && Array.isArray(vr.values) && vr.values.length > 0) {
+    return vr.values[Math.floor(Math.random() * vr.values.length)]
+  }
+  if (Array.isArray(vr)) {
+    const inRule = vr.find(r => r?.operator === 'IN' && r.values?.length)
+    if (inRule) return inRule.values[Math.floor(Math.random() * inRule.values.length)]
+  }
+  if (vr.hasOperator && vr.operator === 'IN' && Array.isArray(vr.values) && vr.values.length > 0) {
+    return vr.values[Math.floor(Math.random() * vr.values.length)]
+  }
+  if (vr.hasOptions && Array.isArray(vr.options) && vr.options.length > 0) {
+    return vr.options[Math.floor(Math.random() * vr.options.length)]
+  }
+  return null
+}
+
+function pickFromEnumFieldType(fieldType) {
+  if (!fieldType) return null
+  const ft = String(fieldType).toLowerCase()
+  if (!ft.startsWith('enum(') || !ft.endsWith(')')) return null
+  const inner = ft.slice(5, -1)
+  const values = inner
+    .split(',')
+    .map(s => s.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean)
+  if (!values.length) return null
+  return values[Math.floor(Math.random() * values.length)]
+}
+
+/** 与生成器 prepareFieldList 一致的列表属性名 */
+export function resolveListFieldProp(field) {
+  if (!field) return ''
+  if (field.camelCaseName) return field.camelCaseName
+  const raw = field.field?.fieldName || field.fieldName || ''
+  if (!raw) return ''
+  if (!raw.includes('_')) {
+    return raw.charAt(0).toLowerCase() + raw.slice(1)
+  }
+  return raw
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part, i) => (i === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1)))
+    .join('')
+}
+
 // 根据字段类型生成模拟值
 export function generateMockValue(field) {
-  // 1. 优先处理IN约束
-  if (field.validateRule) {
+  const parsedRule = parseValidateRuleInput(field)
+  const fromRules = pickFromValidationRules(parsedRule)
+  if (fromRules != null && fromRules !== '') {
+    return fromRules
+  }
+
+  const fromEnumType = pickFromEnumFieldType(field.fieldType)
+  if (fromEnumType != null && fromEnumType !== '') {
+    return fromEnumType
+  }
+
+  // 1. 优先处理IN约束（validateRule 字符串）
+  if (field.validateRule && typeof field.validateRule === 'string') {
     try {
       const validateRule = JSON.parse(field.validateRule);
       
@@ -228,29 +302,46 @@ export function generateMockValue(field) {
     return '2023-01-01 12:00:00';
   }
   
-  // 布尔类型
-  if (type.includes('bool') || type.includes('boolean')) {
-    return Math.random() > 0.5 ? true : false;
+  // 布尔 / 状态位
+  if (type.includes('bool') || type.includes('boolean') || type === 'bit' || type.startsWith('tinyint(1)')) {
+    return Math.random() > 0.5 ? 1 : 0;
   }
   
-  // 默认返回空字符串
-  return '';
+  const label = field.label || field.fieldName || '字段'
+  return `示例${label}${Math.floor(Math.random() * 1000)}`;
 }
 
-// 生成模拟数据列表
-export function generateMockDataList(fields, count = 10) {
-  const dataList = [];
-  
-  for (let i = 0; i < count; i++) {
-    const row = {};
-    fields.forEach(field => {
-      const propName = field.fieldName?.replace(/^[A-Z]/, char => char.toLowerCase()) || field.fieldName;
-      row[propName] = generateMockValue(field);
-    });
-    dataList.push(row);
+/** 将元数据/生成器字段转为 mock 生成器可用的扁平结构 */
+export function toMockFieldShape(field) {
+  if (!field) return {}
+  const meta = field.field || field
+  return {
+    fieldName: resolveListFieldProp(field) || meta.fieldName || field.fieldName,
+    fieldType: field.fieldType || meta.fieldType,
+    fieldLength: meta.fieldLength ?? field.fieldLength,
+    validateRule: meta.validateRule ?? field.validateRule,
+    validationRules: field.validationRules || meta.validationRules,
+    formComponent: meta.formComponent || field.formComponent,
+    label: field.label || meta.label || field.label
   }
-  
-  return dataList;
+}
+
+// 生成模拟数据列表（属性名优先 camelCaseName，与生成代码一致）
+export function generateMockDataList(fields, count = 10) {
+  const dataList = []
+
+  for (let i = 0; i < count; i++) {
+    const row = {}
+    fields.forEach(field => {
+      const mockField = toMockFieldShape(field)
+      const propName = resolveListFieldProp(field) || getListFieldPropName(mockField) || mockField.fieldName
+      if (!propName) return
+      row[propName] = generateMockValue(mockField)
+    })
+    dataList.push(row)
+  }
+
+  return dataList
 }
 
 // 格式化预览日期
@@ -265,10 +356,14 @@ export function formatPreviewNumber(num) {
   return num.toString();
 }
 
-// 获取列表字段属性名
+// 获取列表字段属性名（扁平 MetadataField；生成器结构请用 resolveListFieldProp）
 export function getListFieldPropName(field) {
-  if (!field) return '';
-  return field.fieldName?.replace(/^[A-Z]/, char => char.toLowerCase()) || field.fieldName;
+  if (!field) return ''
+  if (field.camelCaseName) return field.camelCaseName
+  const raw = field.field?.fieldName || field.fieldName || ''
+  if (!raw) return ''
+  if (raw.includes('_')) return resolveListFieldProp(field)
+  return raw.replace(/^[A-Z]/, char => char.toLowerCase()) || raw
 }
 
 // 获取表单字段属性名

@@ -202,4 +202,16 @@ public class TableGeneratedCodeBundle {
      */
     @Schema(description = "pom.xml")
     private String pomXml;
+
+    /**
+     * 开箱说明（README.md，Markdown）
+     */
+    @Schema(description = "开箱说明 README.md")
+    private String readmeMd;
+
+    /**
+     * 前端环境变量示例（.env.example）
+     */
+    @Schema(description = "前端 .env.example")
+    private String envExample;
 }

@@ -46,8 +46,8 @@ public class MetadataPhysicalDatabaseServiceImpl implements MetadataPhysicalData
     private OperationLogService logService;
 
     @Override
-    public List<MetadataPhysicalDatabase> listAll() {
-        return physicalDatabaseMapper.selectAll();
+    public List<MetadataPhysicalDatabase> listAll(Boolean includeDisabled) {
+        return physicalDatabaseMapper.selectAll(includeDisabled);
     }
 
     @Override

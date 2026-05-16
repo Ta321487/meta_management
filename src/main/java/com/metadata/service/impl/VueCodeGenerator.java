@@ -108,6 +108,7 @@ public class VueCodeGenerator {
         data.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
         data.put("businessCode", businessCode);
         data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+        data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
 
         return templateManager.processTemplate("vue_list.vue.ftl", data);
     }
@@ -130,9 +131,12 @@ public class VueCodeGenerator {
 
         List<MetadataField> fields = fieldService.listByTableCode(tableCode);
         String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(fields);
+        List<MetadataField> formLayoutFields = fields.stream()
+                .filter(CodeGenUtils::fieldParticipatesInForm)
+                .collect(Collectors.toList());
         // 获取表关联关系
         List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
-        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(formLayoutFields, relations);
         // 获取表相关的业务规则
         List<Map<String, Object>> businessRules = getTableBusinessRules(tableCode, businessCode);
 
@@ -145,6 +149,7 @@ public class VueCodeGenerator {
         data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
         data.put("businessRules", businessRules);
         data.put("relations", relations);
+        data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
 
         return templateManager.processTemplate("vue_form.vue.ftl", data);
     }
@@ -260,9 +265,25 @@ public class VueCodeGenerator {
      * @throws CodeGenException 代码生成异常
      */
     public String generateEnvFile() throws CodeGenException {
+        return generateEnvFile(null);
+    }
+
+    /**
+     * @param appTitle 前端展示标题；为空则用默认
+     */
+    public String generateEnvFile(String appTitle) throws CodeGenException {
         Map<String, Object> data = new HashMap<>();
-        
+        data.put("appTitle", appTitle != null && !appTitle.trim().isEmpty() ? appTitle.trim() : "元数据管理系统");
         return templateManager.processTemplate(".env.ftl", data);
+    }
+
+    /**
+     * 开箱用环境变量示例（复制为 .env）
+     */
+    public String generateEnvExampleFile(String appTitle) throws CodeGenException {
+        Map<String, Object> data = new HashMap<>();
+        data.put("appTitle", appTitle != null && !appTitle.trim().isEmpty() ? appTitle.trim() : "元数据管理系统");
+        return templateManager.processTemplate(".env.example.ftl", data);
     }
     
     /**
@@ -359,7 +380,18 @@ public class VueCodeGenerator {
                     meta.put("moduleCode", node.getModuleCode() != null ? node.getModuleCode() : "");
                     meta.put("nodeCode", node.getNodeCode() != null ? node.getNodeCode() : "");
                     meta.put("relatedTableCode", node.getRelatedTableCode() != null ? node.getRelatedTableCode() : tableCode);
-                    meta.put("isMenuVisible", node.getIsMenuVisible() != null ? node.getIsMenuVisible() : 1);
+                    boolean sidebarMenu = CodeGenUtils.isSidebarMenuNodeType(node.getNodeType());
+                    int menuVisible = node.getIsMenuVisible() != null ? node.getIsMenuVisible() : (sidebarMenu ? 1 : 0);
+                    if (!sidebarMenu) {
+                        menuVisible = 0;
+                    }
+                    meta.put("isMenuVisible", menuVisible);
+                    meta.put("nodeType", node.getNodeType() != null ? node.getNodeType() : "");
+                    if (menuVisible == 1) {
+                        meta.put("title", CodeGenUtils.formatMenuTitle(node.getNodeName(), table.getTableName()));
+                    } else {
+                        meta.put("title", node.getNodeName() != null ? node.getNodeName() : node.getNodeCode());
+                    }
                     meta.put("icon", node.getIcon() != null ? node.getIcon() : "");
                     meta.put("businessCode", businessCode);
                     route.put("meta", meta);
@@ -378,6 +410,8 @@ public class VueCodeGenerator {
             Map<String, Object> listMeta = new HashMap<>();
             listMeta.put("relatedTableCode", tableCode);
             listMeta.put("isMenuVisible", 1);
+            listMeta.put("nodeType", "LIST_PAGE");
+            listMeta.put("title", CodeGenUtils.formatMenuTitle(table.getTableName(), table.getTableName()));
             listMeta.put("businessCode", businessCode);
             listRoute.put("meta", listMeta);
             
@@ -438,12 +472,137 @@ public class VueCodeGenerator {
     }
     
     /**
+     * 构建表单预览/生成用数据模型（与 {@code vue_form.vue.ftl} 入参一致，不渲染模板）
+     */
+    public Map<String, Object> buildFormModel(String tableCode, String businessCode) throws CodeGenException {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+        }
+        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(fields);
+        List<MetadataField> formLayoutFields = fields.stream()
+                .filter(CodeGenUtils::fieldParticipatesInForm)
+                .collect(Collectors.toList());
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(formLayoutFields, relations);
+        Map<String, Object> model = new HashMap<>();
+        model.put("tableCode", tableCode);
+        model.put("tableName", table.getTableName());
+        model.put("fields", fieldList);
+        model.put("primaryKeyCamelCase", primaryKeyCamelCase);
+        model.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
+        model.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
+        model.put("businessCode", businessCode);
+        model.put("businessRules", getTableBusinessRules(tableCode, businessCode));
+        model.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        return model;
+    }
+
+    /**
+     * 构建列表预览/生成用数据模型（与 {@code vue_list.vue.ftl} 入参一致）
+     */
+    public Map<String, Object> buildListModel(String tableCode, String businessCode) throws CodeGenException {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+        }
+        List<MetadataField> allFields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(allFields);
+        List<MetadataField> fields = allFields.stream()
+                .filter(f -> !"primary_key".equals(f.getFormComponent()))
+                .collect(Collectors.toList());
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
+        Map<String, Object> model = new HashMap<>();
+        model.put("tableCode", tableCode);
+        model.put("tableName", table.getTableName());
+        model.put("fields", fieldList);
+        model.put("primaryKeyCamelCase", primaryKeyCamelCase);
+        model.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
+        model.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
+        model.put("businessCode", businessCode);
+        model.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        return model;
+    }
+
+    private String resolveMenuTitleForTable(String tableCode, String businessCode, MetadataTable table) {
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        for (MetadataFunctionNode node : nodes) {
+            if (node.getIsEnabled() != null && node.getIsEnabled() == 0) {
+                continue;
+            }
+            if (!CodeGenUtils.isSidebarMenuNodeType(node.getNodeType())) {
+                continue;
+            }
+            if (node.getIsMenuVisible() != null && node.getIsMenuVisible() == 0) {
+                continue;
+            }
+            return CodeGenUtils.formatMenuTitle(node.getNodeName(), table.getTableName());
+        }
+        return CodeGenUtils.formatMenuTitle(table.getTableName(), table.getTableName());
+    }
+
+    /**
+     * 业务系统下全部启用表的整合路由（与 ZIP 内 routes.js 同源）
+     */
+    public List<Map<String, Object>> collectBusinessRoutes(String businessCode) throws CodeGenException {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        List<MetadataTable> tables = tableService.list(null, businessCode);
+        List<Map<String, Object>> allRoutes = new ArrayList<>();
+        for (MetadataTable table : tables) {
+            if (table.getIsEnabled() != null && table.getIsEnabled() == 1) {
+                allRoutes.addAll(generateTableRoutes(table.getTableCode(), businessCode));
+            }
+        }
+        return normalizeMenuRoutes(allRoutes);
+    }
+
+    /**
+     * 侧栏只保留「xx管理」类列表入口，同一表仅一条菜单项。
+     */
+    private List<Map<String, Object>> normalizeMenuRoutes(List<Map<String, Object>> routes) {
+        java.util.Set<String> menuTables = new java.util.LinkedHashSet<>();
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (Map<String, Object> route : routes) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> meta = (Map<String, Object>) route.get("meta");
+            if (meta == null) {
+                result.add(route);
+                continue;
+            }
+            Object visible = meta.get("isMenuVisible");
+            boolean show = visible == null || Integer.valueOf(1).equals(visible) || Boolean.TRUE.equals(visible);
+            String tableCode = meta.get("relatedTableCode") != null ? meta.get("relatedTableCode").toString() : "";
+            String path = route.get("path") != null ? route.get("path").toString() : "";
+            String nodeType = meta.get("nodeType") != null ? meta.get("nodeType").toString() : "";
+            boolean listLike = path.contains("/list")
+                    || (CodeGenUtils.isSidebarMenuNodeType(nodeType) && !path.contains("/form") && !path.contains("/detail"));
+            if (show && listLike && !tableCode.isEmpty()) {
+                if (menuTables.contains(tableCode)) {
+                    meta.put("isMenuVisible", 0);
+                } else {
+                    menuTables.add(tableCode);
+                    meta.put("isMenuVisible", 1);
+                    if (meta.get("title") == null || meta.get("title").toString().isEmpty()) {
+                        meta.put("title", CodeGenUtils.formatMenuTitle(null, tableCode));
+                    }
+                }
+            }
+            result.add(route);
+        }
+        return result;
+    }
+
+    /**
      * 获取表相关的业务规则
      * @param tableCode 表编码
      * @param businessCode 业务系统编码
      * @return 表相关的业务规则
      */
-    private List<Map<String, Object>> getTableBusinessRules(String tableCode, String businessCode) {
+    List<Map<String, Object>> getTableBusinessRules(String tableCode, String businessCode) {
         List<Map<String, Object>> tableRules = new ArrayList<>();
         try {
             // 获取表关联的模块编码列表（通过功能节点关联）

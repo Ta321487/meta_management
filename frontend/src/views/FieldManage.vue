@@ -66,6 +66,13 @@
           </template>
         </el-table-column>
         <el-table-column prop="formComponent" label="表单组件" width="120"/>
+        <el-table-column prop="inForm" label="表单录入" width="100">
+          <template #default="{ row }">
+            <el-tag :type="row.inForm === 0 ? 'info' : 'success'">
+              {{ row.inForm === 0 ? '否' : '是' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="isEnabled" label="状态" width="100">
           <template #default="{ row }">
             <el-tag :type="row.isEnabled === 1 ? 'success' : 'danger'">
@@ -114,7 +121,7 @@
         width="600px"
         @close="handleDialogClose"
     >
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+      <el-form :model="form" :rules="fieldRules" ref="formRef" label-width="100px">
         <el-form-item label="字段编码" prop="fieldCode" v-if="!form.id">
           <el-input v-model="form.fieldCode" placeholder="如：FIELD_001（只能包含字母、数字和下划线）"/>
         </el-form-item>
@@ -191,6 +198,15 @@
         <el-form-item label="显示名" prop="label">
           <el-input v-model="form.label" placeholder="请输入显示名"/>
         </el-form-item>
+        <el-form-item
+            v-if="form.formComponent !== 'primary_key'"
+            label="参与表单录入"
+        >
+          <el-switch v-model="form.inForm" :active-value="1" :inactive-value="0"/>
+          <div style="margin-top: 5px; font-size: 12px; color: #909399;">
+            关闭后不在新增/编辑页展示该字段（如业务编码由系统生成）；列表仍可展示。
+          </div>
+        </el-form-item>
         <el-form-item label="是否必填" prop="isRequired">
           <el-radio-group v-model="form.isRequired">
             <el-radio :label="1">是</el-radio>
@@ -200,7 +216,11 @@
             提示：选择"是"将在数据库层面添加NOT NULL约束
           </div>
         </el-form-item>
-        <el-form-item label="表单组件" prop="formComponent">
+        <el-form-item
+            v-if="form.inForm === 1 && form.formComponent !== 'primary_key'"
+            label="表单组件"
+            prop="formComponent"
+        >
           <el-select v-model="form.formComponent" placeholder="请选择" style="width: 100%">
             <el-option label="主键字段" value="primary_key"/>
             <el-option label="输入框" value="input"/>
@@ -332,6 +352,7 @@ export default {
       validateRule: '',
       sort: 0,
       isEnabled: 1,
+      inForm: 1,
       businessCode: ''
     })
 
@@ -556,12 +577,23 @@ export default {
       }
     })
 
+    watch(() => form.inForm, (v) => {
+      if (form.formComponent === 'primary_key') {
+        return
+      }
+      if (v === 0) {
+        form.formComponent = 'none'
+      } else if (v === 1 && form.formComponent === 'none') {
+        form.formComponent = getRecommendedFormComponent(form.baseFieldType || 'VARCHAR')
+      }
+    })
+
     // 监听业务系统变化，重新加载表列表
     watch(selectedBusinessCode, () => {
       loadTables()
     })
 
-    const rules = {
+    const fieldRules = computed(() => ({
       fieldCode: [
         {required: true, message: '请输入字段编码', trigger: 'blur'},
         {pattern: /^[A-Za-z0-9_]{1,50}$/, message: '字段编码只能包含字母、数字和下划线，长度1-50', trigger: 'blur'}
@@ -573,8 +605,11 @@ export default {
       baseFieldType: [{required: true, message: '请选择基础字段类型', trigger: 'change'}],
       fieldType: [{required: true, message: '请选择字段类型', trigger: 'change'}],
       label: [{required: true, message: '请输入显示名', trigger: 'blur'}],
-      formComponent: [{required: true, message: '请选择表单组件', trigger: 'change'}]
-    }
+      formComponent:
+          form.formComponent === 'primary_key' || form.inForm === 0
+              ? []
+              : [{required: true, message: '请选择表单组件', trigger: 'change'}]
+    }))
 
     // 加载业务系统列表
     const loadBusinessSystems = async () => {
@@ -593,11 +628,11 @@ export default {
         // 只有选择了业务系统，才加载表列表
         if (selectedBusinessCode.value) {
           const res = await getTableList({
-            businessCode: selectedBusinessCode.value
+            businessCode: selectedBusinessCode.value,
+            includeDisabled: true
           })
           if (res.code === 200) {
-            // 过滤掉禁用状态的表
-            tables.value = res.data.filter(table => table.isEnabled === 1)
+            tables.value = Array.isArray(res.data) ? res.data : (res.data?.records || [])
           }
         } else {
           // 未选择业务系统时，清空表列表
@@ -636,7 +671,11 @@ export default {
       try {
         const params = {
           current: pagination.current,
-          size: pagination.size
+          size: pagination.size,
+          includeDisabled: true
+        }
+        if (currentTableBusinessCode.value) {
+          params.businessCode = currentTableBusinessCode.value
         }
         const res = await getFieldList(selectedTableCode.value, params)
         if (res.code === 200) {
@@ -729,6 +768,8 @@ export default {
         formComponent: 'input',
         validateRule: '',
         sort: newSort, // 默认为计算的排序号
+        isEnabled: 1,
+        inForm: 1,
         businessCode: currentTableBusinessCode.value // 默认为当前表的业务系统
       })
 
@@ -766,6 +807,7 @@ export default {
         label: row.label,
         isRequired: row.isRequired,
         formComponent: row.formComponent,
+        inForm: row.inForm != null ? row.inForm : 1,
         validateRule: savedValidateRule, // 使用保存的校验规则
         sort: row.sort,
         businessCode: row.businessCode || '' // 设置当前字段的业务系统
@@ -1132,6 +1174,12 @@ export default {
           submitForm.validateRule = null
         }
 
+        if (submitForm.inForm === 0) {
+          submitForm.formComponent = 'none'
+        } else if (submitForm.inForm === 1 && submitForm.formComponent === 'none' && submitForm.fieldName !== 'id' && submitForm.fieldName !== 'uuid') {
+          submitForm.formComponent = getRecommendedFormComponent(submitForm.baseFieldType || 'VARCHAR')
+        }
+
         if (form.id) {
           await updateField(submitForm)
         } else {
@@ -1414,7 +1462,7 @@ export default {
       selectedRows,
       pagination,
       form,
-      rules,
+      fieldRules,
       baseFieldTypes,
       typeParams,
       // 约束相关

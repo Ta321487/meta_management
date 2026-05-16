@@ -75,6 +75,13 @@
         <el-icon style="margin-right: 4px"><Finished /></el-icon>
         生成代码
       </el-button>
+      <el-button type="primary" plain @click="handleOpenPreview" :disabled="!formData.businessCode">
+        业务系统预览
+      </el-button>
+      <el-button type="warning" plain @click="handleDownloadZip" :disabled="!formData.businessCode">
+        <el-icon style="margin-right: 4px"><FolderOpened /></el-icon>
+        下载业务系统 ZIP
+      </el-button>
       <el-button type="success" @click="handleRunTest" :disabled="!formData.tableCode">测试代码</el-button>
       <el-button type="info" plain @click="handleShowDeploymentGuide">部署指南</el-button>
     </div>
@@ -83,7 +90,7 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue';
-import { InfoFilled, Finished } from '@element-plus/icons-vue';
+import { InfoFilled, Finished, FolderOpened } from '@element-plus/icons-vue';
 
 const props = defineProps({
   form: {
@@ -106,7 +113,9 @@ const emit = defineEmits([
   'table-change',
   'generate-code',
   'run-test',
-  'show-deployment-guide'
+  'show-deployment-guide',
+  'download-project-zip',
+  'open-business-preview'
 ]);
 
 const formData = ref({ ...props.form });
@@ -134,6 +143,8 @@ const handleTableChange = (value) => {
 };
 
 const handleGenerateCode = () => emit('generate-code');
+const handleOpenPreview = () => emit('open-business-preview');
+const handleDownloadZip = () => emit('download-project-zip');
 const handleRunTest = () => emit('run-test');
 const handleShowDeploymentGuide = () => emit('show-deployment-guide');
 </script>

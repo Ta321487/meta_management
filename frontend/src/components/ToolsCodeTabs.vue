@@ -65,6 +65,20 @@
         @copy="handleCopy"
       />
     </el-tab-pane>
+
+    <el-tab-pane label="开箱 README" name="readme">
+      <CodeContainer
+        code-type="readme"
+        :code="codeMap.readme"
+        :rows="22"
+        :show-download="true"
+        :refresh-tooltip="'随「生成当前表代码」自动生成'"
+        placeholder="生成当前表代码后将显示开箱说明（README.md）"
+        @refresh="handleRefresh"
+        @copy="handleCopy"
+        @download="handleDownload"
+      />
+    </el-tab-pane>
   </el-tabs>
 </template>
 
@@ -87,7 +101,7 @@ const props = defineProps({
 });
 
 // Emits
-const emit = defineEmits(['update:modelValue', 'refresh', 'copy']);
+const emit = defineEmits(['update:modelValue', 'refresh', 'copy', 'download']);
 
 // Data
 // 活动标签
@@ -113,6 +127,11 @@ const handleRefresh = (codeType) => {
 // 处理复制
 const handleCopy = (codeType) => {
   emit('copy', codeType);
+};
+
+// 处理下载
+const handleDownload = (codeType, fileName) => {
+  emit('download', codeType, fileName);
 };
 </script>
 

@@ -16,6 +16,10 @@ public class MetadataField {
     private String label;
     private Integer isRequired;
     private String formComponent;
+    /**
+     * 1 参与新增/编辑表单；0 不参与（如业务编码由系统生成，仅列表展示），此时 form_component 存占位如 none。
+     */
+    private Integer inForm;
     private String validateRule;
     private Integer sort;
     private Integer isEnabled;

@@ -64,7 +64,7 @@ public class MetadataExportServiceImpl implements MetadataExportService {
         // 表的字段
         Map<String, List<MetadataField>> fieldsMap = new HashMap<>();
         for (String tableCode : tableCodes) {
-            List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
+            List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode, "", true);
             fieldsMap.put(tableCode, fields);
         }
         result.put("fields", fieldsMap);
@@ -94,7 +94,7 @@ public class MetadataExportServiceImpl implements MetadataExportService {
         result.put("table", table);
 
         // 字段
-        List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
+        List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode, "", true);
         result.put("fields", fields);
 
         return result;
@@ -112,13 +112,13 @@ public class MetadataExportServiceImpl implements MetadataExportService {
         result.put("modules", modules);
 
         // 所有表
-        List<MetadataTable> tables = tableMapper.selectAll(null);
+        List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
         result.put("tables", tables);
 
         // 所有字段
         Map<String, List<MetadataField>> fieldsMap = new HashMap<>();
         for (MetadataTable table : tables) {
-            List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
+            List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode(), "", true);
             fieldsMap.put(table.getTableCode(), fields);
         }
         result.put("fields", fieldsMap);

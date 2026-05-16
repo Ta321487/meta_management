@@ -1,12 +1,4 @@
-<#-- 生成前端.env环境配置文件 -->
-# 基础URL配置
-VUE_APP_BASE_API = '/api'
-
-# 项目名称
-VUE_APP_TITLE = '元数据管理系统'
-
-# 版本号
-VUE_APP_VERSION = '1.0.0'
-
-# 开发环境配置
-VUE_APP_ENV = 'development'
+<#-- 生成前端.env环境配置文件；appTitle 由代码生成器传入（业务系统 + 表） -->
+# Vite 环境变量（npm run dev 前复制为 .env）
+VITE_APP_BASE_API=/api
+VITE_APP_TITLE=${appTitle!"业务系统"}

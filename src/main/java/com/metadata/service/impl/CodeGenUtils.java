@@ -7,6 +7,8 @@ import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.entity.MetadataField;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.service.MetadataBusinessSystemService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
@@ -14,6 +16,8 @@ import java.util.*;
  * 代码生成工具类，包含公共方法和工具函数
  */
 public class CodeGenUtils {
+
+    private static final Logger log = LoggerFactory.getLogger(CodeGenUtils.class);
 
     /**
      * 内置正则表达式映射表，根据type值提供相应的正则表达式
@@ -131,6 +135,13 @@ public class CodeGenUtils {
     }
 
     /**
+     * 是否参与「新增/编辑」表单布局（列表等仍可展示该列）。
+     */
+    public static boolean fieldParticipatesInForm(MetadataField f) {
+        return f != null && (f.getInForm() == null || f.getInForm() != 0);
+    }
+
+    /**
      * 准备字段列表，添加转换后的属性
      *
      * @param fields 字段列表
@@ -206,6 +217,7 @@ public class CodeGenUtils {
             fieldMap.put("label", field.getLabel());
             fieldMap.put("isRequired", field.getIsRequired());
             fieldMap.put("formComponent", field.getFormComponent());
+            fieldMap.put("inForm", field.getInForm());
             fieldMap.put("javaType", getJavaType(field.getFieldType()));
 
             // 生成字段名并检查是否为关键字
@@ -302,153 +314,213 @@ public class CodeGenUtils {
     }
 
     /**
-     * 解析校验规则JSON，提取正则表达式等信息
+     * 将元数据字段 {@code validateRule} 解析为供 FreeMarker（Vue 等）使用的 {@code validationRules} Map。
+     * <p><b>语义约定（与生成模板一致）</b>：
+     * <ul>
+     *   <li><b>字符串长度</b>：仅使用 {@code minLength} / {@code maxLength}（可选 {@code lengthMessage}）。</li>
+     *   <li><b>数值上下界</b>：{@code min} / {@code max} 表示<strong>数值</strong>范围（可选 {@code rangeMessage}），与字符长度无关。</li>
+     *   <li><b>正则</b>：显式 {@code pattern}；或 {@code type} 为内置别名 {@code email}/{@code url}/{@code number}/{@code integer}。
+     *       当 {@code type} 为 {@code crossField} 时，不把 {@code type} 当作内置正则（跨字段规则单独解析）。</li>
+     *   <li><b>JSON 数组</b>：支持 {@code [{...},{...}]}，按顺序合并为单个对象后再解析（同名键后者覆盖前者）。</li>
+     * </ul>
      *
-     * @param validateRule 校验规则JSON字符串
-     * @return 解析后的校验规则
+     * @param validateRule 校验规则 JSON 字符串，对象或对象数组
+     * @return 供模板读取的标志位与参数；解析失败时返回全 false 的 Map，并打 WARN 日志
      */
     public static Map<String, Object> parseValidationRule(String validateRule) {
+        Map<String, Object> rules = newValidationRuleDefaults();
+        if (validateRule == null || validateRule.trim().isEmpty()) {
+            return rules;
+        }
+
+        final JSONObject jsonObject;
+        try {
+            jsonObject = normalizeValidateRuleToJSONObject(validateRule.trim());
+        } catch (Exception e) {
+            log.warn("validateRule 无法解析为 JSON，已忽略: {}", abbreviateForLog(validateRule), e);
+            return rules;
+        }
+        if (jsonObject == null || jsonObject.isEmpty()) {
+            return rules;
+        }
+
+        try {
+            fillPatternRules(jsonObject, rules);
+            fillOptionsRules(jsonObject, rules);
+            fillLengthRules(jsonObject, rules);
+            fillNumericRangeRules(jsonObject, rules);
+            fillOperatorRules(jsonObject, rules);
+            fillCrossFieldRules(jsonObject, rules);
+        } catch (Exception e) {
+            log.warn("validateRule 解析后处理失败，已忽略: {}", abbreviateForLog(validateRule), e);
+            return newValidationRuleDefaults();
+        }
+
+        return rules;
+    }
+
+    private static Map<String, Object> newValidationRuleDefaults() {
         Map<String, Object> rules = new HashMap<>();
-        // 初始化默认值，避免模板访问时出错
         rules.put("hasPattern", false);
         rules.put("hasOptions", false);
         rules.put("hasLength", false);
         rules.put("hasRange", false);
         rules.put("hasOperator", false);
-
-        if (validateRule == null || validateRule.trim().isEmpty()) {
-            return rules;
-        }
-
-        try {
-            JSONObject jsonObject = JSON.parseObject(validateRule);
-
-            // 提取正则表达式或type属性对应的内置正则表达式
-            String pattern = null;
-            if (jsonObject.containsKey("pattern")) {
-                pattern = jsonObject.getString("pattern");
-            } else if (jsonObject.containsKey("type")) {
-                String type = jsonObject.getString("type");
-                if (BUILT_IN_REGEX_MAP.containsKey(type)) {
-                    pattern = BUILT_IN_REGEX_MAP.get(type);
-                }
-            }
-
-            if (pattern != null) {
-                String message = jsonObject.getString("message");
-                rules.put("hasPattern", true);
-                rules.put("pattern", pattern);
-                rules.put("patternMessage", message != null ? message : "格式不正确");
-            } else {
-                rules.put("hasPattern", false);
-            }
-
-            // 提取选项（用于下拉框）
-            if (jsonObject.containsKey("options")) {
-                Object options = jsonObject.get("options");
-                rules.put("hasOptions", true);
-                rules.put("options", options);
-            } else {
-                rules.put("hasOptions", false);
-            }
-
-            // 提取长度限制
-            boolean hasLength = false;
-            if (jsonObject.containsKey("minLength") || jsonObject.containsKey("maxLength")) {
-                if (jsonObject.containsKey("minLength")) {
-                    rules.put("minLength", convertToNumber(jsonObject.get("minLength")));
-                }
-                if (jsonObject.containsKey("maxLength")) {
-                    rules.put("maxLength", convertToNumber(jsonObject.get("maxLength")));
-                }
-                hasLength = true;
-                String lengthMessage = jsonObject.getString("lengthMessage");
-                rules.put("lengthMessage", lengthMessage != null ? lengthMessage : "长度必须在${minLength}到${maxLength}之间");
-            }
-            rules.put("hasLength", hasLength);
-
-            // 提取数值范围
-            boolean hasRange = false;
-            if (jsonObject.containsKey("min") || jsonObject.containsKey("max")) {
-                if (jsonObject.containsKey("min")) {
-                    rules.put("min", convertToNumber(jsonObject.get("min")));
-                }
-                if (jsonObject.containsKey("max")) {
-                    rules.put("max", convertToNumber(jsonObject.get("max")));
-                }
-                hasRange = true;
-                String rangeMessage = jsonObject.getString("rangeMessage");
-                rules.put("rangeMessage", rangeMessage != null ? rangeMessage : "数值必须在${min}到${max}之间");
-            }
-            rules.put("hasRange", hasRange);
-
-            // 提取操作符（IN、BETWEEN等）
-            if (jsonObject.containsKey("operator")) {
-                String operator = jsonObject.getString("operator");
-                rules.put("hasOperator", true);
-                rules.put("operator", operator);
-
-                String operatorMessage = jsonObject.getString("operatorMessage");
-                rules.put("operatorMessage", operatorMessage != null ? operatorMessage : "值必须在指定范围内");
-
-                // 提取IN操作符的values
-                if ("IN".equalsIgnoreCase(operator) && jsonObject.containsKey("values")) {
-                    Object values = jsonObject.get("values");
-                    rules.put("values", values);
-                }
-
-                // 提取BETWEEN操作符的min和max
-                if ("BETWEEN".equalsIgnoreCase(operator)) {
-                    if (jsonObject.containsKey("min")) {
-                        rules.put("min", convertToNumber(jsonObject.get("min")));
-                    }
-                    if (jsonObject.containsKey("max")) {
-                        rules.put("max", convertToNumber(jsonObject.get("max")));
-                    }
-                }
-            }
-
-            // 提取跨字段比较规则
-            if (jsonObject.containsKey("type") && "crossField".equalsIgnoreCase(jsonObject.getString("type"))) {
-                rules.put("hasCrossField", true);
-                if (jsonObject.containsKey("field1")) {
-                    rules.put("crossField1", jsonObject.getString("field1"));
-                }
-                if (jsonObject.containsKey("operator")) {
-                    rules.put("crossFieldOperator", jsonObject.getString("operator"));
-                }
-                if (jsonObject.containsKey("field2")) {
-                    rules.put("crossField2", jsonObject.getString("field2"));
-                }
-                if (jsonObject.containsKey("condition")) {
-                    rules.put("crossFieldCondition", jsonObject.getString("condition"));
-                }
-                // 提取跨字段比较的message，如果有message则使用message，否则使用condition
-                if (jsonObject.containsKey("message")) {
-                    String message = jsonObject.getString("message");
-                    if (message != null && !message.trim().isEmpty()) {
-                        rules.put("crossFieldMessage", message);
-                    } else if (jsonObject.containsKey("condition")) {
-                        rules.put("crossFieldMessage", jsonObject.getString("condition"));
-                    }
-                } else if (jsonObject.containsKey("condition")) {
-                    rules.put("crossFieldMessage", jsonObject.getString("condition"));
-                }
-            } else {
-                rules.put("hasCrossField", false);
-            }
-
-        } catch (Exception e) {
-            // JSON解析失败，忽略校验规则
-            rules.put("hasPattern", false);
-            rules.put("hasOptions", false);
-            rules.put("hasLength", false);
-            rules.put("hasRange", false);
-            rules.put("hasOperator", false);
-            rules.put("hasCrossField", false);
-        }
-
+        rules.put("hasCrossField", false);
         return rules;
+    }
+
+    private static String abbreviateForLog(String s) {
+        if (s == null) {
+            return "";
+        }
+        String t = s.replace('\n', ' ').replace('\r', ' ').trim();
+        return t.length() <= 200 ? t : t.substring(0, 200) + "...";
+    }
+
+    /**
+     * 将根 JSON 规范为单个 {@link JSONObject}：对象直接返回；数组则按序 {@code putAll} 合并（仅合入 JSON 对象元素）。
+     */
+    private static JSONObject normalizeValidateRuleToJSONObject(String trimmed) {
+        if (trimmed.charAt(0) == '[') {
+            JSONArray array = JSON.parseArray(trimmed);
+            if (array == null || array.isEmpty()) {
+                return null;
+            }
+            JSONObject merged = new JSONObject();
+            for (int i = 0; i < array.size(); i++) {
+                Object el = array.get(i);
+                if (el instanceof JSONObject) {
+                    merged.putAll((JSONObject) el);
+                }
+            }
+            return merged.isEmpty() ? null : merged;
+        }
+        JSONObject obj = JSON.parseObject(trimmed);
+        return obj == null || obj.isEmpty() ? null : obj;
+    }
+
+    private static void fillPatternRules(JSONObject jsonObject, Map<String, Object> rules) {
+        String pattern = null;
+        if (jsonObject.containsKey("pattern")) {
+            pattern = jsonObject.getString("pattern");
+        } else {
+            String type = jsonObject.getString("type");
+            if (type != null && !"crossField".equalsIgnoreCase(type) && BUILT_IN_REGEX_MAP.containsKey(type)) {
+                pattern = BUILT_IN_REGEX_MAP.get(type);
+            }
+        }
+
+        if (pattern != null && !pattern.isEmpty()) {
+            String message = jsonObject.getString("message");
+            rules.put("hasPattern", true);
+            rules.put("pattern", pattern);
+            rules.put("patternMessage", message != null ? message : "格式不正确");
+        } else {
+            rules.put("hasPattern", false);
+        }
+    }
+
+    private static void fillOptionsRules(JSONObject jsonObject, Map<String, Object> rules) {
+        if (jsonObject.containsKey("options")) {
+            rules.put("hasOptions", true);
+            rules.put("options", jsonObject.get("options"));
+        } else {
+            rules.put("hasOptions", false);
+        }
+    }
+
+    private static void fillLengthRules(JSONObject jsonObject, Map<String, Object> rules) {
+        boolean hasLength = jsonObject.containsKey("minLength") || jsonObject.containsKey("maxLength");
+        rules.put("hasLength", hasLength);
+        if (!hasLength) {
+            return;
+        }
+        if (jsonObject.containsKey("minLength")) {
+            rules.put("minLength", convertToNumber(jsonObject.get("minLength")));
+        }
+        if (jsonObject.containsKey("maxLength")) {
+            rules.put("maxLength", convertToNumber(jsonObject.get("maxLength")));
+        }
+        String lengthMessage = jsonObject.getString("lengthMessage");
+        rules.put("lengthMessage", lengthMessage != null ? lengthMessage : "长度必须在${minLength}到${maxLength}之间");
+    }
+
+    private static void fillNumericRangeRules(JSONObject jsonObject, Map<String, Object> rules) {
+        boolean hasRange = jsonObject.containsKey("min") || jsonObject.containsKey("max");
+        rules.put("hasRange", hasRange);
+        if (!hasRange) {
+            return;
+        }
+        if (jsonObject.containsKey("min")) {
+            rules.put("min", convertToNumber(jsonObject.get("min")));
+        }
+        if (jsonObject.containsKey("max")) {
+            rules.put("max", convertToNumber(jsonObject.get("max")));
+        }
+        String rangeMessage = jsonObject.getString("rangeMessage");
+        rules.put("rangeMessage", rangeMessage != null ? rangeMessage : "数值必须在${min}到${max}之间");
+    }
+
+    private static void fillOperatorRules(JSONObject jsonObject, Map<String, Object> rules) {
+        // crossField 规则里的 operator 表示字段间比较符，与 IN/BETWEEN 元数据操作符无关
+        if ("crossField".equalsIgnoreCase(jsonObject.getString("type"))) {
+            rules.put("hasOperator", false);
+            return;
+        }
+        if (!jsonObject.containsKey("operator")) {
+            rules.put("hasOperator", false);
+            return;
+        }
+        String operator = jsonObject.getString("operator");
+        rules.put("hasOperator", true);
+        rules.put("operator", operator);
+
+        String operatorMessage = jsonObject.getString("operatorMessage");
+        rules.put("operatorMessage", operatorMessage != null ? operatorMessage : "值必须在指定范围内");
+
+        if ("IN".equalsIgnoreCase(operator) && jsonObject.containsKey("values")) {
+            rules.put("values", jsonObject.get("values"));
+        }
+
+        if ("BETWEEN".equalsIgnoreCase(operator)) {
+            if (jsonObject.containsKey("min")) {
+                rules.put("min", convertToNumber(jsonObject.get("min")));
+            }
+            if (jsonObject.containsKey("max")) {
+                rules.put("max", convertToNumber(jsonObject.get("max")));
+            }
+        }
+    }
+
+    private static void fillCrossFieldRules(JSONObject jsonObject, Map<String, Object> rules) {
+        if (!jsonObject.containsKey("type") || !"crossField".equalsIgnoreCase(jsonObject.getString("type"))) {
+            rules.put("hasCrossField", false);
+            return;
+        }
+        rules.put("hasCrossField", true);
+        if (jsonObject.containsKey("field1")) {
+            rules.put("crossField1", jsonObject.getString("field1"));
+        }
+        if (jsonObject.containsKey("operator")) {
+            rules.put("crossFieldOperator", jsonObject.getString("operator"));
+        }
+        if (jsonObject.containsKey("field2")) {
+            rules.put("crossField2", jsonObject.getString("field2"));
+        }
+        if (jsonObject.containsKey("condition")) {
+            rules.put("crossFieldCondition", jsonObject.getString("condition"));
+        }
+        if (jsonObject.containsKey("message")) {
+            String message = jsonObject.getString("message");
+            if (message != null && !message.trim().isEmpty()) {
+                rules.put("crossFieldMessage", message);
+            } else if (jsonObject.containsKey("condition")) {
+                rules.put("crossFieldMessage", jsonObject.getString("condition"));
+            }
+        } else if (jsonObject.containsKey("condition")) {
+            rules.put("crossFieldMessage", jsonObject.getString("condition"));
+        }
     }
 
     /**
@@ -534,6 +606,58 @@ public class CodeGenUtils {
     public static String convertToTableName(String code) {
         // 将 TABLE_CODE 转换为 table_code
         return code.toLowerCase().replace("_TABLE", "");
+    }
+
+    /**
+     * 侧栏/页头展示名：规范为「xx管理」，去掉「列表表」「列表」等生成痕迹。
+     *
+     * @param preferred 优先使用的名称（功能节点名或表中文名）
+     * @param tableNameFallback 表中文名兜底
+     */
+    public static String formatMenuTitle(String preferred, String tableNameFallback) {
+        String raw = preferred;
+        if (raw == null || raw.trim().isEmpty()) {
+            raw = tableNameFallback;
+        }
+        if (raw == null || raw.trim().isEmpty()) {
+            return "数据管理";
+        }
+        String s = raw.trim();
+        String[] stripSuffixes = {"列表表", "列表页", "列表", "表单页", "表单", "详情页", "详情", "明细页", "明细",
+                "批量导入页", "批量导入", "管理管理"};
+        boolean changed;
+        do {
+            changed = false;
+            for (String suffix : stripSuffixes) {
+                if (s.endsWith(suffix) && s.length() > suffix.length()) {
+                    s = s.substring(0, s.length() - suffix.length()).trim();
+                    changed = true;
+                }
+            }
+            while (s.endsWith("表") && s.length() > 1) {
+                s = s.substring(0, s.length() - 1).trim();
+                changed = true;
+            }
+        } while (changed);
+        if (s.isEmpty()) {
+            s = "数据";
+        }
+        if (!s.endsWith("管理")) {
+            s = s + "管理";
+        }
+        return s;
+    }
+
+    /** 是否宜出现在侧栏菜单（仅列表类入口） */
+    public static boolean isSidebarMenuNodeType(String nodeType) {
+        if (nodeType == null || nodeType.isEmpty()) {
+            return true;
+        }
+        String t = nodeType.toUpperCase();
+        if (t.contains("FORM") || t.contains("DETAIL") || t.contains("IMPORT") || t.contains("EDIT")) {
+            return false;
+        }
+        return t.contains("LIST") || t.contains("MENU") || t.contains("PAGE");
     }
 
     /**
@@ -900,6 +1024,7 @@ public class CodeGenUtils {
             fieldMap.put("label", field.getLabel());
             fieldMap.put("isRequired", field.getIsRequired());
             fieldMap.put("formComponent", field.getFormComponent());
+            fieldMap.put("inForm", field.getInForm());
             fieldMap.put("javaType", getJavaType(field.getFieldType()));
 
             // 生成字段名并检查是否为关键字

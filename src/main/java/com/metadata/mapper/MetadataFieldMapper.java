@@ -23,13 +23,19 @@ public interface MetadataFieldMapper {
     default MetadataField selectByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode) {
         return selectByCode(tableCode, fieldCode, "");
     }
-    List<MetadataField> selectByTableCode(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode);
-    
+    List<MetadataField> selectByTableCode(@Param("tableCode") String tableCode,
+                                         @Param("businessCode") String businessCode,
+                                         @Param("includeDisabled") Boolean includeDisabled);
+
+    default List<MetadataField> selectByTableCode(String tableCode, String businessCode) {
+        return selectByTableCode(tableCode, businessCode, null);
+    }
+
     /**
      * 查询表的所有字段（默认业务系统）
      */
     default List<MetadataField> selectByTableCode(String tableCode) {
-        return selectByTableCode(tableCode, "");
+        return selectByTableCode(tableCode, "", null);
     }
     
     int countByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode, @Param("businessCode") String businessCode);
@@ -41,24 +47,38 @@ public interface MetadataFieldMapper {
         return countByCode(tableCode, fieldCode, "");
     }
     
-    Long countByTableCode(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode);
-    
+    Long countByTableCode(@Param("tableCode") String tableCode,
+                          @Param("businessCode") String businessCode,
+                          @Param("includeDisabled") Boolean includeDisabled);
+
+    default Long countByTableCode(@Param("tableCode") String tableCode, @Param("businessCode") String businessCode) {
+        return countByTableCode(tableCode, businessCode, null);
+    }
+
     /**
      * 根据表编码统计字段数量（默认业务系统）
      */
     default Long countByTableCode(@Param("tableCode") String tableCode) {
-        return countByTableCode(tableCode, "");
+        return countByTableCode(tableCode, "", null);
     }
-    List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode, 
+
+    List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode,
                                              @Param("businessCode") String businessCode,
-                                             @Param("pageRequest") com.metadata.common.PageRequest pageRequest);
-    
+                                             @Param("pageRequest") com.metadata.common.PageRequest pageRequest,
+                                             @Param("includeDisabled") Boolean includeDisabled);
+
+    default List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode,
+                                             @Param("businessCode") String businessCode,
+                                             @Param("pageRequest") com.metadata.common.PageRequest pageRequest) {
+        return selectPageByTableCode(tableCode, businessCode, pageRequest, null);
+    }
+
     /**
      * 分页查询表的字段（默认业务系统）
      */
-    default List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode, 
+    default List<MetadataField> selectPageByTableCode(@Param("tableCode") String tableCode,
                                              @Param("pageRequest") com.metadata.common.PageRequest pageRequest) {
-        return selectPageByTableCode(tableCode, "", pageRequest);
+        return selectPageByTableCode(tableCode, "", pageRequest, null);
     }
     
     /**

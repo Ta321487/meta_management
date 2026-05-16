@@ -54,6 +54,8 @@ public final class GeneratedCodeBundleMapper {
         b.setMyBatisConfigJava(m.get("MyBatisConfig.java"));
         b.setCorsConfigJava(m.get("CorsConfig.java"));
         b.setPomXml(m.get("pom.xml"));
+        b.setReadmeMd(m.get("README.md"));
+        b.setEnvExample(m.get(".env.example"));
         return b;
     }
 
@@ -97,6 +99,8 @@ public final class GeneratedCodeBundleMapper {
         putIfPresent(m, "MyBatisConfig.java", b.getMyBatisConfigJava());
         putIfPresent(m, "CorsConfig.java", b.getCorsConfigJava());
         putIfPresent(m, "pom.xml", b.getPomXml());
+        putIfPresent(m, "README.md", b.getReadmeMd());
+        putIfPresent(m, ".env.example", b.getEnvExample());
         return m;
     }
 

@@ -14,9 +14,14 @@ public interface MetadataSyncService {
     String extractTableName(String sql);
     
     /**
-     * 同步数据库表字段到元数据系统
+     * 同步数据库表字段到元数据系统（连接须指向表所在物理库）
      */
     void syncTableFields(String tableName, Connection connection) throws Exception;
+
+    /**
+     * 同步字段并登记/更新元数据表（指定业务系统与物理库名）
+     */
+    void syncTableFields(String tableName, Connection connection, String businessCode, String databaseName) throws Exception;
     
     /**
      * 工具方法：转换为表名（下划线）

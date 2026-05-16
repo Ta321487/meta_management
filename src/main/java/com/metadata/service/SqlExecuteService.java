@@ -47,6 +47,11 @@ public interface SqlExecuteService {
     Map<String, Object> executeMultipleSql(String sqls);
 
     /**
+     * 在指定 catalog 上批量执行 SQL（用分号分隔）
+     */
+    Map<String, Object> executeMultipleSql(String sqls, String targetCatalog);
+
+    /**
      * 同步数据库表外键到元数据关联关系系统（公共方法，供外部调用）
      * @param tableCode 表编码，如果为null则同步所有表
      * @return 同步结果

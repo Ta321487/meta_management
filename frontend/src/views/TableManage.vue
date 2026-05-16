@@ -49,6 +49,14 @@
           >
             补齐缺失物理表
           </el-button>
+          <el-button
+            type="success"
+            :disabled="!searchForm.businessCode"
+            :loading="importMetadataSubmitting"
+            @click="handleImportMetadataTables"
+          >
+            从物理库导入元数据
+          </el-button>
         </el-form-item>
       </el-form>
 
@@ -181,7 +189,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList, batchAssignBusinessSystem, ensureMissingPhysicalTables } from '../api'
+import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList, batchAssignBusinessSystem, ensureMissingPhysicalTables, importMissingMetadataTables } from '../api'
 
 export default {
   name: 'TableManage',
@@ -212,6 +220,7 @@ export default {
       businessCode: ''
     })
     const ensurePhysicalSubmitting = ref(false)
+    const importMetadataSubmitting = ref(false)
     const form = reactive({
       id: null,
       tableCode: '',
@@ -233,7 +242,8 @@ export default {
         const params = {
           ...searchForm,
           current: pagination.current,
-          size: pagination.size
+          size: pagination.size,
+          includeDisabled: true
         }
         const res = await getTableList(params)
         if (res.code === 200) {
@@ -328,6 +338,38 @@ export default {
         ElMessage.error(error.response?.data?.message || error.message || '请求失败')
       } finally {
         ensurePhysicalSubmitting.value = false
+      }
+    }
+
+    const handleImportMetadataTables = async () => {
+      if (!searchForm.businessCode) {
+        ElMessage.warning('请先在筛选中选择业务系统')
+        return
+      }
+      try {
+        await ElMessageBox.confirm(
+          '将扫描该业务系统默认物理库，把尚未在元数据中登记的表及字段导入。适用于 SQL 执行页建表后的补救。是否继续？',
+          '从物理库导入元数据',
+          { type: 'info', confirmButtonText: '确定', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+      importMetadataSubmitting.value = true
+      try {
+        const res = await importMissingMetadataTables(searchForm.businessCode)
+        if (res.code === 200 && res.data) {
+          const d = res.data
+          const n = d.importedCount ?? (d.imported && d.imported.length) ?? 0
+          const s = d.skippedCount ?? (d.skipped && d.skipped.length) ?? 0
+          const f = d.failedCount ?? (d.failed && d.failed.length) ?? 0
+          ElMessage.success(`导入 ${n} 张，跳过 ${s}，失败 ${f}（库: ${d.catalog || ''}）`)
+          loadData()
+        }
+      } catch (error) {
+        ElMessage.error(error.response?.data?.message || error.message || '导入失败')
+      } finally {
+        importMetadataSubmitting.value = false
       }
     }
 
@@ -594,6 +636,8 @@ export default {
       pagination,
       searchForm,
       ensurePhysicalSubmitting,
+      importMetadataSubmitting,
+      handleImportMetadataTables,
       form,
       rules,
       handleSearch,

@@ -9,7 +9,7 @@ import java.util.List;
 @Mapper
 public interface MetadataPhysicalDatabaseMapper {
 
-    List<MetadataPhysicalDatabase> selectAll();
+    List<MetadataPhysicalDatabase> selectAll(@Param("includeDisabled") Boolean includeDisabled);
 
     MetadataPhysicalDatabase selectById(@Param("id") Long id);
 

@@ -65,15 +65,11 @@
 <script>
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
-<#if captchaEnabled>
 import { login } from '@/api/auth'
-<#else>
-import { login } from '../api'
-</#if>
 import { ElMessage } from 'element-plus'
 import { User, Lock, Data } from '@element-plus/icons-vue'
 <#if captchaEnabled>
-import CaptchaInput from '../components/CaptchaInput.vue'
+import CaptchaInput from '@/components/CaptchaInput.vue'
 </#if>
 
 export default {

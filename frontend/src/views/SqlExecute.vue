@@ -5,7 +5,7 @@
         <div class="card-header">
           <span>SQL执行</span>
           <el-alert
-            title="提示：支持 SELECT/INSERT/UPDATE、CREATE TABLE、单行 CREATE DATABASE/SCHEMA（自动 utf8mb4）；禁止 DROP/TRUNCATE/DELETE 等危险操作"
+            title="提示：须先选择目标库再执行。"
             type="warning"
             :closable="false"
             style="margin-top: 10px"
@@ -13,11 +13,32 @@
         </div>
       </template>
 
+      <div class="target-db-bar">
+        <span class="target-db-label">目标数据库</span>
+        <el-select
+          v-model="targetCatalog"
+          filterable
+          clearable
+          placeholder="请选择要执行的 MySQL 库"
+          style="width: 360px"
+          :loading="catalogLoading"
+        >
+          <el-option
+            v-for="db in catalogOptions"
+            :key="db.catalogName"
+            :label="db.label"
+            :value="db.catalogName"
+          />
+        </el-select>
+        <el-button link type="primary" @click="loadCatalogOptions">刷新库列表</el-button>
+        <span v-if="targetCatalog" class="target-db-hint">将在库 <code>{{ targetCatalog }}</code> 上执行</span>
+      </div>
+
       <div class="sql-editor-container">
         <div class="editor-header">
           <span>SQL语句</span>
           <div>
-            <el-button type="primary" @click="handleExecute" :loading="executing">执行</el-button>
+            <el-button type="primary" @click="handleExecute" :loading="executing" :disabled="!targetCatalog">执行</el-button>
             <el-button @click="handleFormat">格式化</el-button>
             <el-button @click="handleClear">清空</el-button>
             <el-button @click="showImportDialog = true">导入SQL</el-button>
@@ -163,11 +184,11 @@
 </template>
 
 <script>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElLoading } from 'element-plus'
 import { InfoFilled, UploadFilled } from '@element-plus/icons-vue'
 import * as monaco from 'monaco-editor'
-import { executeSql, executeMultipleSql } from '../api'
+import { executeSql, executeMultipleSql, getPhysicalDatabaseList } from '../api'
 import axios from 'axios'
 
 export default {
@@ -190,6 +211,46 @@ export default {
     const fileList = ref([])
     const remoteUrl = ref('')
     const importLoading = ref(false)
+
+    const STORAGE_KEY_TARGET_CATALOG = 'sqlExecute.targetCatalog'
+    const targetCatalog = ref(sessionStorage.getItem(STORAGE_KEY_TARGET_CATALOG) || '')
+    const catalogOptions = ref([])
+    const catalogLoading = ref(false)
+
+    watch(targetCatalog, (v) => {
+      if (v && String(v).trim()) {
+        sessionStorage.setItem(STORAGE_KEY_TARGET_CATALOG, String(v).trim())
+      } else {
+        sessionStorage.removeItem(STORAGE_KEY_TARGET_CATALOG)
+      }
+    })
+
+    const loadCatalogOptions = async () => {
+      catalogLoading.value = true
+      try {
+        const res = await getPhysicalDatabaseList()
+        if (res.code === 200) {
+          catalogOptions.value = (res.data || [])
+            .filter(row => row.isEnabled !== 0)
+            .map(row => ({
+              catalogName: row.catalogName,
+              label: row.displayName
+                ? `${row.catalogName}（${row.displayName}）`
+                : row.catalogName
+            }))
+          if (targetCatalog.value && !catalogOptions.value.some(o => o.catalogName === targetCatalog.value)) {
+            catalogOptions.value.unshift({
+              catalogName: targetCatalog.value,
+              label: `${targetCatalog.value}（未在库管理中登记）`
+            })
+          }
+        }
+      } catch (e) {
+        ElMessage.error('加载库列表失败: ' + (e.message || '未知错误'))
+      } finally {
+        catalogLoading.value = false
+      }
+    }
 
     // 初始化编辑器
     const initEditor = () => {
@@ -234,6 +295,12 @@ export default {
         ElMessage.warning('请输入SQL语句')
         return
       }
+      if (!targetCatalog.value || !targetCatalog.value.trim()) {
+        ElMessage.warning('请先选择目标数据库')
+        return
+      }
+
+      const payload = { sql: sqlText, targetCatalog: targetCatalog.value.trim() }
 
       executing.value = true
       result.value = null
@@ -244,9 +311,9 @@ export default {
         
         let response
         if (sqlCount > 1) {
-          response = await executeMultipleSql({ sql: sqlText })
+          response = await executeMultipleSql(payload)
         } else {
-          response = await executeSql({ sql: sqlText })
+          response = await executeSql(payload)
         }
 
         if (response.code === 200) {
@@ -376,7 +443,9 @@ export default {
 
     // 生命周期钩子
     onMounted(() => {
+      localStorage.removeItem(STORAGE_KEY_TARGET_CATALOG)
       initEditor()
+      loadCatalogOptions()
     })
 
     onBeforeUnmount(() => {
@@ -402,7 +471,11 @@ export default {
       handleClear,
       handleFileChange,
       handleImportLocal,
-      handleImportRemote
+      handleImportRemote,
+      targetCatalog,
+      catalogOptions,
+      catalogLoading,
+      loadCatalogOptions
     }
   }
 }
@@ -417,6 +490,33 @@ export default {
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.target-db-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.target-db-label {
+  font-weight: 600;
+  color: #303133;
+}
+
+.target-db-hint {
+  font-size: 13px;
+  color: #606266;
+}
+
+.target-db-hint code {
+  padding: 0 4px;
+  background: #ebeef5;
+  border-radius: 2px;
 }
 
 .sql-editor-container {

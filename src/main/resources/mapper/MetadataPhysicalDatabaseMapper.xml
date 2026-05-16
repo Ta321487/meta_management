@@ -16,7 +16,13 @@
     </resultMap>
 
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT * FROM metadata_physical_database ORDER BY create_time DESC
+        SELECT * FROM metadata_physical_database
+        <where>
+            <if test="includeDisabled == null or includeDisabled == false">
+                is_enabled = 1
+            </if>
+        </where>
+        ORDER BY create_time DESC
     </select>
 
     <select id="selectById" resultMap="BaseResultMap">

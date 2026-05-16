@@ -7,10 +7,12 @@ import com.metadata.common.SqlExecuteSingleResultPayload;
 import com.metadata.common.codes.ApiMessages;
 import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.exception.BizException;
+import com.metadata.service.MySqlPhysicalCatalogService;
 import com.metadata.service.SqlExecuteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -24,6 +26,9 @@ public class SqlExecuteController {
     @Autowired
     private SqlExecuteService sqlExecuteService;
 
+    @Autowired
+    private MySqlPhysicalCatalogService mySqlPhysicalCatalogService;
+
     /**
      * 执行SQL语句
      */
@@ -34,7 +39,9 @@ public class SqlExecuteController {
         if (sql == null || sql.trim().isEmpty()) {
             throw BizException.of(AppErrorCodes.SQL_TEXT_EMPTY, ApiMessages.SQL_REQUIRED);
         }
-        return Result.success(SqlExecuteSingleResultPayload.fromMap(sqlExecuteService.executeSql(sql)));
+        String catalog = resolveTargetCatalog(request.getTargetCatalog());
+        return Result.success(SqlExecuteSingleResultPayload.fromMap(
+                sqlExecuteService.executeSql(sql, false, catalog)));
     }
 
     /**
@@ -47,6 +54,20 @@ public class SqlExecuteController {
         if (sqls == null || sqls.trim().isEmpty()) {
             throw BizException.of(AppErrorCodes.SQL_TEXT_EMPTY, ApiMessages.SQL_REQUIRED);
         }
-        return Result.success(SqlExecuteMultipleResultPayload.fromMap(sqlExecuteService.executeMultipleSql(sqls)));
+        String catalog = resolveTargetCatalog(request.getTargetCatalog());
+        return Result.success(SqlExecuteMultipleResultPayload.fromMap(
+                sqlExecuteService.executeMultipleSql(sqls, catalog)));
+    }
+
+    private String resolveTargetCatalog(String targetCatalog) {
+        if (!StringUtils.hasText(targetCatalog)) {
+            throw BizException.of(AppErrorCodes.SQL_TARGET_CATALOG_REQUIRED, ApiMessages.SQL_TARGET_CATALOG_REQUIRED);
+        }
+        String catalog = targetCatalog.trim();
+        if (!mySqlPhysicalCatalogService.isValidCatalogName(catalog)) {
+            throw BizException.of(AppErrorCodes.SQL_TARGET_CATALOG_REQUIRED,
+                    "库名不符合安全规则：仅允许字母、数字、下划线、美元符号，长度 1–64");
+        }
+        return catalog;
     }
 }

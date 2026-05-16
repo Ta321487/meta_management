@@ -50,4 +50,26 @@ public class BusinessCatalogResolver {
                 : tableMapper.selectByCode(tableCode);
         return resolveCatalog(table);
     }
+
+    /** 业务系统默认物理库名 */
+    public String resolveCatalogForBusiness(MetadataBusinessSystem bs) {
+        if (bs == null || !StringUtils.hasText(bs.getDatabaseName())) {
+            return null;
+        }
+        return bs.getDatabaseName().trim();
+    }
+
+    /** 按物理库名反查业务系统编码（用于 SQL 执行后同步元数据） */
+    public String resolveBusinessCodeByCatalog(String catalog) {
+        if (!StringUtils.hasText(catalog)) {
+            return null;
+        }
+        String key = catalog.trim();
+        for (MetadataBusinessSystem bs : businessSystemService.listAll(true)) {
+            if (bs.getDatabaseName() != null && key.equalsIgnoreCase(bs.getDatabaseName().trim())) {
+                return bs.getBusinessCode();
+            }
+        }
+        return null;
+    }
 }

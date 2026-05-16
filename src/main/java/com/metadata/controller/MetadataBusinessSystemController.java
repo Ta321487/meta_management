@@ -86,9 +86,11 @@ public class MetadataBusinessSystemController {
      * 查询所有业务系统
      */
     @GetMapping("/list")
-    @Operation(summary = "查询业务系统列表", description = "查询所有业务系统")
-    public Result<List<MetadataBusinessSystem>> list() {
-        List<MetadataBusinessSystem> list = businessSystemService.listAll();
+    @Operation(summary = "查询业务系统列表", description = "默认仅返回启用的业务系统；管理端传 includeDisabled=true 含停用")
+    public Result<List<MetadataBusinessSystem>> list(
+            @Parameter(description = "为 true 时包含已停用的业务系统（表管理等业务端勿传）")
+            @RequestParam(required = false) Boolean includeDisabled) {
+        List<MetadataBusinessSystem> list = businessSystemService.listAll(Boolean.TRUE.equals(includeDisabled));
         return Result.success(list);
     }
 

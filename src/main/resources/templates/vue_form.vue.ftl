@@ -7,17 +7,25 @@
 </#function>
 
 <template>
-  <div class="${componentName?lower_case}-form">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>${table.tableName}表单</span>
+  <div class="admin-page ${componentName?lower_case}-form">
+    <div class="page-header">
+      <div class="page-header-left row">
+        <el-button link type="primary" class="back-btn" @click="goBack">
+          <el-icon><ArrowLeft /></el-icon> 返回
+        </el-button>
+        <div>
+          <h2 class="page-title">${menuTitle!table.tableName}</h2>
+          <span class="page-desc">{{ isEdit ? '编辑' : '新增' }}记录</span>
         </div>
-      </template>
+      </div>
+    </div>
 
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+    <el-card shadow="never" class="form-card">
+      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px" label-position="right">
+        <el-row :gutter="24">
 <#list fields as field>
         <#if field.field.formComponent != "primary_key">
+        <el-col :xs="24" :sm="24" :md="${(field.field.formComponent == 'textarea')?then(24, 12)}" :lg="${(field.field.formComponent == 'textarea')?then(24, 12)}">
         <el-form-item label="${field.field.label}" prop="${field.camelCaseName}">
           <#if field.isForeignKey!false>
           <el-select v-model="form.${field.camelCaseName}" placeholder="请选择${field.field.label}" style="width: 100%" filterable>
@@ -49,33 +57,40 @@
           <#elseif field.field.formComponent == "number">
           <el-input-number v-model="form.${field.camelCaseName}" style="width: 100%" />
           <#elseif field.field.formComponent == "textarea">
-          <el-input v-model="form.${field.camelCaseName}" type="textarea" :rows="3" />
+          <el-input v-model="form.${field.camelCaseName}" type="textarea" :rows="4" />
           <#else>
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
           </#if>
         </el-form-item>
+        </el-col>
         </#if>
 </#list>
-        <el-form-item>
+        </el-row>
+        <div class="form-actions">
           <el-button type="primary" @click="handleSubmit">保存</el-button>
+          <el-button @click="goBack">取消</el-button>
           <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
+        </div>
       </el-form>
     </el-card>
   </div>
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { ${componentName}Api <#list fields as field><#if field.isForeignKey!false>, ${field.relatedTableClassName}Api</#if></#list> } from '../api'
 
 export default {
   name: '${componentName}Form',
   setup() {
     const route = useRoute()
+    const router = useRouter()
     const formRef = ref(null)
+    const isEdit = computed(() => !!form.${primaryKeyCamelCase})
+    const goBack = () => router.back()
     const form = reactive({
 <#list fields as field>
       ${field.camelCaseName}: <#if field.field.fieldType?lower_case?contains("int")>null<#elseif field.field.fieldType?lower_case?contains("date")>null<#else>''</#if>,
@@ -115,7 +130,7 @@ export default {
         },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasRange!false)>
-        <!-- hasRange: ${field.validationRules.hasRange?c}, min: ${field.validationRules.min!''}, max: ${field.validationRules.max!''} -->
+        <#-- hasRange：元数据 min/max 表示数值上下界；字符串长度请用 minLength/maxLength（hasLength） -->
         { 
           type: 'number',
           <#assign minValue = field.validationRules.min!-99999999>
@@ -329,6 +344,8 @@ export default {
       formRef,
       form,
       rules,
+      isEdit,
+      goBack,
       handleSubmit,
       handleReset
       <#list fields as field>
@@ -342,13 +359,6 @@ export default {
 </script>
 
 <style scoped>
-.${componentName?lower_case}-form {
-  height: 100%;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.page-header-left { display: flex; align-items: center; gap: 12px; }
+.back-btn { padding-left: 0; }
 </style>

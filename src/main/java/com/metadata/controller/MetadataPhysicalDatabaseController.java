@@ -20,9 +20,11 @@ public class MetadataPhysicalDatabaseController {
     private MetadataPhysicalDatabaseService physicalDatabaseService;
 
     @GetMapping("/list")
-    @Operation(summary = "物理库列表")
-    public Result<List<MetadataPhysicalDatabase>> list() {
-        return Result.success(physicalDatabaseService.listAll());
+    @Operation(summary = "物理库列表", description = "默认仅启用；管理端传 includeDisabled=true 含停用")
+    public Result<List<MetadataPhysicalDatabase>> list(
+            @Parameter(description = "为 true 时包含已停用的登记库")
+            @RequestParam(required = false) Boolean includeDisabled) {
+        return Result.success(physicalDatabaseService.listAll(Boolean.TRUE.equals(includeDisabled)));
     }
 
     @PostMapping("/add")

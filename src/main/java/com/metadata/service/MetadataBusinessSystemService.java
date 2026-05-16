@@ -11,9 +11,13 @@ import java.util.List;
 public interface MetadataBusinessSystemService {
 
     /**
-     * 查询所有业务系统
+     * 查询业务系统列表。includeDisabled 为 true 时含停用（管理端）；否则仅启用。
      */
-    List<MetadataBusinessSystem> listAll();
+    List<MetadataBusinessSystem> listAll(Boolean includeDisabled);
+
+    default List<MetadataBusinessSystem> listAll() {
+        return listAll(false);
+    }
 
     /**
      * 根据编码查询业务系统

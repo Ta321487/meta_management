@@ -54,16 +54,40 @@
     </select>
 
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table
-        <where>
-            <if test="tableName != null and tableName != ''">
-                AND table_name LIKE CONCAT('%', #{tableName}, '%')
-            </if>
-            <if test="businessCode != null and businessCode != ''">
-                AND business_code = #{businessCode}
-            </if>
-        </where>
-        ORDER BY create_time DESC
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT * FROM metadata_table
+                <where>
+                    <if test="tableName != null and tableName != ''">
+                        AND table_name LIKE CONCAT('%', #{tableName}, '%')
+                    </if>
+                    <if test="businessCode != null and businessCode != ''">
+                        AND business_code = #{businessCode}
+                    </if>
+                </where>
+                ORDER BY create_time DESC
+            </when>
+            <otherwise>
+                SELECT t.* FROM metadata_table t
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                <where>
+                    bs.is_enabled = 1
+                    AND t.is_enabled = 1
+                    AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                    <if test="tableName != null and tableName != ''">
+                        AND t.table_name LIKE CONCAT('%', #{tableName}, '%')
+                    </if>
+                    <if test="businessCode != null and businessCode != ''">
+                        AND t.business_code = #{businessCode}
+                    </if>
+                </where>
+                ORDER BY t.create_time DESC
+            </otherwise>
+        </choose>
     </select>
 
     <select id="countByCode" resultType="int">
@@ -71,35 +95,91 @@
     </select>
 
     <select id="count" resultType="Long">
-        SELECT COUNT(*) FROM metadata_table
-        <where>
-            <if test="tableName != null and tableName != ''">
-                AND table_name LIKE CONCAT('%', #{tableName}, '%')
-            </if>
-            <if test="businessCode != null and businessCode != ''">
-                AND business_code = #{businessCode}
-            </if>
-        </where>
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT COUNT(*) FROM metadata_table
+                <where>
+                    <if test="tableName != null and tableName != ''">
+                        AND table_name LIKE CONCAT('%', #{tableName}, '%')
+                    </if>
+                    <if test="businessCode != null and businessCode != ''">
+                        AND business_code = #{businessCode}
+                    </if>
+                </where>
+            </when>
+            <otherwise>
+                SELECT COUNT(*) FROM metadata_table t
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                <where>
+                    bs.is_enabled = 1
+                    AND t.is_enabled = 1
+                    AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                    <if test="tableName != null and tableName != ''">
+                        AND t.table_name LIKE CONCAT('%', #{tableName}, '%')
+                    </if>
+                    <if test="businessCode != null and businessCode != ''">
+                        AND t.business_code = #{businessCode}
+                    </if>
+                </where>
+            </otherwise>
+        </choose>
     </select>
 
     <select id="selectPage" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table
-        <where>
-            <if test="tableName != null and tableName != ''">
-                AND table_name LIKE CONCAT('%', #{tableName}, '%')
-            </if>
-            <if test="businessCode != null and businessCode != ''">
-                AND business_code = #{businessCode}
-            </if>
-        </where>
-        ORDER BY create_time DESC
-        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT * FROM metadata_table
+                <where>
+                    <if test="tableName != null and tableName != ''">
+                        AND table_name LIKE CONCAT('%', #{tableName}, '%')
+                    </if>
+                    <if test="businessCode != null and businessCode != ''">
+                        AND business_code = #{businessCode}
+                    </if>
+                </where>
+                ORDER BY create_time DESC
+                LIMIT #{pageRequest.offset}, #{pageRequest.size}
+            </when>
+            <otherwise>
+                SELECT t.* FROM metadata_table t
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                <where>
+                    bs.is_enabled = 1
+                    AND t.is_enabled = 1
+                    AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                    <if test="tableName != null and tableName != ''">
+                        AND t.table_name LIKE CONCAT('%', #{tableName}, '%')
+                    </if>
+                    <if test="businessCode != null and businessCode != ''">
+                        AND t.business_code = #{businessCode}
+                    </if>
+                </where>
+                ORDER BY t.create_time DESC
+                LIMIT #{pageRequest.offset}, #{pageRequest.size}
+            </otherwise>
+        </choose>
     </select>
 
     <select id="selectByModuleCode" resultMap="BaseResultMap">
         SELECT t.* FROM metadata_table t
         INNER JOIN metadata_module_table mt ON t.table_code = mt.table_code
-        WHERE t.is_enabled = 1 AND mt.module_code = #{moduleCode}
+        INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+        LEFT JOIN metadata_physical_database pdb ON (
+            NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+            AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+        )
+        WHERE t.is_enabled = 1
+          AND bs.is_enabled = 1
+          AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+          AND mt.module_code = #{moduleCode}
         <if test="businessCode != null and businessCode != ''">
             AND t.business_code = #{businessCode}
         </if>
@@ -107,15 +187,38 @@
     </select>
 
     <select id="selectByCodes" resultMap="BaseResultMap">
-        SELECT * FROM metadata_table
-        WHERE is_enabled = 1 AND table_code IN
-        <foreach collection="tableCodes" item="tableCode" open="(" separator="," close=")">
-            #{tableCode}
-        </foreach>
-        <if test="businessCode != null and businessCode != ''">
-            AND business_code = #{businessCode}
-        </if>
-        ORDER BY create_time DESC
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT * FROM metadata_table
+                WHERE table_code IN
+                <foreach collection="tableCodes" item="tableCode" open="(" separator="," close=")">
+                    #{tableCode}
+                </foreach>
+                <if test="businessCode != null and businessCode != ''">
+                    AND business_code = #{businessCode}
+                </if>
+                ORDER BY create_time DESC
+            </when>
+            <otherwise>
+                SELECT t.* FROM metadata_table t
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                WHERE t.is_enabled = 1
+                  AND bs.is_enabled = 1
+                  AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                  AND t.table_code IN
+                <foreach collection="tableCodes" item="tableCode" open="(" separator="," close=")">
+                    #{tableCode}
+                </foreach>
+                <if test="businessCode != null and businessCode != ''">
+                    AND t.business_code = #{businessCode}
+                </if>
+                ORDER BY t.create_time DESC
+            </otherwise>
+        </choose>
     </select>
 
     <select id="countByDatabaseName" resultType="int">

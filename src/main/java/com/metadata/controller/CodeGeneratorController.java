@@ -11,7 +11,13 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 /**
  * 代码生成控制器
@@ -216,6 +222,33 @@ public class CodeGeneratorController {
         return Result.success(GeneratedCodeBundleMapper.fromMap(
                 codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled)));
 
+    }
+
+    /**
+     * 按业务系统下载完整项目 ZIP（全部启用表 + 可运行前端）
+     */
+    @GetMapping("/project-zip/business/{businessCode}")
+    @Operation(summary = "下载业务系统项目 ZIP", description = "打包该业务系统下全部启用表的 SQL、后端与 Vite 前端，解压后一层项目根目录")
+    public ResponseEntity<byte[]> downloadProjectZipByBusiness(
+            @Parameter(description = "业务系统编码")
+            @PathVariable String businessCode,
+            @Parameter(description = "Java 根包名，为空则使用业务系统配置")
+            @RequestParam(required = false) String packageName,
+            @RequestParam(defaultValue = "false") boolean useInterface,
+            @RequestParam(defaultValue = "false") boolean captchaEnabled) throws Exception {
+        byte[] body = codeGeneratorService.generateProjectZipByBusinessSystem(
+                businessCode, packageName, useInterface, captchaEnabled);
+        String safe = businessCode.replaceAll("[^a-zA-Z0-9._-]", "-");
+        if (safe.isEmpty()) {
+            safe = "app";
+        }
+        String filename = safe + "-generated.zip";
+        String encoded = URLEncoder.encode(filename, StandardCharsets.UTF_8).replace("+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encoded)
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .contentLength(body.length)
+                .body(body);
     }
 
     /**

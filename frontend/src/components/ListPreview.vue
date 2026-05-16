@@ -149,7 +149,7 @@
         label-position="top"
       >
         <el-form-item 
-          v-for="field in filteredFields" 
+          v-for="field in dialogFormFields" 
           :key="field.id"
           :label="field.label" 
           :prop="getListFieldPropName(field)"
@@ -361,11 +361,18 @@ const filteredFields = computed(() => {
   return props.fields.filter(field => {
     return field && 
            field.formComponent !== 'primary_key' && 
-           field.formComponent !== 'primary_key' && 
            field.fieldName !== 'uuid' &&
            field.fieldName !== 'create_time' &&
            field.fieldName !== 'update_time';
   });
+});
+
+// 列表内「新增/编辑」弹窗：不包含不参与表单的字段
+const dialogFormFields = computed(() => {
+  return filteredFields.value.filter(field =>
+      (field.inForm == null || field.inForm !== 0) &&
+      field.formComponent !== 'none'
+  );
 });
 
 // 搜索字段（过滤掉长文本和大字段，且不包含主键字段和文本域）
@@ -373,7 +380,11 @@ const searchFields = computed(() => {
   return filteredFields.value.filter(field => {
     const type = (field.fieldType || '').toLowerCase();
     const formComponent = field.formComponent || '';
-    
+
+    if (field.inForm === 0 || formComponent === 'none') {
+      return false;
+    }
+
     // 排除文本域类型
     if (formComponent === 'textarea') {
       return false;
@@ -521,6 +532,9 @@ const handleSubmit = () => {
 const formRules = computed(() => {
   const rules = {};
   props.fields.forEach(field => {
+    if (field.inForm === 0 || field.formComponent === 'none') {
+      return;
+    }
     const propName = getListFieldPropName(field);
     
     // 初始化该字段的规则数组

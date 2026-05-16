@@ -18,6 +18,16 @@
         @generate-code="form.tableCode ? handleGenerateCurrentTable() : handleGenerateAllTables()"
         @run-test="runTest"
         @show-deployment-guide="deploymentGuideVisible = true"
+        @download-project-zip="handleDownloadProjectZip"
+        @open-business-preview="businessPreviewVisible = true"
+      />
+
+      <BusinessSystemPreview
+        v-model="businessPreviewVisible"
+        :business-code="form.businessCode"
+        :package-name="form.packageName"
+        :use-interface="form.useInterface"
+        :captcha-enabled="form.captchaEnabled"
       />
 
       <!-- 代码标签页容器 -->
@@ -75,6 +85,7 @@
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import axios from 'axios'
 import { Check, Close, ArrowUp, ArrowDown, Loading, InfoFilled } from '@element-plus/icons-vue'
 import {
   getTableList,
@@ -120,6 +131,7 @@ import TestResult from '../components/TestResult.vue'
 import ListPreview from '../components/ListPreview.vue'
 import FormPreview from '../components/FormPreview.vue'
 import LoginPreview from '../components/LoginPreview.vue'
+import BusinessSystemPreview from '../components/preview/BusinessSystemPreview.vue'
 import DeploymentGuide from '../components/DeploymentGuide.vue'
 import {
   applyAuthExtensionBundle,
@@ -175,6 +187,8 @@ const codeMap = reactive({
   authController: '',
   captchaService: '',
   env: '',
+  readme: '',
+  envExample: '',
   result: '',
   pageRequest: '',
   pageResult: ''
@@ -200,6 +214,7 @@ const deploymentGuideVisible = ref(false)
 
 // 登录页预览相关
 const loginPreviewVisible = ref(false)
+const businessPreviewVisible = ref(false)
 
 // 加载业务系统列表
 const loadBusinessSystems = async () => {
@@ -309,6 +324,41 @@ const handleDownload = async (codeType, fileName) => {
     ElMessage.success('下载成功')
   } catch (error) {
     ElMessage.error('下载失败：' + (error.message || '未知错误'))
+  }
+}
+
+/** 按业务系统下载完整项目 ZIP */
+const handleDownloadProjectZip = async () => {
+  if (!form.businessCode) {
+    ElMessage.warning('请先选择业务系统')
+    return
+  }
+  try {
+    const res = await axios.get(
+      `/metadata-system/api/codegen/project-zip/business/${encodeURIComponent(form.businessCode)}`,
+      {
+        params: {
+          packageName: form.packageName || undefined,
+          useInterface: form.useInterface,
+          captchaEnabled: form.captchaEnabled
+        },
+        responseType: 'blob',
+        withCredentials: true
+      }
+    )
+    const fname = `${String(form.businessCode).replace(/[^a-zA-Z0-9._-]/g, '-')}-generated.zip`
+    const url = URL.createObjectURL(new Blob([res.data], { type: 'application/zip' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fname
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    ElMessage.success('已开始下载 ZIP')
+  } catch (error) {
+    ElMessage.error('ZIP 下载失败：' + (error.message || '未知错误'))
   }
 }
 
@@ -506,6 +556,19 @@ const handleGenerate = async (type) => {
           codeMap.env = resEnv.data
         }
         break
+      case 'readme':
+      case 'envExample': {
+        if (!form.tableCode) {
+          ElMessage.warning('请先选择表')
+          return
+        }
+        const bundleRes = await generateAll(form.tableCode, form.packageName, form.businessCode, form.useInterface, form.captchaEnabled)
+        if (bundleRes.code === 200 && bundleRes.data) {
+          applyGeneratedCodeBundle(codeMap, bundleRes.data)
+          ElMessage.success('已重新生成（含 README.md 与 .env.example）')
+        }
+        return
+      }
       case 'login':
         res = await generateLoginPage(form.businessCode, form.captchaEnabled)
         if (res.code === 200) {
@@ -730,7 +793,11 @@ const handlePreviewForm = async () => {
       }
       console.log('Final fields:', fields)
       
-      formPreviewFields.value = fields
+      formPreviewFields.value = fields.filter(f =>
+          f.formComponent !== 'primary_key' &&
+          f.inForm !== 0 &&
+          f.formComponent !== 'none'
+      )
     }
   } catch (error) {
     console.log('加载字段信息失败:', error)

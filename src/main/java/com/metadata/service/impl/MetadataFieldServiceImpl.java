@@ -131,7 +131,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         // 确保businessCode不为null，如果没有提供则从表中获取
         if (field.getBusinessCode() == null || field.getBusinessCode().isEmpty()) {
             // 从表中获取业务系统编码
-            MetadataField existingField = fieldMapper.selectByTableCode(field.getTableCode()).stream().findFirst().orElse(null);
+            MetadataField existingField = fieldMapper.selectByTableCode(field.getTableCode(), "", true).stream().findFirst().orElse(null);
             if (existingField != null) {
                 String existingBusinessCode = existingField.getBusinessCode();
                 // 确保从现有字段获取的businessCode不为null或空字符串
@@ -152,6 +152,12 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         // 设置isEnabled默认值
         if (field.getIsEnabled() == null) {
             field.setIsEnabled(1);
+        }
+        if (field.getInForm() == null) {
+            field.setInForm(1);
+        }
+        if (Integer.valueOf(0).equals(field.getInForm())) {
+            field.setFormComponent("none");
         }
 
         // 保存原始校验规则的message字段
@@ -199,6 +205,13 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         field.setId(existing.getId());
         field.setFieldCode(existing.getFieldCode()); // 编码不可修改
         field.setTableCode(existing.getTableCode()); // 表编码不可修改
+
+        if (field.getInForm() == null) {
+            field.setInForm(existing.getInForm() != null ? existing.getInForm() : 1);
+        }
+        if (Integer.valueOf(0).equals(field.getInForm())) {
+            field.setFormComponent("none");
+        }
 
         String phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), existing.getBusinessCode());
 
@@ -344,7 +357,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         }
 
         // 检查表中字段数量，不能删除最后一个字段
-        Long fieldCount = fieldMapper.countByTableCode(field.getTableCode());
+        Long fieldCount = fieldMapper.countByTableCode(field.getTableCode(), "", true);
         if (fieldCount <= 1) {
             throw BizException.of(AppErrorCodes.FIELD_LAST_COLUMN_CANNOT_DELETE, FieldMessages.CANNOT_DELETE_LAST_FIELD);
         }
@@ -389,25 +402,18 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
      * 查询表的所有字段
      */
     @Override
-    public List<MetadataField> listByTableCode(String tableCode) {
-        return fieldMapper.selectByTableCode(tableCode);
-    }
-    
-    /**
-     * 查询表的所有字段（按业务系统）
-     */
-    @Override
-    public List<MetadataField> listByTableCode(String tableCode, String businessCode) {
-        return fieldMapper.selectByTableCode(tableCode, businessCode);
+    public List<MetadataField> listByTableCode(String tableCode, String businessCode, Boolean includeDisabled) {
+        return fieldMapper.selectByTableCode(tableCode, businessCode, includeDisabled);
     }
 
     /**
      * 分页查询表的字段
      */
     @Override
-    public PageResult<MetadataField> pageByTableCode(String tableCode, PageRequest pageRequest) {
-        Long total = fieldMapper.countByTableCode(tableCode);
-        List<MetadataField> records = fieldMapper.selectPageByTableCode(tableCode, pageRequest);
+    public PageResult<MetadataField> pageByTableCode(String tableCode, String businessCode, PageRequest pageRequest, Boolean includeDisabled) {
+        String bc = businessCode != null ? businessCode : "";
+        Long total = fieldMapper.countByTableCode(tableCode, bc, includeDisabled);
+        List<MetadataField> records = fieldMapper.selectPageByTableCode(tableCode, bc, pageRequest, includeDisabled);
         return new PageResult<>(total, records);
     }
 
@@ -416,7 +422,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
      */
     @Override
     public List<Map<String, Object>> getConstraints(String tableCode) {
-        List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
+        List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode, "", true);
         String businessCode = fields.isEmpty() ? "" : (fields.get(0).getBusinessCode() != null ? fields.get(0).getBusinessCode() : "");
         MetadataTable metaTable = tableMapper.selectByCode(tableCode, businessCode);
         if (metaTable == null) {
@@ -557,7 +563,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
             // 如果有tableCode和fieldName，则通过tableCode和fieldName获取字段信息
             if (tableCode != null && fieldName != null) {
-                List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode);
+                List<MetadataField> fields = fieldMapper.selectByTableCode(tableCode, "", true);
                 if (fields != null && !fields.isEmpty()) {
                     for (MetadataField f : fields) {
                         if (fieldName.equals(f.getFieldName())) {
@@ -578,7 +584,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         if (field != null) {
             phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), field.getBusinessCode());
         } else if (tableCode != null) {
-            List<MetadataField> fs = fieldMapper.selectByTableCode(tableCode);
+            List<MetadataField> fs = fieldMapper.selectByTableCode(tableCode, "", true);
             String bc = fs.isEmpty() ? "" : (fs.get(0).getBusinessCode() != null ? fs.get(0).getBusinessCode() : "");
             MetadataTable t = tableMapper.selectByCode(tableCode, bc);
             phyCatalog = businessCatalogResolver.resolveCatalog(t);
@@ -707,7 +713,7 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
                     }
                 } else if (tableName != null) {
                     // 否则，通过表名查询表的业务系统编码
-                    List<MetadataTable> tables = tableMapper.selectAll(null);
+                    List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
                     for (MetadataTable t : tables) {
                         if (tableName.equalsIgnoreCase(codeGeneratorService.convertToTableName(t.getTableCode())) || 
                             tableName.equalsIgnoreCase(t.getTableCode())) {

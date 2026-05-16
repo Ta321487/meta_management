@@ -99,6 +99,7 @@ public final class AppErrorCodes {
     // ---------- SQL 工具 15xx ----------
     public static final int SQL_TEXT_EMPTY = 1501;
     public static final int SQL_EXECUTE_FAILED = 1502;
+    public static final int SQL_TARGET_CATALOG_REQUIRED = 1503;
 
     // ---------- 物理库登记 16xx ----------
     /** 物理库登记记录不存在 */

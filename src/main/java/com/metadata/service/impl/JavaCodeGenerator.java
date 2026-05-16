@@ -630,13 +630,13 @@ public class JavaCodeGenerator {
      * 生成认证扩展包（字符型验证码 + Session 登录）
      */
     public Map<String, String> generateAuthExtension(String packageName, boolean captchaEnabled) throws CodeGenException {
-        if (!captchaEnabled) {
-            return Map.of();
-        }
         Map<String, Object> data = new HashMap<>();
         data.put("packageName", packageName);
+        data.put("captchaEnabled", captchaEnabled);
         Map<String, String> files = new LinkedHashMap<>();
-        files.put("CaptchaService.java", templateManager.processTemplate("auth-extension/captcha-service.java.ftl", data));
+        if (captchaEnabled) {
+            files.put("CaptchaService.java", templateManager.processTemplate("auth-extension/captcha-service.java.ftl", data));
+        }
         files.put("AuthService.java", templateManager.processTemplate("auth-extension/auth-service.java.ftl", data));
         files.put("AuthServiceImpl.java", templateManager.processTemplate("auth-extension/auth-service-impl.java.ftl", data));
         files.put("AuthController.java", templateManager.processTemplate("auth-extension/auth-controller.java.ftl", data));

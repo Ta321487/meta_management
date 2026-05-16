@@ -38,14 +38,22 @@ public interface MetadataTableService {
     MetadataTable getByCode(String tableCode);
 
     /**
-     * 查询所有表
+     * 查询表列表。includeDisabled 为 true 时不按业务系统/物理库/表启用链路过滤（表管理页传 true）。
      */
-    List<MetadataTable> list(String tableName, String businessCode);
+    List<MetadataTable> list(String tableName, String businessCode, Boolean includeDisabled);
+
+    default List<MetadataTable> list(String tableName, String businessCode) {
+        return list(tableName, businessCode, null);
+    }
 
     /**
      * 分页查询表
      */
-    PageResult<MetadataTable> page(String tableName, String businessCode, PageRequest pageRequest);
+    PageResult<MetadataTable> page(String tableName, String businessCode, PageRequest pageRequest, Boolean includeDisabled);
+
+    default PageResult<MetadataTable> page(String tableName, String businessCode, PageRequest pageRequest) {
+        return page(tableName, businessCode, pageRequest, null);
+    }
 
     /**
      * 根据模块编码查询表
@@ -94,4 +102,9 @@ public interface MetadataTableService {
      * @return 含 created、skipped、failed 列表及计数的 Map，便于前端展示
      */
     Map<String, Object> ensureMissingPhysicalTables(String businessCode);
+
+    /**
+     * 将物理库中尚未登记到元数据的表导入（反向「补齐缺失物理表」）。
+     */
+    Map<String, Object> importMissingMetadataTables(String businessCode);
 }

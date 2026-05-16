@@ -34,6 +34,7 @@
         :code-map="codeMap"
         @refresh="handleRefresh"
         @copy="handleCopy"
+        @download="handleDownload"
       />
     </el-collapse-item>
   </el-collapse>

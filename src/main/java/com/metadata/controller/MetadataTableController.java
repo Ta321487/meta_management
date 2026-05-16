@@ -85,22 +85,24 @@ public class MetadataTableController {
      * 查询所有表
      */
     @GetMapping("/list")
-    @Operation(summary = "查询表列表", description = "查询表列表，支持分页和条件查询")
+    @Operation(summary = "查询表列表", description = "默认仅返回「业务系统启用 + 物理库登记启用或未登记 + 表启用」的表；表管理页传 includeDisabled=true 可查全部")
     public Result<?> list(
             @Parameter(description = "表名称") @RequestParam(required = false) String tableName,
             @Parameter(description = "业务系统") @RequestParam(required = false) String businessCode,
+            @Parameter(description = "为 true 时包含停用链路下的表（管理端）") @RequestParam(required = false) Boolean includeDisabled,
             @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
             @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
+        boolean inc = Boolean.TRUE.equals(includeDisabled);
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataTable> pageResult = tableService.page(tableName, businessCode, pageRequest);
+            PageResult<MetadataTable> pageResult = tableService.page(tableName, businessCode, pageRequest, inc);
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataTable> list = tableService.list(tableName, businessCode);
+        List<MetadataTable> list = tableService.list(tableName, businessCode, inc);
         return Result.success(list);
     }
 
@@ -147,6 +149,13 @@ public class MetadataTableController {
     public Result<Map<String, Object>> ensureMissingPhysicalTables(
             @Parameter(description = "业务系统编码") @RequestParam String businessCode) {
         return Result.success(tableService.ensureMissingPhysicalTables(businessCode));
+    }
+
+    @PostMapping("/importMissingMetadataTables")
+    @Operation(summary = "从物理库导入元数据", description = "扫描业务系统默认物理库，将尚未登记的表及字段写入元数据（SQL 执行建表后的补救）")
+    public Result<Map<String, Object>> importMissingMetadataTables(
+            @Parameter(description = "业务系统编码") @RequestParam String businessCode) {
+        return Result.success(tableService.importMissingMetadataTables(businessCode));
     }
 }
 

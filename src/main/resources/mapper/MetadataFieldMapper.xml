@@ -11,6 +11,7 @@
         <result column="label" property="label"/>
         <result column="is_required" property="isRequired"/>
         <result column="form_component" property="formComponent"/>
+        <result column="in_form" property="inForm"/>
         <result column="validate_rule" property="validateRule"/>
         <result column="sort" property="sort"/>
         <result column="is_enabled" property="isEnabled"/>
@@ -21,9 +22,9 @@
 
     <insert id="insert" parameterType="com.metadata.entity.MetadataField" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_field (field_code, table_code, field_name, field_type, label, 
-                                   is_required, form_component, validate_rule, sort, is_enabled, business_code)
+                                   is_required, form_component, in_form, validate_rule, sort, is_enabled, business_code)
         VALUES (#{fieldCode}, #{tableCode}, #{fieldName}, #{fieldType}, #{label},
-                #{isRequired}, #{formComponent}, #{validateRule}, #{sort}, #{isEnabled, jdbcType=INTEGER}, #{businessCode, jdbcType=VARCHAR})
+                #{isRequired}, #{formComponent}, #{inForm, jdbcType=INTEGER}, #{validateRule}, #{sort}, #{isEnabled, jdbcType=INTEGER}, #{businessCode, jdbcType=VARCHAR})
     </insert>
 
     <update id="update" parameterType="com.metadata.entity.MetadataField">
@@ -34,6 +35,7 @@
             label = #{label, jdbcType=VARCHAR},
             is_required = #{isRequired, jdbcType=INTEGER},
             form_component = #{formComponent, jdbcType=VARCHAR},
+            in_form = #{inForm, jdbcType=INTEGER},
             validate_rule = #{validateRule, jdbcType=VARCHAR},
             sort = #{sort, jdbcType=INTEGER},
             is_enabled = #{isEnabled, jdbcType=INTEGER},
@@ -69,12 +71,34 @@
     </select>
 
     <select id="selectByTableCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_field 
-        WHERE table_code = #{tableCode}
-        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
-            AND business_code = #{businessCode}
-        </if>
-        ORDER BY sort ASC, create_time ASC
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT * FROM metadata_field
+                WHERE table_code = #{tableCode}
+                <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
+                    AND business_code = #{businessCode}
+                </if>
+                ORDER BY sort ASC, create_time ASC
+            </when>
+            <otherwise>
+                SELECT f.* FROM metadata_field f
+                INNER JOIN metadata_table t ON f.table_code = t.table_code
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                WHERE f.table_code = #{tableCode}
+                  AND bs.is_enabled = 1
+                  AND t.is_enabled = 1
+                  AND f.is_enabled = 1
+                  AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
+                    AND f.business_code = #{businessCode}
+                </if>
+                ORDER BY f.sort ASC, f.create_time ASC
+            </otherwise>
+        </choose>
     </select>
 
     <select id="countByCode" resultType="int">
@@ -86,20 +110,64 @@
     </select>
 
     <select id="countByTableCode" resultType="Long">
-        SELECT COUNT(*) FROM metadata_field WHERE table_code = #{tableCode}
-        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
-            AND business_code = #{businessCode}
-        </if>
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT COUNT(*) FROM metadata_field WHERE table_code = #{tableCode}
+                <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
+                    AND business_code = #{businessCode}
+                </if>
+            </when>
+            <otherwise>
+                SELECT COUNT(*) FROM metadata_field f
+                INNER JOIN metadata_table t ON f.table_code = t.table_code
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                WHERE f.table_code = #{tableCode}
+                  AND bs.is_enabled = 1
+                  AND t.is_enabled = 1
+                  AND f.is_enabled = 1
+                  AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
+                    AND f.business_code = #{businessCode}
+                </if>
+            </otherwise>
+        </choose>
     </select>
 
     <select id="selectPageByTableCode" resultMap="BaseResultMap">
-        SELECT * FROM metadata_field 
-        WHERE table_code = #{tableCode}
-        <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
-            AND business_code = #{businessCode}
-        </if>
-        ORDER BY sort ASC, create_time ASC
-        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+        <choose>
+            <when test="includeDisabled != null and includeDisabled == true">
+                SELECT * FROM metadata_field
+                WHERE table_code = #{tableCode}
+                <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
+                    AND business_code = #{businessCode}
+                </if>
+                ORDER BY sort ASC, create_time ASC
+                LIMIT #{pageRequest.offset}, #{pageRequest.size}
+            </when>
+            <otherwise>
+                SELECT f.* FROM metadata_field f
+                INNER JOIN metadata_table t ON f.table_code = t.table_code
+                INNER JOIN metadata_business_system bs ON t.business_code = bs.business_code
+                LEFT JOIN metadata_physical_database pdb ON (
+                    NULLIF(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))), '') IS NOT NULL
+                    AND LOWER(TRIM(pdb.catalog_name)) = LOWER(TRIM(COALESCE(NULLIF(TRIM(t.database_name), ''), NULLIF(TRIM(bs.database_name), ''))))
+                )
+                WHERE f.table_code = #{tableCode}
+                  AND bs.is_enabled = 1
+                  AND t.is_enabled = 1
+                  AND f.is_enabled = 1
+                  AND (pdb.id IS NULL OR pdb.is_enabled = 1)
+                <if test="businessCode != null and businessCode != '' and businessCode != 'null'">
+                    AND f.business_code = #{businessCode}
+                </if>
+                ORDER BY f.sort ASC, f.create_time ASC
+                LIMIT #{pageRequest.offset}, #{pageRequest.size}
+            </otherwise>
+        </choose>
     </select>
 
     <!-- 获取表的约束级别 -->

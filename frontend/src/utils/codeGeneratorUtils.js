@@ -101,7 +101,9 @@ export function getFileName(codeType, tableCode) {
     pomXml: 'pom.xml',
     result: 'Result.java',
     pageRequest: 'PageRequest.java',
-    pageResult: 'PageResult.java'
+    pageResult: 'PageResult.java',
+    readme: 'README.md',
+    envExample: '.env.example'
   };
   
   return fileNameMap[codeType] || `${codeType}.txt`;
@@ -154,6 +156,8 @@ export function applyGeneratedCodeBundle(codeMap, bundle) {
   codeMap.api = bundle.apiJs || ''
   codeMap.requestJs = bundle.requestJs || ''
   codeMap.env = bundle.envFile || ''
+  codeMap.readme = bundle.readmeMd || ''
+  codeMap.envExample = bundle.envExample || ''
   codeMap.application = bundle.applicationJava || ''
   codeMap.applicationYml = bundle.applicationYml || ''
   codeMap.mybatisConfig = bundle.myBatisConfigJava || ''

@@ -3,6 +3,21 @@
 > 约定：业务系统编码 **`DEMO_ERP`**；物理库名 **`demo_erp`**；包名 **`com.demo.erp`**。  
 > 登录：用户名 **`admin`**，密码 **`123456`**（若库中已修改，以实际为准）。
 
+### 已有数据库升级（跟本剧本前）
+
+若库由**旧版** `init.sql` 初始化、尚未包含下列列，请在 MySQL 中执行仓库内脚本（无则跳过；以执行报错为准）：
+
+| 脚本 | 作用 |
+|------|------|
+| `database/alter_business_system_is_enabled.sql` | 业务系统增加 `is_enabled`（启用/停用） |
+| `database/alter_metadata_field_in_form.sql` | 字段增加 `in_form`（是否参与表单录入） |
+
+**全新**按当前仓库 `database/init.sql` 建库可跳过上述脚本。
+
+### 启用链与界面（了解即可，不影响逐步点击）
+
+元数据按 **业务系统 → 物理库登记 → 表 → 字段** 逐级启用；**默认列表/下拉**只出现「整条链均为启用」的对象（便于业务侧选表、选库）。**各管理页**在加载列表时已带「含停用」参数，故跟剧本时**照常点界面即可**，无需手拼 `includeDisabled` 等查询参数。
+
 ---
 
 ## 目录
@@ -15,7 +30,7 @@
 6. [业务系统关联模块](#6-业务系统关联模块)
 7. [表管理](#7-表管理)
 8. [模块管理补全关联表](#8-模块管理补全关联表)
-9. [字段管理](#9-字段管理)
+9. [字段管理](#9-字段管理)（含「参与表单录入」与列表列「表单录入」）
 10. [表关联管理](#10-表关联管理)
 11. [功能节点管理](#11-功能节点管理)
 12. [业务规则管理](#12-业务规则管理)
@@ -114,11 +129,12 @@
 | 包名 `packageName` | `com.demo.erp` |
 | 默认物理库 `databaseName` | `demo_erp` |
 | 描述 `description` | `全链路模拟：主数据、销售、仓储、系统配置共八大表` |
+| 启用 `isEnabled` | 开（1） |
 | 是否默认 `isDefault` | 是（1） |
 
 ### 4.2 列表操作
 
-- 「编辑」核对后确定  
+- 「编辑」核对后确定（弹窗内可开关 **启用**：停用后，其它页面的表/字段下拉将不再出现该系统下的表，直至重新启用）  
 - 「设为默认」：已是默认则禁用可跳过  
 - 勿「删除」
 
@@ -238,8 +254,8 @@
 
 ### 表列表其它操作
 
-- 勾选 `mdm_customer`、`mdm_product` → 「批量分配业务系统」→ `DEMO_ERP`  
-- 对 `sys_dict`：「禁用」→「启用」  
+- 勾选 `mdm_customer`、`mdm_product` → 「批量分配业务系统」→ `DEMO_ERP`
+- 对 `sys_dict`：「禁用」→「启用」（验证启用链：禁用期间该表不会出现在模块挂表、代码生成选表等**业务侧**下拉中；表管理页仍可见）
 - 勿「批量删除」  
 
 ---
@@ -254,13 +270,23 @@
 
 **前提**：业务系统选 `演示ERP业务系统`；表下拉依次切换；每张表 **6** 条字段。
 
+### 9.0 「参与表单录入」在系统里做什么（不是可删功能）
+
+- **系统需要**：元数据用该开关区分两类字段——**要在新增/编辑页里出现表单项、并进入 Vue 表单页预览/生成**的字段，与**只在列表里展示、或由系统生成而不让用户在表单里填**的字段（库字段 `in_form`，界面弹窗文案为 **「参与表单录入」**）。
+- **在界面上哪里看**  
+  - **列表**：字段表格有一列 **「表单录入」**，值为「是 / 否」（与 `in_form` 一致）。  
+  - **新增 / 编辑弹窗**：表单项区域上方有 **「参与表单录入」** 开关（默认 **开**）。主键行（`formComponent = primary_key`）不出现该开关。  
+  - 关为 **否** 时，弹窗会隐藏 **「表单组件」** 等与手工录入相关的配置（保存后 `form_component` 可为占位 `none`）。
+- **跟本剧本**：下面各表逐行录入时，**非主键字段保持「参与表单录入」为开即可**（与表格一致）；仅 **`mdm_customer` 表数据录完后的「（可选演示）」** 会刻意关一次，用于验证代码生成行为。
+
 **通用**：
 
 - 业务系统 `businessCode`：一律 `DEMO_ERP`  
 - 未单独说明的 `validateRule`：JSON 填 `{}`  
-- `id` 行：`isRequired` = 是，`formComponent` = `primary_key`  
+- `id` 行：`isRequired` = 是，`formComponent` = `primary_key`（主键行无「参与表单录入」开关，不参与手工录入）  
+- **参与表单录入**：表格中未单独写时均为 **开**（`in_form = 1`）。若某字段（如业务编码）由系统生成、**不在新增/编辑页出现表单项**，保存前关掉「参与表单录入」：界面会隐藏「表单组件」，库内 `in_form = 0` 且 `form_component` 存占位 `none`；**列表预览与列表代码生成仍可有该列**，仅表单预览 / Vue 表单页生成会排除该字段。
 
-列说明：**字段编码** | **字段名称** | **基础类型与参数** | **完整 fieldType** | **显示名** | **必填** | **表单组件** | **校验规则** | **排序**
+列说明：**字段编码** | **字段名称** | **基础类型与参数** | **完整 fieldType** | **显示名** | **必填** | **表单组件** | **校验规则** | **排序**（参与表单录入未列时默认 **开**）
 
 ### 表 `mdm_customer`
 
@@ -272,6 +298,8 @@
 | `MC_F_STATUS` | `status` | TINYINT | `TINYINT` | `状态` | 是 | `number` | `{"type":"number","min":0,"max":2,"message":"状态0草稿1生效2作废","trigger":"blur"}` | `30` |
 | `MC_F_REMARK` | `remark` | VARCHAR 512 | `VARCHAR(512)` | `备注` | 否 | `textarea` | `{}` | `40` |
 | `MC_F_CT` | `create_time` | DATETIME | `DATETIME` | `创建时间` | 否 | `datepicker` | `{}` | `50` |
+
+**（可选演示）** 全部保存后，编辑 `MC_F_CODE`（客户编码）：关闭「参与表单录入」再保存 → 再打开「代码生成」中该表的 **Vue 表单页预览**，应不再出现客户编码输入项；**Vue 列表页预览**仍可有「客户编码」列。
 
 ### 表 `mdm_product`
 
@@ -592,6 +620,8 @@
 
 ### 规则 2 — 模块 MDM
 
+| 字段 | 值 |
+|------|-----|
 | 规则编码 | `RULE_MDM_SEARCH_001` |
 | 规则类型 | `SEARCH_RULE` |
 | 规则内容 | `{"defaultFields":["customer_code","customer_name","status"],"allowFuzzy":["customer_name"],"maxConditions":8}` |
@@ -599,6 +629,8 @@
 
 ### 规则 3 — 模块 SALES
 
+| 字段 | 值 |
+|------|-----|
 | 规则编码 | `RULE_SALES_DISP_001` |
 | 规则类型 | `DISPLAY_RULE` |
 | 规则内容 | `{"listColumns":["order_no","customer_id","order_status","create_time"],"formSections":[{"title":"基本信息","fields":["order_no","customer_id"]},{"title":"状态","fields":["order_status"]}]}` |
@@ -606,6 +638,8 @@
 
 ### 规则 4 — 模块 SALES
 
+| 字段 | 值 |
+|------|-----|
 | 规则编码 | `RULE_SALES_PROC_001` |
 | 规则类型 | `PROCESS_RULE` |
 | 规则内容 | `{"states":["DRAFT","CONFIRMED","CANCELLED"],"transitions":[{"from":"DRAFT","to":"CONFIRMED","label":"确认"},{"from":"DRAFT","to":"CANCELLED","label":"作废"},{"from":"CONFIRMED","to":"CANCELLED","label":"关闭"}]}` |
@@ -613,6 +647,8 @@
 
 ### 规则 5 — 模块 WH
 
+| 字段 | 值 |
+|------|-----|
 | 规则编码 | `RULE_WH_RPT_001` |
 | 规则类型 | `REPORT_RULE` |
 | 规则内容 | `{"datasetTable":"wh_stock","dimensions":["warehouse_id","product_id"],"metrics":[{"name":"sum_on_hand","expr":"SUM(qty_on_hand)"},{"name":"sum_locked","expr":"SUM(qty_locked)"}],"filters":[{"field":"qty_on_hand","op":">","value":0}]}` |
@@ -620,6 +656,8 @@
 
 ### 规则 6 — 模块 CFG
 
+| 字段 | 值 |
+|------|-----|
 | 规则编码 | `RULE_CFG_BATCH_001` |
 | 规则类型 | `BATCH_RULE` |
 | 规则内容 | `{"maxBatchSize":500,"idempotent":true,"onError":"STOP","allowedOps":["INSERT","UPDATE"]}` |
@@ -771,10 +809,15 @@ SELECT * FROM table_that_does_not_exist_for_error_test_xyz;
 ## 14. 代码生成
 
 1. 业务系统：`演示ERP业务系统`（`DEMO_ERP`）  
-2. **选择表**：先清空  
+2. **选择表**：先清空（下拉中仅展示 **启用链完整** 的表；若某表被禁用或上级业务系统/物理库停用，将不可选）  
 3. 包名只读：`com.demo.erp`  
 4. 「接口 + 实现类」先 **关**（传统 Service）  
 5. 点「生成代码」  
+
+**与字段「参与表单录入」的关系**：
+
+- **Vue 表单页**（含预览）：只生成 **参与表单录入 = 开** 的字段表单项；已关闭的字段（如业务编码）不会出现。  
+- **Vue 列表页**：仍按列展示主数据（含编码等列），与「仅控制是否录入」一致。  
 
 ### 折叠「Java相关」— 依次打开标签
 
@@ -850,6 +893,7 @@ SELECT * FROM table_that_does_not_exist_for_error_test_xyz;
 
 | 项 | 数量/要求 |
 |----|-----------|
+| 已有库升级脚本（若适用） | `alter_business_system_is_enabled`、`alter_metadata_field_in_form` 已执行 |
 | 物理库登记 | 1 |
 | 模块类型 | 3 |
 | 业务系统 | 1 + 关联 4 模块 |

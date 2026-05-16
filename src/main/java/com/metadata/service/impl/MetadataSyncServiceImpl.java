@@ -67,23 +67,31 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         return matchedTableName;
     }
     
-    /**
-     * 同步数据库表字段到元数据系统
-     */
     @Override
     public void syncTableFields(String tableName, Connection connection) throws Exception {
+        syncTableFields(tableName, connection, null, null);
+    }
+
+    /**
+     * 同步数据库表字段到元数据系统（必须在表所在的物理库连接上执行）
+     */
+    @Override
+    public void syncTableFields(String tableName, Connection connection, String businessCode, String databaseName) throws Exception {
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_START, "开始同步表字段: " + tableName);
-        // 使用新的连接，确保能看到最新的表结构
-        try (Connection newConnection = dataSource.getConnection()) {
-            DatabaseMetaData metaData = newConnection.getMetaData();
-            String catalog = newConnection.getCatalog();
-            String schema = newConnection.getSchema();
+        if (connection == null) {
+            throw new IllegalArgumentException("connection 不能为空");
+        }
+        DatabaseMetaData metaData = connection.getMetaData();
+        String catalog = org.springframework.util.StringUtils.hasText(databaseName)
+                ? databaseName.trim()
+                : connection.getCatalog();
+        String schema = connection.getSchema();
         
         // 查找对应的表编码（通过表名匹配，表名可能是表编码或实际表名）
         MetadataTable table = tableMapper.selectByCode(tableName.toUpperCase());
         if (table == null) {
             // 如果表编码不存在，尝试通过表名查找
-            List<MetadataTable> tables = tableMapper.selectAll(null);
+            List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
             for (MetadataTable t : tables) {
                 // 如果表名就是表编码，或者有其他映射关系
                 if (tableName.equalsIgnoreCase(t.getTableCode()) || 
@@ -115,8 +123,9 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 // 使用PreparedStatement防止SQL注入，表名使用反引号包裹
                 try (PreparedStatement pstmt = connection.prepareStatement(
                          "SELECT TABLE_COMMENT FROM information_schema.TABLES " +
-                         "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?")) {
-                    pstmt.setString(1, tableName);
+                         "WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?")) {
+                    pstmt.setString(1, catalog);
+                    pstmt.setString(2, tableName);
                     try (ResultSet rs = pstmt.executeQuery()) {
                         if (rs.next()) {
                             tableComment = rs.getString("TABLE_COMMENT");
@@ -153,8 +162,14 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 table.setTableName(tableComment != null && !tableComment.isEmpty() ? tableComment : tableName);
                 table.setPkStrategy(pkStrategy);
                 table.setDescription(tableComment);
-                table.setIsEnabled(1); // 设置默认启用状态
-                table.setBusinessCode("DEFAULT"); // 设置默认业务系统编码
+                table.setIsEnabled(1);
+                table.setBusinessCode(org.springframework.util.StringUtils.hasText(businessCode)
+                        ? businessCode.trim() : "DEFAULT");
+                if (org.springframework.util.StringUtils.hasText(databaseName)) {
+                    table.setDatabaseName(databaseName.trim());
+                } else if (org.springframework.util.StringUtils.hasText(catalog)) {
+                    table.setDatabaseName(catalog);
+                }
                 tableMapper.insert(table);
                 tableCreated = true;
                 
@@ -188,7 +203,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         
         // 使用 SHOW COLUMNS 获取表结构（直接查询数据库，确保获取最新字段信息）
         Map<String, MetadataField> physicalFields = new HashMap<>();
-        try (Statement stmt = newConnection.createStatement()) {
+        try (Statement stmt = connection.createStatement()) {
             String columnsSql = "SHOW FULL COLUMNS FROM `" + tableName + "`";
             ResultSet columns = stmt.executeQuery(columnsSql);
             int sort = 0;
@@ -256,10 +271,12 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                     field.setFormComponent("primary_key"); // 主键字段使用primary_key表单组件
                     // 所有主键在数据库层面都是必填的（NOT NULL）
                     field.setIsRequired(1);
+                    field.setInForm(1);
                 } else {
                     // 普通字段：根据字段类型设置表单组件和必填状态
                     field.setIsRequired("NO".equalsIgnoreCase(nullableStr) ? 1 : 0);
                     field.setFormComponent(getDefaultFormComponent(fieldType));
+                    field.setInForm(1);
                 }
                 
                 // 处理ENUM类型的校验规则
@@ -293,7 +310,10 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 
                 field.setSort(sort++);
                 field.setIsEnabled(1);
-                
+                if (field.getInForm() == null) {
+                    field.setInForm(1);
+                }
+
                 physicalFields.put(fieldCode, field);
             }
         }
@@ -304,8 +324,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
             logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "开始获取表CHECK约束: " + tableName);
             
             // 1. 直接使用SHOW CREATE TABLE获取表结构，这是最可靠的方式
-            try (Connection conn = dataSource.getConnection();
-                 Statement stmt = conn.createStatement()) {
+            try (Statement stmt = connection.createStatement()) {
                 String showCreateSql = "SHOW CREATE TABLE `" + tableName + "`";
                 logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "执行SQL: " + showCreateSql);
                 ResultSet rs = stmt.executeQuery(showCreateSql);
@@ -320,19 +339,18 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 logService.logError("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "使用SHOW CREATE TABLE获取CHECK约束失败", e.getMessage());
                 
                 // 2. 尝试从information_schema.CHECK_CONSTRAINTS表查询（MySQL 8.0+）
-                try (Connection conn = dataSource.getConnection();
-                     Statement stmt = conn.createStatement()) {
-                    // MySQL 8.0中CHECK_CONSTRAINTS表的查询方式，需要关联TABLE_CONSTRAINTS表获取TABLE_NAME
-                    String checkSql = "SELECT cc.CONSTRAINT_NAME, cc.CHECK_CLAUSE " +
-                                     "FROM information_schema.CHECK_CONSTRAINTS cc " +
-                                     "JOIN information_schema.TABLE_CONSTRAINTS tc " +
-                                     "ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA " +
-                                     "AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME " +
-                                     "WHERE cc.CONSTRAINT_SCHEMA = '" + schema + "' " +
-                                     "AND tc.TABLE_NAME = '" + tableName + "' " +
-                                     "AND tc.CONSTRAINT_TYPE = '" + SqlConstants.CONSTRAINT_TYPE_CHECK + "'";
-                    logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "执行SQL: " + checkSql);
-                    ResultSet rs = stmt.executeQuery(checkSql);
+                try (PreparedStatement checkPstmt = connection.prepareStatement(
+                        "SELECT cc.CONSTRAINT_NAME, cc.CHECK_CLAUSE "
+                                + "FROM information_schema.CHECK_CONSTRAINTS cc "
+                                + "JOIN information_schema.TABLE_CONSTRAINTS tc "
+                                + "ON cc.CONSTRAINT_SCHEMA = tc.CONSTRAINT_SCHEMA "
+                                + "AND cc.CONSTRAINT_NAME = tc.CONSTRAINT_NAME "
+                                + "WHERE cc.CONSTRAINT_SCHEMA = ? AND tc.TABLE_NAME = ? "
+                                + "AND tc.CONSTRAINT_TYPE = ?")) {
+                    checkPstmt.setString(1, catalog);
+                    checkPstmt.setString(2, tableName);
+                    checkPstmt.setString(3, SqlConstants.CONSTRAINT_TYPE_CHECK);
+                    ResultSet rs = checkPstmt.executeQuery();
                     while (rs.next()) {
                         // 移除未使用的变量 constraintName
                         String checkClause = rs.getString("CHECK_CLAUSE");
@@ -360,7 +378,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "总共获取到" + checkConstraints.size() + "个CHECK约束: " + checkConstraints);
         
         // 获取现有字段
-        List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode);
+        List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode, "", true);
         Map<String, MetadataField> existingFieldMap = new HashMap<>();
             for (MetadataField field : existingFields) {
             // 将现有字段的fieldCode转换为大写，确保统一的大小写规则
@@ -583,7 +601,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         
         // 3. 为ENUM类型字段生成CHECK约束
         // 遍历所有已保存的字段，为ENUM类型且有校验规则的字段生成CHECK约束
-        List<MetadataField> savedFields = fieldMapper.selectByTableCode(tableCode);
+        List<MetadataField> savedFields = fieldMapper.selectByTableCode(tableCode, "", true);
         for (MetadataField field : savedFields) {
             // 检查字段类型是否为ENUM，且是否有校验规则
             if (field.getFieldType() != null && field.getFieldType().toUpperCase().startsWith("ENUM") &&
@@ -603,7 +621,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                             
                             // 先删除旧的CHECK约束（如果存在）
                             String dropSql = "ALTER TABLE `" + physicalTableName + "` DROP CHECK `" + constraintName + "`";
-                            try (Statement stmt = newConnection.createStatement()) {
+                            try (Statement stmt = connection.createStatement()) {
                                 try {
                                     stmt.execute(dropSql);
                                     logService.logSuccess("admin", SqlConstants.LOG_MODULE_GET_CHECK_CONSTRAINTS, "删除旧CHECK约束: " + constraintName);
@@ -627,7 +645,6 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         }
         
         logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_END, "表字段同步完成: " + tableName);
-        }
     }
     
     /**
@@ -673,7 +690,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         MetadataTable table = tableMapper.selectByCode(tableName.toUpperCase());
         if (table == null) {
             // 如果表编码不存在，尝试通过表名查找
-            List<MetadataTable> tables = tableMapper.selectAll(null);
+            List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
             for (MetadataTable t : tables) {
                 if (tableName.equalsIgnoreCase(t.getTableCode()) || 
                     tableName.equalsIgnoreCase(t.getTableName())) {
@@ -702,7 +719,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 MetadataTable mainTable = tableMapper.selectByCode(pkTableName.toUpperCase());
                 if (mainTable == null) {
                     // 尝试通过表名查找
-                    List<MetadataTable> tables = tableMapper.selectAll(null);
+                    List<MetadataTable> tables = tableMapper.selectAll(null, null, true);
                     for (MetadataTable t : tables) {
                         if (pkTableName.equalsIgnoreCase(t.getTableCode()) || 
                             pkTableName.equalsIgnoreCase(t.getTableName())) {
@@ -723,7 +740,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 MetadataField mainField = fieldMapper.selectByCode(mainTableCode, pkColumnName.toUpperCase());
                 if (mainField == null) {
                     // 尝试通过字段名查找
-                    List<MetadataField> fields = fieldMapper.selectByTableCode(mainTableCode);
+                    List<MetadataField> fields = fieldMapper.selectByTableCode(mainTableCode, "", true);
                     for (MetadataField f : fields) {
                         if (pkColumnName.equalsIgnoreCase(f.getFieldName())) {
                             mainField = f;
@@ -741,7 +758,7 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 MetadataField slaveField = fieldMapper.selectByCode(slaveTableCode, fkColumnName.toUpperCase());
                 if (slaveField == null) {
                     // 尝试通过字段名查找
-                    List<MetadataField> fields = fieldMapper.selectByTableCode(slaveTableCode);
+                    List<MetadataField> fields = fieldMapper.selectByTableCode(slaveTableCode, "", true);
                     for (MetadataField f : fields) {
                         if (fkColumnName.equalsIgnoreCase(f.getFieldName())) {
                             slaveField = f;

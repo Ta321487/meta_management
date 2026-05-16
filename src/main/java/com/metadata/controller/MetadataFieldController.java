@@ -74,21 +74,25 @@ public class MetadataFieldController {
      * 查询表的所有字段（支持分页）
      */
     @GetMapping("/list/{tableCode}")
-    @Operation(summary = "查询字段列表", description = "根据表编码查询字段列表，支持分页")
+    @Operation(summary = "查询字段列表", description = "默认仅返回上级启用链路下的启用字段；字段管理传 includeDisabled=true 可查全部")
     public Result<?> listByTableCode(
             @Parameter(description = "表编码") @PathVariable String tableCode,
+            @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode,
+            @Parameter(description = "为 true 时包含停用字段及停用上级下的字段（管理端）") @RequestParam(required = false) Boolean includeDisabled,
             @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
             @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
+        boolean inc = Boolean.TRUE.equals(includeDisabled);
+        String bc = businessCode != null ? businessCode : "";
         // 如果传入了分页参数，使用分页查询
         if (current != null && size != null) {
             PageRequest pageRequest = new PageRequest();
             pageRequest.setCurrent(current);
             pageRequest.setSize(size);
-            PageResult<MetadataField> pageResult = fieldService.pageByTableCode(tableCode, pageRequest);
+            PageResult<MetadataField> pageResult = fieldService.pageByTableCode(tableCode, bc, pageRequest, inc);
             return Result.success(pageResult);
         }
         // 否则使用非分页查询（兼容旧接口）
-        List<MetadataField> list = fieldService.listByTableCode(tableCode);
+        List<MetadataField> list = fieldService.listByTableCode(tableCode, bc, inc);
         return Result.success(list);
     }
 

@@ -6,11 +6,13 @@ import com.metadata.common.PageResult;
 import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.exception.BizException;
 import com.metadata.entity.MetadataField;
+import com.metadata.entity.MetadataPhysicalDatabase;
 import com.metadata.entity.MetadataTable;
 import com.metadata.entity.MetadataTableRelation;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.mapper.MetadataFieldMapper;
 import com.metadata.mapper.MetadataModuleTableMapper;
+import com.metadata.mapper.MetadataPhysicalDatabaseMapper;
 import com.metadata.mapper.MetadataTableMapper;
 import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.*;
@@ -69,7 +71,13 @@ public class MetadataTableServiceImpl implements MetadataTableService {
     private MetadataTableRelationMapper relationMapper;
 
     @Autowired
+    private MetadataPhysicalDatabaseMapper physicalDatabaseMapper;
+
+    @Autowired
     private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
+    @Autowired
+    private MetadataSyncService metadataSyncService;
 
     /**
      * 新增表
@@ -87,11 +95,20 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (table.getBusinessCode() == null || table.getBusinessCode().isEmpty()) {
             table.setBusinessCode("DEFAULT");
         }
-        // 表级未指定物理库时，继承业务系统默认库名
         MetadataBusinessSystem businessSystem = businessSystemService.getByCode(table.getBusinessCode());
+        if (businessSystem != null && businessSystem.getIsEnabled() != null && businessSystem.getIsEnabled() == 0) {
+            throw BizException.badRequest("业务系统已停用，无法新增表");
+        }
+        // 表级未指定物理库时，继承业务系统默认库名
         if (businessSystem != null && (table.getDatabaseName() == null || table.getDatabaseName().trim().isEmpty())
                 && businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
             table.setDatabaseName(businessSystem.getDatabaseName().trim());
+        }
+        if (table.getDatabaseName() != null && StringUtils.hasText(table.getDatabaseName())) {
+            MetadataPhysicalDatabase pdb = physicalDatabaseMapper.selectByCatalogName(table.getDatabaseName().trim());
+            if (pdb != null && pdb.getIsEnabled() != null && pdb.getIsEnabled() == 0) {
+                throw BizException.badRequest("物理库登记已停用，无法在该库下新增表");
+            }
         }
         // 先创建元数据记录
         tableMapper.insert(table);
@@ -261,17 +278,17 @@ public class MetadataTableServiceImpl implements MetadataTableService {
      * 查询所有表
      */
     @Override
-    public List<MetadataTable> list(String tableName, String businessCode) {
-        return tableMapper.selectAll(tableName, businessCode);
+    public List<MetadataTable> list(String tableName, String businessCode, Boolean includeDisabled) {
+        return tableMapper.selectAll(tableName, businessCode, includeDisabled);
     }
 
     /**
      * 分页查询表
      */
     @Override
-    public PageResult<MetadataTable> page(String tableName, String businessCode, PageRequest pageRequest) {
-        Long total = tableMapper.count(tableName, businessCode);
-        List<MetadataTable> records = tableMapper.selectPage(tableName, businessCode, pageRequest);
+    public PageResult<MetadataTable> page(String tableName, String businessCode, PageRequest pageRequest, Boolean includeDisabled) {
+        Long total = tableMapper.count(tableName, businessCode, includeDisabled);
+        List<MetadataTable> records = tableMapper.selectPage(tableName, businessCode, pageRequest, includeDisabled);
         return new PageResult<>(total, records);
     }
 
@@ -307,8 +324,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             for (MetadataTableRelation relation : mainRelations) {
                 String slaveTableCode = relation.getSlaveTableCode();
                 if (!tableCodeSet.contains(slaveTableCode)) {
-                    // 传递业务系统编码，确保只返回当前业务系统的表
-                    MetadataTable slaveTable = tableMapper.selectByCode(slaveTableCode, businessCode);
+                    List<MetadataTable> slaveRows = tableMapper.selectByCodes(Collections.singletonList(slaveTableCode), businessCode, false);
+                    MetadataTable slaveTable = slaveRows.isEmpty() ? null : slaveRows.get(0);
                     if (slaveTable != null) {
                         allTables.add(slaveTable);
                         tableCodeSet.add(slaveTableCode);
@@ -321,8 +338,8 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             for (MetadataTableRelation relation : slaveRelations) {
                 String mainTableCode = relation.getMainTableCode();
                 if (!tableCodeSet.contains(mainTableCode)) {
-                    // 传递业务系统编码，确保只返回当前业务系统的表
-                    MetadataTable mainTable = tableMapper.selectByCode(mainTableCode, businessCode);
+                    List<MetadataTable> mainRows = tableMapper.selectByCodes(Collections.singletonList(mainTableCode), businessCode, false);
+                    MetadataTable mainTable = mainRows.isEmpty() ? null : mainRows.get(0);
                     if (mainTable != null) {
                         allTables.add(mainTable);
                         tableCodeSet.add(mainTableCode);
@@ -346,8 +363,14 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, "表不存在");
         }
 
-        // 更新表的业务系统
         table.setBusinessCode(businessCode);
+        if (StringUtils.hasText(businessCode)) {
+            MetadataBusinessSystem bs = businessSystemService.getByCode(businessCode);
+            if (bs != null && StringUtils.hasText(bs.getDatabaseName())
+                    && !StringUtils.hasText(table.getDatabaseName())) {
+                table.setDatabaseName(bs.getDatabaseName().trim());
+            }
+        }
         tableMapper.update(table);
 
         // 更新表关联的所有字段的业务系统
@@ -385,7 +408,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (tableCodes == null || tableCodes.isEmpty()) {
             return List.of();
         }
-        return tableMapper.selectByCodes(tableCodes);
+        return tableMapper.selectByCodes(tableCodes, "", false);
     }
 
     /**
@@ -413,7 +436,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (!StringUtils.hasText(businessCode)) {
             throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "业务系统编码不能为空");
         }
-        List<MetadataTable> tables = tableMapper.selectAll(null, businessCode);
+        List<MetadataTable> tables = tableMapper.selectAll(null, businessCode, false);
         if (tables == null) {
             tables = Collections.emptyList();
         }
@@ -468,11 +491,114 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         return out;
     }
 
+    @Override
+    public Map<String, Object> importMissingMetadataTables(String businessCode) {
+        if (!StringUtils.hasText(businessCode)) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "业务系统编码不能为空");
+        }
+        MetadataBusinessSystem bs = businessSystemService.getByCode(businessCode.trim());
+        if (bs == null) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "业务系统不存在: " + businessCode);
+        }
+        String catalog = businessCatalogResolver.resolveCatalogForBusiness(bs);
+        if (!StringUtils.hasText(catalog)) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID,
+                    "请先在业务系统中配置默认物理库名，或在「库管理」登记该库");
+        }
+        catalog = catalog.trim();
+        if (!mySqlPhysicalCatalogService.isValidCatalogName(catalog)) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "物理库名不合法: " + catalog);
+        }
+
+        List<String> imported = new ArrayList<>();
+        List<String> skipped = new ArrayList<>();
+        List<Map<String, String>> failed = new ArrayList<>();
+
+        try (Connection conn = businessDataSourcePoolManager.getConnection(catalog)) {
+            List<String> physicalTables = listPhysicalTables(conn, catalog);
+            for (String physicalName : physicalTables) {
+                MetadataTable existing = findMetadataTableByPhysicalName(businessCode, physicalName);
+                if (existing != null) {
+                    Long fieldCount = fieldMapper.countByTableCode(existing.getTableCode(), businessCode, true);
+                    if (fieldCount != null && fieldCount > 0) {
+                        skipped.add(physicalName + "（元数据已登记）");
+                        continue;
+                    }
+                    try {
+                        metadataSyncService.syncTableFields(physicalName, conn, businessCode, catalog);
+                        metadataSyncService.syncTableForeignKeys(physicalName, conn);
+                        fieldMapper.updateFieldsBusinessSystemByTable(existing.getTableCode(), businessCode);
+                        imported.add(physicalName + "（补字段）");
+                        logService.logSuccess("admin", "IMPORT_METADATA_TABLE",
+                                "补同步字段: " + physicalName + " @ " + catalog);
+                    } catch (Exception e) {
+                        failed.add(singleFailRow(physicalName, e.getMessage()));
+                    }
+                    continue;
+                }
+                try {
+                    metadataSyncService.syncTableFields(physicalName, conn, businessCode, catalog);
+                    metadataSyncService.syncTableForeignKeys(physicalName, conn);
+                    imported.add(physicalName);
+                    logService.logSuccess("admin", "IMPORT_METADATA_TABLE",
+                            "从物理库导入元数据表: " + physicalName + " @ " + catalog);
+                } catch (Exception e) {
+                    failed.add(singleFailRow(physicalName, e.getMessage()));
+                    logService.logError("admin", "IMPORT_METADATA_TABLE",
+                            "导入失败: " + physicalName, e.getMessage());
+                }
+            }
+        } catch (SQLException e) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "连接物理库失败: " + e.getMessage());
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("imported", imported);
+        out.put("skipped", skipped);
+        out.put("failed", failed);
+        out.put("importedCount", imported.size());
+        out.put("skippedCount", skipped.size());
+        out.put("failedCount", failed.size());
+        out.put("catalog", catalog);
+        return out;
+    }
+
+    private List<String> listPhysicalTables(Connection conn, String catalog) throws SQLException {
+        List<String> names = new ArrayList<>();
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT TABLE_NAME FROM information_schema.TABLES "
+                        + "WHERE TABLE_SCHEMA = ? AND TABLE_TYPE = 'BASE TABLE' ORDER BY TABLE_NAME")) {
+            ps.setString(1, catalog);
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    names.add(rs.getString(1));
+                }
+            }
+        }
+        return names;
+    }
+
+    private MetadataTable findMetadataTableByPhysicalName(String businessCode, String physicalTableName) {
+        List<MetadataTable> tables = tableMapper.selectAll(null, businessCode, true);
+        if (tables == null) {
+            return null;
+        }
+        for (MetadataTable t : tables) {
+            String physical = CodeGenUtils.convertToTableName(t.getTableCode());
+            if (physicalTableName.equalsIgnoreCase(physical)
+                    || physicalTableName.equalsIgnoreCase(t.getTableName())
+                    || physicalTableName.equalsIgnoreCase(t.getTableCode())) {
+                return t;
+            }
+        }
+        return null;
+    }
+
     /**
      * 若元数据表下没有任何字段，则按主键策略自动插入一条主键字段（与「新增表」行为一致），便于直接生成建表 SQL。
      */
     private void ensureDefaultPrimaryKeyFieldIfMissing(MetadataTable table) {
-        List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode());
+        List<MetadataField> fields = fieldMapper.selectByTableCode(table.getTableCode(), "", true);
         if (fields != null && !fields.isEmpty()) {
             return;
         }
@@ -505,6 +631,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
             primaryKeyField.setIsRequired(1);
         }
         primaryKeyField.setIsEnabled(1);
+        primaryKeyField.setInForm(0);
         String bc = table.getBusinessCode();
         if (bc == null || bc.isEmpty()) {
             bc = "DEFAULT";

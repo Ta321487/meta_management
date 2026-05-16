@@ -125,6 +125,19 @@
         @download="handleDownload"
       />
     </el-tab-pane>
+
+    <el-tab-pane label=".env.example" name="envExample">
+      <CodeContainer
+        code-type="envExample"
+        :code="codeMap.envExample"
+        :show-download="true"
+        :rows="12"
+        placeholder="生成当前表代码后将显示 .env.example（复制为 .env）"
+        @refresh="handleRefresh"
+        @copy="handleCopy"
+        @download="handleDownload"
+      />
+    </el-tab-pane>
   </el-tabs>
 </template>
 

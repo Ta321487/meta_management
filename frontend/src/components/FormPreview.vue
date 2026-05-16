@@ -208,10 +208,11 @@ const filteredFields = computed(() => {
   return props.fields.filter(field => {
     return field && 
            field.formComponent !== 'primary_key' && 
-           field.formComponent !== 'primary_key' && 
            field.fieldName !== 'uuid' &&
            field.fieldName !== 'create_time' &&
-           field.fieldName !== 'update_time';
+           field.fieldName !== 'update_time' &&
+           (field.inForm == null || field.inForm !== 0) &&
+           field.formComponent !== 'none';
   });
 });
 
@@ -228,6 +229,12 @@ const formRules = computed(() => {
   console.log(`[FormPreview] 开始计算formRules，字段数量:`, props.fields.length);
   const rules = {};
   props.fields.forEach(field => {
+    if (!field) {
+      return;
+    }
+    if (field.inForm === 0 || field.formComponent === 'none') {
+      return;
+    }
     console.log(`[FormPreview] 处理字段:`, field.fieldName, field);
     const propName = getFormFieldPropName(field);
     

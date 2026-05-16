@@ -160,6 +160,14 @@ public interface CodeGeneratorService {
      */
     Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface, boolean captchaEnabled) throws Exception;
 
+    /**
+     * 按业务系统打包完整项目 ZIP（全部启用表的 SQL、后端、可运行前端）。
+     *
+     * @param businessCode  业务系统编码（必填）
+     * @param packageName   Java 根包名；为空时取业务系统配置的 packageName
+     */
+    byte[] generateProjectZipByBusinessSystem(String businessCode, String packageName, boolean useInterface, boolean captchaEnabled) throws Exception;
+
     default Map<String, String> generateAll(String tableCode, String packageName, String businessCode, boolean useInterface) throws Exception {
         return generateAll(tableCode, packageName, businessCode, useInterface, false);
     }

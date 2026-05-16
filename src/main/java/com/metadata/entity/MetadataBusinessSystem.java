@@ -18,6 +18,10 @@ public class MetadataBusinessSystem {
      * 该业务系统默认的物理库名（MySQL schema），物理 DDL 默认落在此库。
      */
     private String databaseName;
+    /**
+     * 1 启用 0 停用；停用后业务侧接口不再返回该系统下表（管理端可 includeDisabled）。
+     */
+    private Integer isEnabled;
     private LocalDateTime createTime;
     private LocalDateTime updateTime;
 }

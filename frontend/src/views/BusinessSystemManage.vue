@@ -34,6 +34,13 @@
             </el-tag>
           </template>
         </el-table-column>
+        <el-table-column prop="isEnabled" label="启用" width="90">
+          <template #default="{ row }">
+            <el-tag :type="row.isEnabled === 1 ? 'success' : 'info'">
+              {{ row.isEnabled === 1 ? '是' : '否' }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <el-table-column prop="createTime" label="创建时间" width="120">
           <template #default="{ row }">
             {{ formatDate(row.createTime) }}
@@ -115,6 +122,9 @@
         </el-form-item>
         <el-form-item label="描述" prop="description">
           <el-input v-model="form.description" type="textarea" :rows="3" placeholder="请输入业务系统描述" />
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="form.isEnabled" :active-value="1" :inactive-value="0" />
         </el-form-item>
         <el-form-item label="是否默认">
           <el-switch v-model="form.isDefault" :active-value="1" :inactive-value="0" />
@@ -213,7 +223,8 @@ export default {
       packageName: '',
       databaseName: '',
       description: '',
-      isDefault: 0
+      isDefault: 0,
+      isEnabled: 1
     })
     
     // 表单验证规则
@@ -253,7 +264,7 @@ export default {
 
     const loadPhysicalCatalogs = async () => {
       try {
-        const res = await getPhysicalDatabaseList()
+        const res = await getPhysicalDatabaseList({ includeDisabled: true })
         if (res.code === 200) {
           physicalDbRows.value = res.data || []
         }
@@ -266,7 +277,7 @@ export default {
     const loadData = async () => {
       loading.value = true
       try {
-        const res = await getBusinessSystemList()
+        const res = await getBusinessSystemList({ includeDisabled: true })
         if (res.code === 200) {
           // 在前端根据搜索条件过滤数据
           let filteredData = res.data
@@ -328,6 +339,7 @@ export default {
       form.databaseName = ''
       form.description = ''
       form.isDefault = 0
+      form.isEnabled = 1
       syncAfterSave.value = false
     }
     
@@ -344,6 +356,7 @@ export default {
       form.databaseName = row.databaseName && String(row.databaseName).trim() !== '' ? row.databaseName : ''
       form.description = row.description
       form.isDefault = row.isDefault
+      form.isEnabled = row.isEnabled != null ? row.isEnabled : 1
     }
 
     // 设为默认

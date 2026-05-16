@@ -26,6 +26,8 @@ public final class ApiMessages {
 
     public static final String SQL_REQUIRED = "SQL语句不能为空";
 
+    public static final String SQL_TARGET_CATALOG_REQUIRED = "请先选择目标数据库";
+
     public static final String SQL_EXECUTE_FAILED = "执行失败";
 
     public static final String SQL_EXECUTE_ERROR_PREFIX = "SQL执行失败: ";

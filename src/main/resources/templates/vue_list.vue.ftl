@@ -7,22 +7,22 @@
 </#function>
 
 <template>
-  <div class="${componentName?lower_case}-list">
-    <el-card>
-      <template #header>
-        <div class="card-header">
-          <span>${table.tableName}</span>
-          <div>
-            <el-button type="danger" :disabled="multipleSelection.length === 0" @click="handleBatchDelete" style="margin-right: 10px">
-              批量删除
-            </el-button>
-            <el-button type="primary" @click="handleAdd">新增</el-button>
-          </div>
-        </div>
-      </template>
+  <div class="admin-page ${componentName?lower_case}-list">
+    <div class="page-header">
+      <div class="page-header-left">
+        <h2 class="page-title">${menuTitle!table.tableName}</h2>
+        <span class="page-desc">${businessName!""} · 数据列表</span>
+      </div>
+      <div class="page-header-actions">
+        <el-button type="danger" plain :disabled="multipleSelection.length === 0" @click="handleBatchDelete">批量删除</el-button>
+        <el-button type="primary" @click="handleAdd">
+          <el-icon style="vertical-align: middle; margin-right: 4px"><Plus /></el-icon>新增
+        </el-button>
+      </div>
+    </div>
 
-      <!-- 搜索表单 -->
-      <el-form :model="searchForm" :inline="true" class="search-form">
+    <el-card shadow="never" class="search-card">
+      <el-form :model="searchForm" :inline="true" class="search-form" @submit.prevent>
 <#list fields as field>
         <#if field.field.formComponent != "primary_key" && field.field.formComponent != "textarea" && (field.field.formComponent == "input" || field.field.formComponent == "select" || field.field.formComponent == "datepicker" || field.field.formComponent == "date" || field.field.formComponent == "number")>
         <el-form-item label="${field.field.label}">
@@ -55,10 +55,14 @@
           <el-button @click="handleReset">重置</el-button>
         </el-form-item>
       </el-form>
+    </el-card>
 
-      <el-table 
-        :data="tableData" 
-        border 
+    <el-card shadow="never" class="table-card">
+      <el-table
+        :data="tableData"
+        border
+        stripe
+        highlight-current-row
         style="width: 100%"
         v-loading="loading"
         @selection-change="handleSelectionChange"
@@ -82,13 +86,13 @@
 </#list>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
+            <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
 
-      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+      <div class="table-footer">
         <el-pagination
           v-model:current-page="pagination.current"
           v-model:page-size="pagination.size"
@@ -101,11 +105,12 @@
       </div>
     </el-card>
 
-    <!-- 新增/编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="600px"
+      width="720px"
+      class="dialog-form"
+      destroy-on-close
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
@@ -156,6 +161,7 @@
 <script>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 import { ${componentName}Api<#list relatedLoadTargets as rt>, ${rt.relatedTableClassName}Api</#list> } from '../api'
 
 export default {
@@ -243,6 +249,7 @@ export default {
         },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasRange!false)>
+        <#-- hasRange：元数据 min/max 为数值范围；字符串长度用 minLength/maxLength -->
         { 
           type: 'number',
           <#if field.validationRules?exists && field.validationRules.min?exists>min: ${field.validationRules.min!-99999999}, </#if>
@@ -459,19 +466,5 @@ export default {
 </script>
 
 <style scoped>
-.${componentName?lower_case}-list {
-  height: 100%;
-  padding: 20px;
-  background-color: #f5f7fa;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.search-form {
-  margin-bottom: 20px;
-}
+/* 布局见 src/styles/admin.css */
 </style>

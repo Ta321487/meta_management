@@ -42,8 +42,8 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
      * 查询所有业务系统
      */
     @Override
-    public List<MetadataBusinessSystem> listAll() {
-        return businessSystemMapper.selectAll();
+    public List<MetadataBusinessSystem> listAll(Boolean includeDisabled) {
+        return businessSystemMapper.selectAll(includeDisabled);
     }
 
     /**
@@ -87,6 +87,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
             }
         }
         mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+        if (businessSystem.getIsEnabled() == null) {
+            businessSystem.setIsEnabled(1);
+        }
         businessSystemMapper.insert(businessSystem);
     }
 
@@ -107,6 +110,9 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
         }
         businessSystem.setDatabaseName(catalog);
         MetadataBusinessSystem old = businessSystemMapper.selectByCode(businessSystem.getBusinessCode());
+        if (businessSystem.getIsEnabled() == null && old != null) {
+            businessSystem.setIsEnabled(old.getIsEnabled());
+        }
         // 如果设置为默认系统，先将其他系统设置为非默认
         if (businessSystem.getIsDefault() != null && businessSystem.getIsDefault() == 1) {
             MetadataBusinessSystem defaultSystem = getDefault();

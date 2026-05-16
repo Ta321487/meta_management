@@ -76,13 +76,13 @@ public class ConfigGenerator {
         sb.append("  level:\n");
         sb.append("    root: INFO\n");
         sb.append("    ").append(packageName).append(": DEBUG\n");
+        sb.append("\n");
+        sb.append("# 登录账号（生成子系统默认，可按需改为数据库校验）\n");
+        sb.append("app:\n");
+        sb.append("  auth:\n");
+        sb.append("    default-username: admin\n");
+        sb.append("    default-password: admin123\n");
         if (captchaEnabled) {
-            sb.append("\n");
-            sb.append("# 认证扩展包（验证码 + Session 登录）\n");
-            sb.append("app:\n");
-            sb.append("  auth:\n");
-            sb.append("    default-username: admin\n");
-            sb.append("    default-password: admin123\n");
             sb.append("  captcha:\n");
             sb.append("    enabled: true\n");
             sb.append("    length: 4\n");
@@ -137,5 +137,12 @@ public class ConfigGenerator {
         data.put("description", description);
 
         return templateManager.processTemplate("pom.xml.ftl", data);
+    }
+
+    /**
+     * 生成「开箱说明」Markdown（随单表代码包导出 README.md）
+     */
+    public String generateOutboxReadme(Map<String, Object> data) throws CodeGenException {
+        return templateManager.processTemplate("outbox-readme.md.ftl", data);
     }
 }

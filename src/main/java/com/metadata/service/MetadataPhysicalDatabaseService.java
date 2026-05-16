@@ -6,7 +6,11 @@ import java.util.List;
 
 public interface MetadataPhysicalDatabaseService {
 
-    List<MetadataPhysicalDatabase> listAll();
+    List<MetadataPhysicalDatabase> listAll(Boolean includeDisabled);
+
+    default List<MetadataPhysicalDatabase> listAll() {
+        return listAll(false);
+    }
 
     void add(MetadataPhysicalDatabase row);
 
