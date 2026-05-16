@@ -20,6 +20,7 @@ import com.metadata.mapper.MetadataTableRelationMapper;
 import com.metadata.service.CodeGeneratorService;
 import com.metadata.service.MetadataBusinessRuleService;
 import com.metadata.service.MetadataFieldService;
+import com.metadata.service.MetadataSyncService;
 import com.metadata.service.OperationLogService;
 import com.metadata.service.SqlExecuteService;
 import com.metadata.util.CodeValidator;
@@ -30,6 +31,11 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -64,6 +70,12 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
     @Autowired
     private BusinessCatalogResolver businessCatalogResolver;
+
+    @Autowired
+    private BusinessDataSourcePoolManager businessDataSourcePoolManager;
+
+    @Autowired
+    private MetadataSyncService metadataSyncService;
 
     /**
      * 从校验规则中提取message字段
@@ -166,21 +178,29 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         fieldMapper.insert(field);
         logService.logSuccess("admin", "ADD", "新增字段：" + JSON.toJSONString(field));
 
-        // 生成并执行ALTER TABLE ADD COLUMN语句
-        try {
-            String phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), field.getBusinessCode());
-            String alterSql = codeGeneratorService.generateAlterTableAddColumnSQL(field.getTableCode(), field);
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
-            if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + sqlResult.get("message"));
+        String phyCatalog = businessCatalogResolver.resolveCatalog(field.getTableCode(), field.getBusinessCode());
+        String physicalTableName = codeGeneratorService.convertToTableName(field.getTableCode());
+        boolean columnAlreadyOnInstance = physicalColumnExists(phyCatalog, physicalTableName, field.getFieldName());
+
+        if (columnAlreadyOnInstance) {
+            logService.logSuccess("admin", "SKIP_ADD_COLUMN_EXISTS",
+                    "物理列已存在，仅登记元数据: " + field.getTableCode() + "." + field.getFieldName());
+        } else {
+            // 生成并执行ALTER TABLE ADD COLUMN语句
+            try {
+                String alterSql = codeGeneratorService.generateAlterTableAddColumnSQL(field.getTableCode(), field);
+                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, phyCatalog);
+                if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
+                    throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + sqlResult.get("message"));
+                }
+                logService.logSuccess("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
+            } catch (Exception e) {
+                logService.logError("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN失败", e.getMessage());
+                if (e instanceof BizException) {
+                    throw (BizException) e;
+                }
+                throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + e.getMessage(), e);
             }
-            logService.logSuccess("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN成功: " + alterSql.substring(0, Math.min(100, alterSql.length())));
-        } catch (Exception e) {
-            logService.logError("admin", "ALTER_TABLE_ADD_COLUMN", "执行ALTER TABLE ADD COLUMN失败", e.getMessage());
-            if (e instanceof BizException) {
-                throw (BizException) e;
-            }
-            throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED, FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + e.getMessage(), e);
         }
 
         // 重新从数据库中获取最新的字段信息（包括syncTableFields更新后的信息），传递业务系统编码
@@ -188,6 +208,105 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
         // 合并message字段到最新的校验规则中
         mergeMessageIntoValidateRule(field, latestField, originalMessage);
+    }
+
+    @Override
+    public Map<String, Object> syncMissingFieldsFromPhysical(String tableCode, String businessCode) {
+        if (tableCode == null || tableCode.trim().isEmpty()) {
+            throw BizException.of(AppErrorCodes.TABLE_PARAM_INVALID, "表编码不能为空");
+        }
+        String bc = businessCode != null ? businessCode.trim() : "";
+        MetadataTable table = tableMapper.selectByCode(tableCode.trim(), bc);
+        if (table == null) {
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, "表不存在");
+        }
+        if (bc.isEmpty() && table.getBusinessCode() != null) {
+            bc = table.getBusinessCode();
+        }
+        String catalog = businessCatalogResolver.resolveCatalog(tableCode.trim(), bc);
+        if (catalog == null || catalog.isEmpty()) {
+            throw BizException.badRequest("无法解析物理库，请检查业务系统或表级物理库配置");
+        }
+        String physicalTableName = codeGeneratorService.convertToTableName(tableCode.trim());
+        try (Connection conn = businessDataSourcePoolManager.getConnection(catalog)) {
+            return metadataSyncService.syncMissingFieldsFromPhysical(
+                    physicalTableName, tableCode.trim(), conn, bc, catalog);
+        } catch (BizException e) {
+            throw e;
+        } catch (Exception e) {
+            throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED,
+                    "从物理库同步缺失字段失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public List<String> listPhysicalColumnNames(String tableCode, String businessCode) {
+        if (tableCode == null || tableCode.trim().isEmpty()) {
+            return List.of();
+        }
+        String phyCatalog;
+        try {
+            phyCatalog = businessCatalogResolver.resolveCatalog(tableCode, businessCode);
+        } catch (Exception e) {
+            return List.of();
+        }
+        if (phyCatalog == null || phyCatalog.isEmpty()) {
+            return List.of();
+        }
+        String physicalTableName = codeGeneratorService.convertToTableName(tableCode);
+        return listPhysicalColumnNamesInternal(phyCatalog, physicalTableName);
+    }
+
+    private boolean physicalColumnExists(String catalog, String physicalTableName, String columnName) {
+        if (catalog == null || catalog.isEmpty() || physicalTableName == null || physicalTableName.isEmpty()
+                || columnName == null || columnName.isEmpty()) {
+            return false;
+        }
+        try (Connection c = businessDataSourcePoolManager.getConnection(catalog)) {
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT 1 FROM information_schema.columns "
+                            + "WHERE LOWER(table_schema) = LOWER(?) AND LOWER(table_name) = LOWER(?) "
+                            + "AND LOWER(column_name) = LOWER(?) LIMIT 1")) {
+                ps.setString(1, catalog);
+                ps.setString(2, physicalTableName);
+                ps.setString(3, columnName);
+                try (ResultSet rs = ps.executeQuery()) {
+                    return rs.next();
+                }
+            }
+        } catch (SQLException e) {
+            logService.logError("admin", "CHECK_PHYSICAL_COLUMN",
+                    "检查物理列失败: " + physicalTableName + "." + columnName, e.getMessage());
+            return false;
+        }
+    }
+
+    private List<String> listPhysicalColumnNamesInternal(String catalog, String physicalTableName) {
+        List<String> names = new ArrayList<>();
+        if (catalog == null || catalog.isEmpty() || physicalTableName == null || physicalTableName.isEmpty()) {
+            return names;
+        }
+        try (Connection c = businessDataSourcePoolManager.getConnection(catalog)) {
+            try (PreparedStatement ps = c.prepareStatement(
+                    "SELECT column_name FROM information_schema.columns "
+                            + "WHERE LOWER(table_schema) = LOWER(?) AND LOWER(table_name) = LOWER(?) "
+                            + "ORDER BY ordinal_position")) {
+                ps.setString(1, catalog);
+                ps.setString(2, physicalTableName);
+                try (ResultSet rs = ps.executeQuery()) {
+                    while (rs.next()) {
+                        String name = rs.getString(1);
+                        if (name != null && !name.isEmpty()) {
+                            names.add(name);
+                        }
+                    }
+                }
+            }
+        } catch (SQLException e) {
+            logService.logError("admin", "LIST_PHYSICAL_COLUMNS",
+                    "查询物理列失败: " + catalog + "." + physicalTableName, e.getMessage());
+        }
+        return names;
     }
 
     /**

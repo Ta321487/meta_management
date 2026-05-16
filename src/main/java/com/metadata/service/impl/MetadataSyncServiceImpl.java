@@ -77,7 +77,21 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
      */
     @Override
     public void syncTableFields(String tableName, Connection connection, String businessCode, String databaseName) throws Exception {
-        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_START, "开始同步表字段: " + tableName);
+        doSyncTableFields(tableName, connection, businessCode, databaseName, false, null);
+    }
+
+    @Override
+    public Map<String, Object> syncMissingFieldsFromPhysical(String tableName, String tableCode, Connection connection,
+            String businessCode, String databaseName) throws Exception {
+        SyncFieldResult result = new SyncFieldResult();
+        doSyncTableFields(tableName, connection, businessCode, databaseName, true, result);
+        return result.toMap(tableName, tableCode);
+    }
+
+    private void doSyncTableFields(String tableName, Connection connection, String businessCode, String databaseName,
+            boolean insertMissingOnly, SyncFieldResult syncResult) throws Exception {
+        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_START,
+                (insertMissingOnly ? "开始补同步缺失字段: " : "开始同步表字段: ") + tableName);
         if (connection == null) {
             throw new IllegalArgumentException("connection 不能为空");
         }
@@ -380,9 +394,12 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
         // 获取现有字段
         List<MetadataField> existingFields = fieldMapper.selectByTableCode(tableCode, "", true);
         Map<String, MetadataField> existingFieldMap = new HashMap<>();
-            for (MetadataField field : existingFields) {
-            // 将现有字段的fieldCode转换为大写，确保统一的大小写规则
+        Set<String> existingFieldNamesLower = new HashSet<>();
+        for (MetadataField field : existingFields) {
             existingFieldMap.put(field.getFieldCode().toUpperCase(), field);
+            if (field.getFieldName() != null && !field.getFieldName().isEmpty()) {
+                existingFieldNamesLower.add(field.getFieldName().toLowerCase(Locale.ROOT));
+            }
         }
         
         // 1. 更新或添加字段
@@ -451,6 +468,12 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
             }
             
             if (existingFieldMap.containsKey(fieldCode)) {
+                if (insertMissingOnly) {
+                    if (syncResult != null) {
+                        syncResult.skipped.add(columnName);
+                    }
+                    continue;
+                }
                 // 字段已存在，更新字段信息
                 MetadataField existingField = existingFieldMap.get(fieldCode);
                 
@@ -582,18 +605,30 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 fieldMapper.update(existingField);
                 logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "更新字段: " + tableCode + "." + fieldCode);
             } else {
-                // 字段不存在，添加新字段
+                if (insertMissingOnly) {
+                    String colLower = columnName.toLowerCase(Locale.ROOT);
+                    if (existingFieldNamesLower.contains(colLower)) {
+                        if (syncResult != null) {
+                            syncResult.skipped.add(columnName);
+                        }
+                        continue;
+                    }
+                }
                 fieldMapper.insert(physicalField);
                 logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "添加字段: " + tableCode + "." + fieldCode);
+                if (insertMissingOnly && syncResult != null) {
+                    syncResult.added.add(columnName);
+                    existingFieldNamesLower.add(columnName.toLowerCase(Locale.ROOT));
+                    existingFieldMap.put(fieldCode, physicalField);
+                }
             }
         }
         
+        if (!insertMissingOnly) {
         // 2. 删除物理表中不存在的字段
-        // 注意：仅删除已启用的字段，避免删除刚刚插入的未启用字段
         for (MetadataField existingField : existingFields) {
             String fieldCode = existingField.getFieldCode().toUpperCase();
             if (!physicalFields.containsKey(fieldCode)) {
-                // 物理表中不存在该字段，删除元数据中的字段
                 fieldMapper.deleteById(existingField.getId());
                 logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_FIELDS, "删除字段: " + tableCode + "." + fieldCode);
             }
@@ -643,8 +678,26 @@ public class MetadataSyncServiceImpl implements MetadataSyncService {
                 }
             }
         }
+        }
         
-        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_END, "表字段同步完成: " + tableName);
+        logService.logSuccess("admin", SqlConstants.LOG_MODULE_SYNC_TABLE_FIELDS_END,
+                (insertMissingOnly ? "缺失字段补同步完成: " : "表字段同步完成: ") + tableName);
+    }
+
+    private static final class SyncFieldResult {
+        private final List<String> added = new ArrayList<>();
+        private final List<String> skipped = new ArrayList<>();
+
+        Map<String, Object> toMap(String physicalTableName, String tableCode) {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("tableCode", tableCode);
+            m.put("physicalTableName", physicalTableName);
+            m.put("added", new ArrayList<>(added));
+            m.put("skipped", new ArrayList<>(skipped));
+            m.put("addedCount", added.size());
+            m.put("skippedCount", skipped.size());
+            return m;
+        }
     }
     
     /**

@@ -10,6 +10,17 @@
         <result column="description" property="description"/>
     </resultMap>
 
+    <sql id="WhereCondition">
+        <where>
+            <if test="typeCode != null and typeCode != ''">
+                AND type_code LIKE CONCAT('%', #{typeCode}, '%')
+            </if>
+            <if test="typeName != null and typeName != ''">
+                AND type_name LIKE CONCAT('%', #{typeName}, '%')
+            </if>
+        </where>
+    </sql>
+
     <insert id="insert" parameterType="com.metadata.entity.MetadataModuleType" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO metadata_module_type (type_code, type_name, default_nodes, description)
         VALUES (#{typeCode}, #{typeName}, #{defaultNodes,typeHandler=com.metadata.util.ListStringTypeHandler}, #{description})
@@ -27,6 +38,13 @@
         DELETE FROM metadata_module_type WHERE id = #{id}
     </delete>
 
+    <delete id="batchDeleteByIds">
+        DELETE FROM metadata_module_type WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
     <select id="selectByCode" resultMap="BaseResultMap">
         SELECT * FROM metadata_module_type WHERE type_code = #{typeCode}
     </select>
@@ -35,5 +53,22 @@
         SELECT * FROM metadata_module_type ORDER BY id
     </select>
 
-</mapper>
+    <select id="selectByCondition" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module_type
+        <include refid="WhereCondition"/>
+        ORDER BY id
+    </select>
 
+    <select id="count" resultType="Long">
+        SELECT COUNT(*) FROM metadata_module_type
+        <include refid="WhereCondition"/>
+    </select>
+
+    <select id="selectPage" resultMap="BaseResultMap">
+        SELECT * FROM metadata_module_type
+        <include refid="WhereCondition"/>
+        ORDER BY id
+        LIMIT #{pageRequest.offset}, #{pageRequest.size}
+    </select>
+
+</mapper>

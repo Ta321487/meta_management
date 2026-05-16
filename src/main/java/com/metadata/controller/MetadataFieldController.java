@@ -97,6 +97,28 @@ public class MetadataFieldController {
     }
 
     /**
+     * 查询业务库物理表已有列名（用于常用字段预览、避免重复 ADD COLUMN）
+     */
+    @GetMapping("/physicalColumns/{tableCode}")
+    @Operation(summary = "物理表列名", description = "返回业务库中该逻辑表对应物理表已存在的列名列表")
+    public Result<List<String>> listPhysicalColumns(
+            @Parameter(description = "表编码") @PathVariable String tableCode,
+            @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode) {
+        return Result.success(fieldService.listPhysicalColumnNames(tableCode, businessCode));
+    }
+
+    /**
+     * 从物理库补登记当前表在元数据中缺失的字段（不 ALTER 物理表）
+     */
+    @PostMapping("/syncFromPhysical/{tableCode}")
+    @Operation(summary = "同步缺失字段", description = "读取业务库物理表结构，仅将尚未登记的列写入元数据")
+    public Result<Map<String, Object>> syncFromPhysical(
+            @Parameter(description = "表编码") @PathVariable String tableCode,
+            @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode) {
+        return Result.success(fieldService.syncMissingFieldsFromPhysical(tableCode, businessCode));
+    }
+
+    /**
      * 获取表的约束列表
      */
     @GetMapping("/constraint/list/{tableCode}")

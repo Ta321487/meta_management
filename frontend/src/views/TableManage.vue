@@ -70,7 +70,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="databaseName" label="物理库" width="140" show-overflow-tooltip />
-        <el-table-column prop="pkStrategy" label="主键策略" width="120" />
+        <el-table-column prop="pkStrategy" label="主键列" width="88">
+          <template #default="{ row }">
+            <span>{{ formatPkStrategyLabel(row.pkStrategy) }}</span>
+          </template>
+        </el-table-column>
         <el-table-column prop="description" label="描述" show-overflow-tooltip />
         <el-table-column prop="isEnabled" label="状态" width="100">
           <template #default="{ row }">
@@ -111,25 +115,44 @@
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
+        <el-alert
+          v-if="!form.id"
+          class="table-add-hint"
+          type="info"
+          :closable="false"
+          show-icon
+          title="本步只登记表，不填字段"
+          description="保存后自动建主键列；业务字段请到「字段管理」添加。"
+        />
         <el-form-item label="表编码" prop="tableCode" v-if="!form.id">
           <el-input v-model="form.tableCode" placeholder="如：TABLE_001" />
         </el-form-item>
         <el-form-item label="表名称" prop="tableName">
           <el-input v-model="form.tableName" placeholder="请输入表名称" />
         </el-form-item>
-        <el-form-item label="主键策略" prop="pkStrategy">
-          <el-select v-model="form.pkStrategy" placeholder="请选择" style="width: 100%">
-            <el-option label="自增(AUTO)" value="AUTO" />
-            <el-option label="UUID" value="UUID" />
+        <el-form-item :label="form.id ? '主键列' : '主键策略'" :prop="form.id ? undefined : 'pkStrategy'">
+          <el-select
+            v-if="!form.id"
+            v-model="form.pkStrategy"
+            placeholder="请选择"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in pkStrategyOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
           </el-select>
+          <span v-else class="pk-strategy-readonly">{{ pkStrategyOptionLabel(form.pkStrategy) }}</span>
         </el-form-item>
         <el-form-item label="业务系统">
           <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%">
@@ -142,10 +165,30 @@
           </el-select>
         </el-form-item>
         <el-form-item label="物理库名">
-          <el-input v-model="form.databaseName" placeholder="留空=用上方业务系统的默认物理库" clearable />
+          <el-select
+            v-model="form.databaseName"
+            filterable
+            clearable
+            placeholder="留空则使用业务系统默认物理库"
+            style="width: 100%"
+          >
+            <el-option label="（使用业务系统默认库）" value="" />
+            <el-option
+              v-for="opt in tableCatalogSelectOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
           <div class="database-name-hint">
-            填写时：仅本表使用该 MySQL 库名（覆盖业务系统默认）。新增表并执行建表 SQL 时，若该库在实例上不存在，会先自动
-            <code>CREATE DATABASE IF NOT EXISTS</code>（库名须为 1–64 位字母、数字、下划线或 <code>$</code>）。仅保存元数据、不触发建表时不会建库。
+            <template v-if="businessDefaultCatalog">
+              当前所选业务系统默认库：<code>{{ businessDefaultCatalog }}</code>。不选则沿用该默认库。
+            </template>
+            <template v-else>
+              不选则使用上方业务系统的默认物理库（须已在「库管理」登记）。
+            </template>
+            若指定库名，仅本表使用该库（覆盖业务系统默认）。请只选「库管理」中已登记的库。
+            「编辑」仅更新元数据。「新增」仅在实例上已存在的物理库中创建物理表，不会自动新建数据库；建库请在「库管理」开启「保存时建库」或执行同步。
           </div>
         </el-form-item>
         <el-form-item label="描述" prop="description">
@@ -160,8 +203,8 @@
 
     <!-- 分配业务系统对话框 -->
     <el-dialog
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       v-model="assignDialogVisible"
       title="批量分配业务系统"
       width="500px"
@@ -187,9 +230,21 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { getTableList, addTable, updateTable, deleteTable, batchDeleteTable, batchUpdateTableStatus, getBusinessSystemList, batchAssignBusinessSystem, ensureMissingPhysicalTables, importMissingMetadataTables } from '../api'
+import {
+  getTableList,
+  addTable,
+  updateTable,
+  deleteTable,
+  batchDeleteTable,
+  batchUpdateTableStatus,
+  getBusinessSystemList,
+  batchAssignBusinessSystem,
+  ensureMissingPhysicalTables,
+  importMissingMetadataTables,
+  getPhysicalDatabaseList
+} from '../api'
 
 export default {
   name: 'TableManage',
@@ -235,6 +290,59 @@ export default {
       tableCode: [{ required: true, message: '请输入表编码', trigger: 'blur' }],
       tableName: [{ required: true, message: '请输入表名称', trigger: 'blur' }],
       pkStrategy: [{ required: true, message: '请选择主键策略', trigger: 'change' }]
+    }
+
+    const pkStrategyOptions = [
+      { value: 'AUTO', label: 'id 自增' },
+      { value: 'UUID', label: 'uuid' }
+    ]
+
+    const pkStrategyOptionLabel = (strategy) => {
+      const opt = pkStrategyOptions.find((o) => o.value === strategy)
+      return opt ? opt.label : strategy || '—'
+    }
+
+    const formatPkStrategyLabel = pkStrategyOptionLabel
+
+    const physicalDbRows = ref([])
+
+    const buildTableCatalogSelectOptions = (currentValue) => {
+      const list = []
+      const seen = new Set()
+      const rows = physicalDbRows.value || []
+      for (const r of rows) {
+        if (r.isEnabled !== 1) continue
+        const name = r.catalogName
+        if (!name || seen.has(name)) continue
+        seen.add(name)
+        const label = r.displayName ? `${name}（${r.displayName}）` : name
+        list.push({ value: name, label })
+      }
+      const cur = currentValue && String(currentValue).trim()
+      if (cur && !seen.has(cur)) {
+        list.push({ value: cur, label: `${cur}（当前值，未在库管理登记）` })
+      }
+      return list
+    }
+
+    const tableCatalogSelectOptions = computed(() => buildTableCatalogSelectOptions(form.databaseName))
+
+    const businessDefaultCatalog = computed(() => {
+      if (!form.businessCode) return ''
+      const sys = businessSystems.value.find((s) => s.businessCode === form.businessCode)
+      const name = sys?.databaseName
+      return name && String(name).trim() !== '' ? String(name).trim() : ''
+    })
+
+    const loadPhysicalCatalogs = async () => {
+      try {
+        const res = await getPhysicalDatabaseList({ includeDisabled: true })
+        if (res.code === 200) {
+          physicalDbRows.value = res.data || []
+        }
+      } catch {
+        physicalDbRows.value = []
+      }
     }
 
     const loadData = async () => {
@@ -373,7 +481,8 @@ export default {
       }
     }
 
-    const handleAdd = () => {
+    const handleAdd = async () => {
+      await loadPhysicalCatalogs()
       dialogTitle.value = '新增表'
       Object.assign(form, {
         id: null,
@@ -387,7 +496,8 @@ export default {
       dialogVisible.value = true
     }
 
-    const handleEdit = (row) => {
+    const handleEdit = async (row) => {
+      await loadPhysicalCatalogs()
       dialogTitle.value = '编辑表'
       Object.assign(form, {
         id: row.id,
@@ -424,7 +534,7 @@ export default {
           ElMessage.success('操作成功')
         } else {
           await addTable(form)
-          ElMessage.success('表创建成功，可前往模块管理关联该表')
+          ElMessage.success('表创建成功：已自动生成主键并建物理表（当前仅主键列），请到「字段管理」补充其余列')
         }
         dialogVisible.value = false
         loadData()
@@ -623,6 +733,7 @@ export default {
     onMounted(() => {
       loadData()
       loadBusinessSystems()
+      loadPhysicalCatalogs()
     })
 
     return {
@@ -640,6 +751,9 @@ export default {
       handleImportMetadataTables,
       form,
       rules,
+      pkStrategyOptions,
+      pkStrategyOptionLabel,
+      formatPkStrategyLabel,
       handleSearch,
       handleEnsurePhysicalTables,
       handleReset,
@@ -654,6 +768,8 @@ export default {
       handleBatchToggleEnable,
       handleSelectionChange,
       handleDialogClose,
+      tableCatalogSelectOptions,
+      businessDefaultCatalog,
       // 分配业务系统相关
       assignDialogVisible,
       assignFormRef,
@@ -693,6 +809,15 @@ export default {
   padding: 0 3px;
   background: #f4f4f5;
   border-radius: 2px;
+}
+
+.table-add-hint {
+  margin-bottom: 16px;
+}
+
+.pk-strategy-readonly {
+  color: #606266;
+  line-height: 32px;
 }
 </style>
 

@@ -1,5 +1,8 @@
 package com.metadata.controller;
 
+import com.metadata.common.BatchDeleteRequest;
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.common.Result;
 import com.metadata.entity.MetadataModuleType;
 import com.metadata.service.MetadataModuleTypeService;
@@ -23,9 +26,20 @@ public class MetadataModuleTypeController {
     private MetadataModuleTypeService typeService;
 
     @GetMapping("/list")
-    @Operation(summary = "查询模块类型列表", description = "查询全部模块类型")
-    public Result<List<MetadataModuleType>> listAll() {
-        List<MetadataModuleType> list = typeService.listAll();
+    @Operation(summary = "查询模块类型列表", description = "查询模块类型列表，支持条件筛选与分页")
+    public Result<?> list(
+            @Parameter(description = "类型编码（模糊）") @RequestParam(required = false) String typeCode,
+            @Parameter(description = "类型名称（模糊）") @RequestParam(required = false) String typeName,
+            @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
+            @Parameter(description = "每页大小") @RequestParam(required = false) Integer size) {
+        if (current != null && size != null) {
+            PageRequest pageRequest = new PageRequest();
+            pageRequest.setCurrent(current);
+            pageRequest.setSize(size);
+            PageResult<MetadataModuleType> pageResult = typeService.page(typeCode, typeName, pageRequest);
+            return Result.success(pageResult);
+        }
+        List<MetadataModuleType> list = typeService.list(typeCode, typeName);
         return Result.success(list);
     }
 
@@ -47,6 +61,13 @@ public class MetadataModuleTypeController {
     @Operation(summary = "删除模块类型", description = "根据主键 ID 删除")
     public Result<?> delete(@Parameter(description = "类型 ID") @PathVariable Long id) {
         typeService.delete(id);
+        return Result.success();
+    }
+
+    @PostMapping("/batchDelete")
+    @Operation(summary = "批量删除模块类型", description = "根据ID列表批量删除模块类型")
+    public Result<?> batchDelete(@Parameter(description = "包含ids列表的参数") @RequestBody BatchDeleteRequest request) {
+        typeService.batchDelete(request.getIds());
         return Result.success();
     }
 }

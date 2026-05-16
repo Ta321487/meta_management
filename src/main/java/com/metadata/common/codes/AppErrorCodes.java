@@ -81,6 +81,7 @@ public final class AppErrorCodes {
     public static final int MODULE_TYPE_CODE_DUPLICATE = 1313;
     public static final int MODULE_TYPE_ID_REQUIRED = 1314;
     public static final int MODULE_TYPE_CODE_CONFLICT = 1315;
+    public static final int MODULE_TYPE_BATCH_IDS_EMPTY = 1316;
 
     // ---------- 关联 / 外键 14xx ----------
     /** 关联服务返回业务失败（success=false） */
@@ -116,6 +117,8 @@ public final class AppErrorCodes {
     public static final int PHYSICAL_DB_SYSTEM_CATALOG_PROTECTED = 1606;
     public static final int PHYSICAL_DB_METADATA_CATALOG_PROTECTED = 1607;
     public static final int PHYSICAL_DB_CREATE_FAILED = 1608;
+    /** 物理库在 MySQL 实例上不存在（未自动建库） */
+    public static final int PHYSICAL_DB_CATALOG_NOT_ON_INSTANCE = 1609;
 
     // ---------- 功能节点 17xx ----------
     public static final int FUNCTION_NODE_CODE_INVALID = 1701;

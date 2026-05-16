@@ -200,13 +200,7 @@ ON DUPLICATE KEY UPDATE `business_code`=`business_code`;
 INSERT INTO `metadata_admin` (`username`, `password`) VALUES ('admin', '$2a$10$cOBRcgHmW.4dInuPjvhL4OTZVdX8owOYwcBJ1cx9sFaWhm2Acel/K')
 ON DUPLICATE KEY UPDATE `username`=`username`;
 
--- 初始化默认模块类型
-INSERT INTO `metadata_module_type` (`type_code`, `type_name`, `default_nodes`, `description`) VALUES
-('DATA_MANAGE', '数据管理型', 'LIST_PAGE,FORM_PAGE,DETAIL_PAGE', '支持CRUD操作的数据管理模块'),
-('PROCESS_APPROVE', '流程审批型', 'LIST_PAGE,FORM_PAGE,PROCESS_PAGE', '支持流程审批的模块'),
-('STAT_REPORT', '统计报表型', 'LIST_PAGE,REPORT_PAGE', '支持统计报表的模块'),
-('BATCH_OPERATE', '批量操作型', 'LIST_PAGE,FORM_PAGE,DETAIL_PAGE,IMPORT_PAGE', '支持CRUD和批量导入的模块')
-ON DUPLICATE KEY UPDATE `type_code`=`type_code`;
+-- 模块类型不在脚本中预置，请在「模块类型管理」页按业务自行新增（页内提供参考模板与节点说明）
 
 -- 确保现有数据的is_enabled字段都设置为1
 UPDATE metadata_table SET is_enabled = 1 WHERE is_enabled IS NULL;

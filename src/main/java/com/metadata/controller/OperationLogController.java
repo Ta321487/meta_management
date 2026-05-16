@@ -29,8 +29,8 @@ public class OperationLogController {
     public Result<?> list(
             @Parameter(description = "模块名称") @RequestParam(required = false) String module,
             @Parameter(description = "操作类型") @RequestParam(required = false) String operateType,
-            @Parameter(description = "开始时间") @RequestParam(required = false) String startTime,
-            @Parameter(description = "结束时间") @RequestParam(required = false) String endTime,
+            @Parameter(description = "操作时间筛选下限（operate_time >=）") @RequestParam(required = false) String startTime,
+            @Parameter(description = "操作时间筛选上限（operate_time <=）") @RequestParam(required = false) String endTime,
             @Parameter(description = "当前页码") @RequestParam(required = false) Integer current,
             @Parameter(description = "每页条数") @RequestParam(required = false) Integer size) {
         if (current != null && size != null) {

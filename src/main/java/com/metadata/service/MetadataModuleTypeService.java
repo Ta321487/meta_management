@@ -1,5 +1,7 @@
 package com.metadata.service;
 
+import com.metadata.common.PageRequest;
+import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataModuleType;
 
 import java.util.List;
@@ -13,6 +15,16 @@ public interface MetadataModuleTypeService {
      * 查询所有模块类型
      */
     List<MetadataModuleType> listAll();
+
+    /**
+     * 条件查询模块类型列表
+     */
+    List<MetadataModuleType> list(String typeCode, String typeName);
+
+    /**
+     * 分页查询模块类型
+     */
+    PageResult<MetadataModuleType> page(String typeCode, String typeName, PageRequest pageRequest);
 
     /**
      * 根据编码查询
@@ -33,4 +45,9 @@ public interface MetadataModuleTypeService {
      * 删除模块类型
      */
     void delete(Long id);
+
+    /**
+     * 批量删除模块类型
+     */
+    void batchDelete(List<Long> ids);
 }

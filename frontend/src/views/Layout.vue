@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-container class="layout-container" @click="hideContextMenu">
     <el-aside :width="isCollapse ? '64px' : '200px'" class="sidebar">
       <div class="logo-wrapper">
@@ -151,8 +151,8 @@
       v-model="passwordDialogVisible"
       title="修改密码"
       width="400px"
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
     >
       <el-form
         :model="passwordForm"

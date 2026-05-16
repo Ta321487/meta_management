@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="rule-manage">
     <el-card>
       <template #header>
@@ -58,8 +58,8 @@
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="700px"
@@ -103,7 +103,7 @@
     </el-dialog>
 
     <!-- 预览对话框 -->
-  <el-dialog v-model="previewVisible" title="规则预览" width="600px" close-on-click-modal="false" close-on-press-escape="false">
+  <el-dialog v-model="previewVisible" title="规则预览" width="600px" :close-on-click-modal="false" :close-on-press-escape="false">
       <pre>{{ previewContent }}</pre>
     </el-dialog>
   </div>

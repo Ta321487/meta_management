@@ -11,7 +11,18 @@ public interface MySqlPhysicalCatalogService {
     boolean isValidCatalogName(String name);
 
     /**
+     * 目标库是否已在当前 MySQL 实例上存在（不创建）。
+     */
+    boolean catalogExistsOnInstance(String catalogName);
+
+    /**
+     * 若库在实例上不存在则抛出业务异常（不创建）。
+     */
+    void requireCatalogOnInstance(String catalogName);
+
+    /**
      * 若库不存在则创建；字符集/排序规则优先从「库管理」登记表读取，无登记则 utf8mb4 / utf8mb4_unicode_ci。
+     * 仅应由「库管理」保存时建库、显式同步、SQL 执行页 CREATE DATABASE 等入口调用。
      */
     void ensureCatalogExists(String catalogName);
 

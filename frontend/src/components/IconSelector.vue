@@ -3,6 +3,8 @@
     v-model="dialogVisible"
     title="选择图标"
     width="800px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
     @close="handleClose"
   >
     <!-- 搜索框 -->

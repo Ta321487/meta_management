@@ -119,7 +119,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         try {
             String phyCatalog = businessCatalogResolver.resolveCatalog(table);
             if (phyCatalog != null && !phyCatalog.isEmpty()) {
-                mySqlPhysicalCatalogService.ensureCatalogExists(phyCatalog);
+                mySqlPhysicalCatalogService.requireCatalogOnInstance(phyCatalog);
             }
             String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode(), table.getBusinessCode());
             Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog);
@@ -465,7 +465,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
                     skipped.add(table.getTableCode() + "（物理表已存在）");
                     continue;
                 }
-                mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+                mySqlPhysicalCatalogService.requireCatalogOnInstance(catalog);
                 ensureDefaultPrimaryKeyFieldIfMissing(table);
                 String ddl = codeGeneratorService.generateCreateTableSQL(table.getTableCode(), businessCode);
                 Map<String, Object> exec = sqlExecuteService.executeSql(ddl, false, catalog);

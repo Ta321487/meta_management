@@ -30,7 +30,7 @@
             :value="db.catalogName"
           />
         </el-select>
-        <el-button link type="primary" @click="loadCatalogOptions">刷新库列表</el-button>
+        <el-button link type="primary" :loading="catalogLoading" @click="handleRefreshCatalog">刷新库列表</el-button>
         <span v-if="targetCatalog" class="target-db-hint">将在库 <code>{{ targetCatalog }}</code> 上执行</span>
       </div>
 
@@ -51,6 +51,8 @@
           title="导入SQL文件"
           width="600px"
           center
+          :close-on-click-modal="false"
+          :close-on-press-escape="false"
         >
           <el-tabs v-model="activeTab">
             <!-- 本地文件上传 -->
@@ -213,7 +215,7 @@ export default {
     const importLoading = ref(false)
 
     const STORAGE_KEY_TARGET_CATALOG = 'sqlExecute.targetCatalog'
-    const targetCatalog = ref(sessionStorage.getItem(STORAGE_KEY_TARGET_CATALOG) || '')
+    const targetCatalog = ref('')
     const catalogOptions = ref([])
     const catalogLoading = ref(false)
 
@@ -225,7 +227,7 @@ export default {
       }
     })
 
-    const loadCatalogOptions = async () => {
+    const loadCatalogOptions = async (notify = false) => {
       catalogLoading.value = true
       try {
         const res = await getPhysicalDatabaseList()
@@ -244,13 +246,31 @@ export default {
               label: `${targetCatalog.value}（未在库管理中登记）`
             })
           }
+          if (notify) {
+            const count = catalogOptions.value.length
+            if (count > 0) {
+              ElMessage.success(`刷新成功，共 ${count} 个可用库`)
+            } else {
+              ElMessage.success('刷新成功，当前无已启用的物理库，请先在库管理中登记')
+            }
+          }
+          return true
         }
+        if (notify) {
+          ElMessage.error('刷新失败：' + (res.message || '未知错误'))
+        }
+        return false
       } catch (e) {
-        ElMessage.error('加载库列表失败: ' + (e.message || '未知错误'))
+        if (notify) {
+          ElMessage.error('刷新失败：' + (e.message || '未知错误'))
+        }
+        return false
       } finally {
         catalogLoading.value = false
       }
     }
+
+    const handleRefreshCatalog = () => loadCatalogOptions(true)
 
     // 初始化编辑器
     const initEditor = () => {
@@ -443,9 +463,10 @@ export default {
 
     // 生命周期钩子
     onMounted(() => {
-      localStorage.removeItem(STORAGE_KEY_TARGET_CATALOG)
+      sessionStorage.removeItem(STORAGE_KEY_TARGET_CATALOG)
+      targetCatalog.value = ''
       initEditor()
-      loadCatalogOptions()
+      loadCatalogOptions(false)
     })
 
     onBeforeUnmount(() => {
@@ -475,7 +496,7 @@ export default {
       targetCatalog,
       catalogOptions,
       catalogLoading,
-      loadCatalogOptions
+      handleRefreshCatalog
     }
   }
 }

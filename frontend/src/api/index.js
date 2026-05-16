@@ -34,6 +34,10 @@ export const importMissingMetadataTables = (businessCode) =>
 
 // 字段相关
 export const getFieldList = (tableCode, params) => request.get(`/field/list/${tableCode}`, { params })
+export const getPhysicalColumnNames = (tableCode, businessCode) =>
+  request.get(`/field/physicalColumns/${tableCode}`, { params: businessCode ? { businessCode } : {} })
+export const syncMissingFieldsFromPhysical = (tableCode, businessCode) =>
+  request.post(`/field/syncFromPhysical/${tableCode}`, null, { params: businessCode ? { businessCode } : {} })
 export const addField = (data) => request.post('/field/add', data)
 export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (id) => request.delete(`/field/delete/${id}`)
@@ -103,10 +107,11 @@ export const testCode = (tableCode, packageName, businessCode, useInterface, cap
   request.get(`/codetest/test/${tableCode}`, { params: { packageName, businessCode, useInterface, captchaEnabled } })
 
 // 模块类型相关
-export const getModuleTypeList = () => request.get('/moduleType/list')
+export const getModuleTypeList = (params) => request.get('/moduleType/list', { params })
 export const addModuleType = (data) => request.post('/moduleType/add', data)
 export const updateModuleType = (data) => request.post('/moduleType/update', data)
-export const deleteModuleType = (data) => request.post('/moduleType/delete', data)
+export const deleteModuleType = (id) => request.delete(`/moduleType/delete/${id}`)
+export const batchDeleteModuleType = (data) => request.post('/moduleType/batchDelete', data)
 
 // 元数据导出相关
 export const getModuleMetadata = (moduleCode) => request.get(`/metadata/module/${moduleCode}`)

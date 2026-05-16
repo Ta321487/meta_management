@@ -1,6 +1,7 @@
 package com.metadata.service;
 
 import java.sql.Connection;
+import java.util.Map;
 
 /**
  * 元数据同步服务接口
@@ -22,7 +23,16 @@ public interface MetadataSyncService {
      * 同步字段并登记/更新元数据表（指定业务系统与物理库名）
      */
     void syncTableFields(String tableName, Connection connection, String businessCode, String databaseName) throws Exception;
-    
+
+    /**
+     * 仅将物理表中尚未登记到元数据的列写入元数据（不 ALTER 物理表、不更新已有元数据、不删除元数据侧多余字段）。
+     *
+     * @param tableName  物理表名
+     * @param tableCode  逻辑表编码（元数据）
+     */
+    Map<String, Object> syncMissingFieldsFromPhysical(String tableName, String tableCode, Connection connection,
+            String businessCode, String databaseName) throws Exception;
+
     /**
      * 工具方法：转换为表名（下划线）
      */

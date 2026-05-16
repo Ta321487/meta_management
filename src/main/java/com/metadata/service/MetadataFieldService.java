@@ -91,4 +91,14 @@ public interface MetadataFieldService {
      * @param status 目标状态，1-启用，0-禁用
      */
     void batchUpdateStatus(List<Long> ids, Integer status);
+
+    /**
+     * 查询业务库物理表上已存在的列名（小写比较由调用方处理）；表或库不存在时返回空列表。
+     */
+    List<String> listPhysicalColumnNames(String tableCode, String businessCode);
+
+    /**
+     * 从业务库物理表补登记尚未写入元数据的列（不修改物理表、不删除元数据字段）。
+     */
+    Map<String, Object> syncMissingFieldsFromPhysical(String tableCode, String businessCode);
 }

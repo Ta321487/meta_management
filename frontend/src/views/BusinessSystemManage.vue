@@ -78,8 +78,8 @@
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       v-model="dialogVisible"
       :title="dialogTitle"
       width="560px"
@@ -99,9 +99,7 @@
           <el-select
             v-model="form.databaseName"
             filterable
-            allow-create
-            default-first-option
-            placeholder="必选：须先在「库管理」登记（全链路模拟为 demo_erp）"
+            placeholder="请从「库管理」已登记的库中选择"
             style="width: 100%"
           >
             <el-option
@@ -116,7 +114,7 @@
           <div class="backfill-block">
             <el-checkbox v-model="syncAfterSave">启用</el-checkbox>
             <p class="backfill-hint">
-              保存成功后：先回补本系统下表级物理库为空的元数据（不覆盖已填库名），再为缺表在对应库建表；无字段自动加主键，物理表已存在则跳过。
+              保存成功后：① 将本系统默认物理库写入元数据，并回补表级物理库为空的记录（不覆盖已填库名）；② 在实例上已存在的物理库中为缺表创建物理表。不会新建数据库，目标库须已在「库管理」建库。
             </p>
           </div>
         </el-form-item>
@@ -138,8 +136,8 @@
     
     <!-- 关联模块对话框 -->
     <el-dialog
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       v-model="associateDialogVisible"
       title="关联模块"
       width="600px"

@@ -3,6 +3,8 @@ package com.metadata.service.impl;
 import com.metadata.common.FillBusinessSystemCatalogRequest;
 import com.metadata.entity.MetadataBusinessSystem;
 import com.metadata.entity.MetadataModule;
+import com.metadata.entity.MetadataPhysicalDatabase;
+import com.metadata.mapper.MetadataPhysicalDatabaseMapper;
 import com.metadata.common.codes.AppErrorCodes;
 import com.metadata.exception.BizException;
 import com.metadata.mapper.MetadataBusinessSystemMapper;
@@ -37,6 +39,23 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
 
     @Autowired
     private MetadataTableMapper tableMapper;
+
+    @Autowired
+    private MetadataPhysicalDatabaseMapper physicalDatabaseMapper;
+
+    /**
+     * 业务系统/补充接口：库须在「库管理」登记且已在实例存在；不在此建库。
+     */
+    private void assertPhysicalCatalogReady(String catalog) {
+        MetadataPhysicalDatabase reg = physicalDatabaseMapper.selectByCatalogName(catalog);
+        if (reg == null) {
+            throw BizException.badRequest("请先在「库管理」登记物理库「" + catalog + "」并建库（保存时建库或同步）");
+        }
+        if (reg.getIsEnabled() != null && reg.getIsEnabled() == 0) {
+            throw BizException.badRequest("物理库登记已停用: " + catalog);
+        }
+        mySqlPhysicalCatalogService.requireCatalogOnInstance(catalog);
+    }
 
     /**
      * 查询所有业务系统
@@ -86,7 +105,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
                 businessSystemMapper.update(defaultSystem);
             }
         }
-        mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+        assertPhysicalCatalogReady(catalog);
         if (businessSystem.getIsEnabled() == null) {
             businessSystem.setIsEnabled(1);
         }
@@ -121,7 +140,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
                 businessSystemMapper.update(defaultSystem);
             }
         }
-        mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+        assertPhysicalCatalogReady(catalog);
         businessSystemMapper.update(businessSystem);
         if (old != null && old.getDatabaseName() != null && !old.getDatabaseName().trim().isEmpty()) {
             businessDataSourcePoolManager.evictCatalog(old.getDatabaseName());
@@ -211,7 +230,7 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
 
         String oldCat = bs.getDatabaseName() != null ? bs.getDatabaseName().trim() : null;
 
-        mySqlPhysicalCatalogService.ensureCatalogExists(catalog);
+        assertPhysicalCatalogReady(catalog);
         bs.setDatabaseName(catalog);
         businessSystemMapper.update(bs);
 

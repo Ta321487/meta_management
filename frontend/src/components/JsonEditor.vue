@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="json-editor-wrapper">
     <div class="json-editor-toolbar">
       <el-button type="primary" size="small" @click="formatJson">格式化</el-button>
@@ -13,8 +13,8 @@
       v-model="testDialogVisible"
       title="正则表达式测试"
       width="500px"
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
     >
       <el-form label-position="top" size="small">
         <el-form-item label="原始JSON中的正则">
@@ -65,8 +65,8 @@
       v-model="exampleDialogVisible"
       title="校验规则示例"
       width="600px"
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
     >
       <div class="example-dialog-content">
         <el-select

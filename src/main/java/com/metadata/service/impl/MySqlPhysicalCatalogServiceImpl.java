@@ -18,6 +18,9 @@ import com.metadata.util.JdbcCatalogUrlRewriter;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -66,6 +69,44 @@ public class MySqlPhysicalCatalogServiceImpl implements MySqlPhysicalCatalogServ
         }
         String t = name.trim();
         return CATALOG_NAME_PATTERN.matcher(t).matches();
+    }
+
+    @Override
+    public boolean catalogExistsOnInstance(String catalogName) {
+        if (catalogName == null || catalogName.trim().isEmpty()) {
+            return false;
+        }
+        String cat = catalogName.trim();
+        if (!isValidCatalogName(cat)) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement ps = connection.prepareStatement(
+                     "SELECT 1 FROM information_schema.schemata WHERE LOWER(schema_name) = LOWER(?) LIMIT 1")) {
+            ps.setString(1, cat);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException e) {
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CREATE_FAILED,
+                    "检查物理库是否存在失败: " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public void requireCatalogOnInstance(String catalogName) {
+        if (catalogName == null || catalogName.trim().isEmpty()) {
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CATALOG_INVALID, "物理库名不能为空");
+        }
+        String cat = catalogName.trim();
+        if (!isValidCatalogName(cat)) {
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CATALOG_INVALID,
+                    "物理库名非法：仅允许字母、数字、下划线、美元符号，长度 1–64");
+        }
+        if (!catalogExistsOnInstance(cat)) {
+            throw BizException.of(AppErrorCodes.PHYSICAL_DB_CATALOG_NOT_ON_INSTANCE,
+                    "物理库「" + cat + "」在 MySQL 实例上不存在，请先在「库管理」登记并开启「保存时建库」或执行同步，勿在新增表/业务系统时自动建库");
+        }
     }
 
     @Override

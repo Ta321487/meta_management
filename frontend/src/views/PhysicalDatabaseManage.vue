@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="physical-database-manage">
     <el-card>
       <template #header>
@@ -46,8 +46,8 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="560px"
-      close-on-click-modal="false"
-      close-on-press-escape="false"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">

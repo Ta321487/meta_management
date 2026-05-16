@@ -41,6 +41,15 @@
               批量启用
             </el-button>
             <el-button type="primary" @click="handleAdd" :disabled="!selectedTableCode">新增字段</el-button>
+            <el-button type="success" @click="openCommonFieldDialog" :disabled="!selectedTableCode">常用字段</el-button>
+            <el-button
+              type="warning"
+              :loading="syncMissingFieldsSubmitting"
+              :disabled="!selectedTableCode"
+              @click="handleSyncMissingFieldsFromPhysical"
+            >
+              同步缺失字段
+            </el-button>
             <el-button type="info" @click="handleViewConstraints" :disabled="!selectedTableCode">查看约束</el-button>
           </div>
         </div>
@@ -114,8 +123,8 @@
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
-        close-on-click-modal="false"
-        close-on-press-escape="false"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
         v-model="dialogVisible"
         :title="dialogTitle"
         width="600px"
@@ -126,10 +135,28 @@
           <el-input v-model="form.fieldCode" placeholder="如：FIELD_001（只能包含字母、数字和下划线）"/>
         </el-form-item>
         <el-form-item label="字段名称" prop="fieldName">
-          <el-input v-model="form.fieldName" placeholder="请输入字段名称"/>
+          <el-input
+            v-model="form.fieldName"
+            :disabled="isEditingPrimaryKey"
+            :placeholder="isEditingPrimaryKey ? '物理列名已随建表固定，不可在此修改' : '请输入字段名称（对应业务库列名）'"
+          />
         </el-form-item>
+        <el-alert
+          v-if="isEditingPrimaryKey"
+          type="warning"
+          :closable="false"
+          show-icon
+          class="pk-field-alert"
+          title="主键列名已固定"
+          description="该字段为新增表/补缺物理表时自动生成的主键，保存时仅更新显示名等元数据，不会 ALTER 改物理列名。若要改用其它列名作主键，请删表后重建并事先规划字段名称。"
+        />
         <el-form-item label="字段类型" prop="baseFieldType">
-          <el-select v-model="form.baseFieldType" placeholder="请选择基础字段类型" style="width: 100%">
+          <el-select
+            v-model="form.baseFieldType"
+            placeholder="请选择基础字段类型"
+            style="width: 100%"
+            :disabled="isEditingPrimaryKey"
+          >
             <el-option
                 v-for="type in baseFieldTypes"
                 :key="type.value"
@@ -267,11 +294,63 @@
       </template>
     </el-dialog>
 
+    <!-- 常用字段一键添加 -->
+    <el-dialog
+        v-model="commonFieldDialogVisible"
+        title="常用字段"
+        width="640px"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
+        @closed="handleCommonFieldDialogClosed"
+    >
+      <p class="common-field-intro">
+        为当前表 <strong>{{ selectedTableCode }}</strong> 批量添加审计/软删列；字段编码按表名自动生成（如
+        <code>{{ commonFieldCodeExample }}</code>）。<strong>已登记</strong>的跳过；
+        业务库<strong>已有同名列</strong>时只补元数据，不再执行 ADD COLUMN。
+      </p>
+      <div class="common-field-toolbar">
+        <el-button size="small" link type="primary" @click="selectAllAddableCommonFields">全选可添加</el-button>
+        <el-button size="small" link @click="clearCommonFieldSelection">清空</el-button>
+      </div>
+      <el-table
+          :data="commonPresetRows"
+          border
+          size="small"
+          max-height="320"
+          @selection-change="handleCommonPresetSelectionChange"
+          ref="commonPresetTableRef"
+      >
+        <el-table-column type="selection" width="48" :selectable="(row) => row.selectable"/>
+        <el-table-column prop="label" label="显示名" width="88"/>
+        <el-table-column prop="fieldName" label="物理列" width="110"/>
+        <el-table-column prop="fieldCode" label="字段编码" min-width="120" show-overflow-tooltip/>
+        <el-table-column prop="fieldType" label="类型" width="100"/>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }">
+            <el-tag :type="commonPresetStatusTagType(row)" size="small">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="commonFieldDialogVisible = false">取消</el-button>
+        <el-button
+            type="primary"
+            :loading="commonFieldSubmitting"
+            :disabled="addableCommonFieldCount === 0"
+            @click="handleCommonFieldSubmit"
+        >
+          添加选中（{{ addableCommonFieldCount }}）
+        </el-button>
+      </template>
+    </el-dialog>
+
     <!-- 约束列表对话框 -->
     <el-dialog
         v-model="constraintDialogVisible"
         title="约束列表"
         width="1000px"
+        :close-on-click-modal="false"
+        :close-on-press-escape="false"
         @open="loadConstraints"
     >
       <el-table :data="constraints" border style="width: 100%" v-loading="constraintLoading">
@@ -296,7 +375,7 @@
 </template>
 
 <script>
-import {computed, onActivated, onMounted, reactive, ref, watch} from 'vue'
+import {computed, nextTick, onActivated, onMounted, reactive, ref, watch} from 'vue'
 import {ElMessage, ElMessageBox} from 'element-plus'
 import {
   addField,
@@ -307,10 +386,17 @@ import {
   getBusinessSystemList,
   getConstraintList,
   getFieldList,
+  getPhysicalColumnNames,
   getTableList,
+  syncMissingFieldsFromPhysical,
   updateField
 } from '../api'
 import JsonEditor from '../components/JsonEditor'
+import {
+  buildCommonFieldPresetRows,
+  buildPresetFieldCode,
+  toAddFieldPayload
+} from '../constants/commonFieldPresets'
 
 export default {
   name: 'FieldManage',
@@ -339,6 +425,27 @@ export default {
     const constraintDialogVisible = ref(false)
     const constraints = ref([])
     const constraintLoading = ref(false)
+    const commonFieldDialogVisible = ref(false)
+    const commonPresetRows = ref([])
+    const commonFieldSelectedKeys = ref([])
+    const commonFieldSubmitting = ref(false)
+    const syncMissingFieldsSubmitting = ref(false)
+    const commonPresetTableRef = ref(null)
+    const allFieldsForTable = ref([])
+
+    const commonFieldCodeExample = computed(() =>
+      buildPresetFieldCode(selectedTableCode.value || 'mdm_customer', 'F_CT')
+    )
+
+    const addableCommonFieldCount = computed(() =>
+      commonPresetRows.value.filter((r) => r.selectable && commonFieldSelectedKeys.value.includes(r.key)).length
+    )
+
+    const commonPresetStatusTagType = (row) => {
+      if (row.metadataExists) return 'info'
+      if (row.physicalExists) return 'warning'
+      return 'success'
+    }
     const form = reactive({
       id: null,
       fieldCode: '',
@@ -354,6 +461,11 @@ export default {
       isEnabled: 1,
       inForm: 1,
       businessCode: ''
+    })
+
+    const isEditingPrimaryKey = computed(() => {
+      if (!form.id) return false
+      return form.formComponent === 'primary_key' || form.fieldName === 'id' || form.fieldName === 'uuid'
     })
 
     // 监听字段名称变化，当字段名为'id'或'uuid'时自动设置排序号为0和表单组件为primary_key
@@ -738,6 +850,217 @@ export default {
     const handleCurrentChange = (val) => {
       pagination.current = val
       loadFields()
+    }
+
+    const fetchAllFieldsForTable = async () => {
+      if (!selectedTableCode.value) return []
+      const params = {
+        current: 1,
+        size: 500,
+        includeDisabled: true
+      }
+      if (currentTableBusinessCode.value) {
+        params.businessCode = currentTableBusinessCode.value
+      }
+      const res = await getFieldList(selectedTableCode.value, params)
+      if (res.code !== 200 || !res.data) return []
+      if (Array.isArray(res.data)) return res.data
+      if (res.data.records && Array.isArray(res.data.records)) return res.data.records
+      return []
+    }
+
+    const syncCommonPresetTableSelection = () => {
+      const table = commonPresetTableRef.value
+      if (!table) return
+      table.clearSelection()
+      commonPresetRows.value.forEach((row) => {
+        if (row.selectable && commonFieldSelectedKeys.value.includes(row.key)) {
+          table.toggleRowSelection(row, true)
+        }
+      })
+    }
+
+    const openCommonFieldDialog = async () => {
+      if (!selectedTableCode.value) {
+        ElMessage.warning('请先选择表')
+        return
+      }
+      getCurrentTableBusinessCode()
+      try {
+        allFieldsForTable.value = await fetchAllFieldsForTable()
+        let physicalColumns = []
+        try {
+          const phyRes = await getPhysicalColumnNames(
+            selectedTableCode.value,
+            currentTableBusinessCode.value
+          )
+          if (phyRes.code === 200 && Array.isArray(phyRes.data)) {
+            physicalColumns = phyRes.data
+          }
+        } catch {
+          physicalColumns = []
+        }
+        commonPresetRows.value = buildCommonFieldPresetRows(
+          selectedTableCode.value,
+          allFieldsForTable.value,
+          physicalColumns
+        )
+        commonFieldSelectedKeys.value = commonPresetRows.value
+          .filter((r) => r.selectable && r.defaultSelected)
+          .map((r) => r.key)
+        commonFieldDialogVisible.value = true
+        await nextTick()
+        syncCommonPresetTableSelection()
+      } catch (e) {
+        ElMessage.error(e.response?.data?.message || e.message || '加载字段列表失败')
+      }
+    }
+
+    const handleCommonPresetSelectionChange = (rows) => {
+      commonFieldSelectedKeys.value = (rows || []).map((r) => r.key)
+    }
+
+    const selectAllAddableCommonFields = async () => {
+      commonFieldSelectedKeys.value = commonPresetRows.value
+        .filter((r) => r.selectable)
+        .map((r) => r.key)
+      await nextTick()
+      syncCommonPresetTableSelection()
+    }
+
+    const clearCommonFieldSelection = async () => {
+      commonFieldSelectedKeys.value = []
+      await nextTick()
+      commonPresetTableRef.value?.clearSelection()
+    }
+
+    const handleCommonFieldDialogClosed = () => {
+      commonPresetRows.value = []
+      commonFieldSelectedKeys.value = []
+    }
+
+    const handleCommonFieldSubmit = async () => {
+      const toAdd = commonPresetRows.value
+        .filter((r) => r.selectable && commonFieldSelectedKeys.value.includes(r.key))
+        .sort((a, b) => a.sortStep - b.sortStep)
+      if (toAdd.length === 0) {
+        ElMessage.warning('请勾选需要添加的字段')
+        return
+      }
+      try {
+        await ElMessageBox.confirm(
+          `将为表「${selectedTableCode.value}」添加 ${toAdd.length} 个字段，并执行 ALTER TABLE。是否继续？`,
+          '确认',
+          { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+
+      const sorts = (allFieldsForTable.value || [])
+        .map((f) => Number(f.sort) || 0)
+        .filter((n) => !Number.isNaN(n))
+      let nextSort = sorts.length > 0 ? Math.max(...sorts) + 1 : 1
+
+      commonFieldSubmitting.value = true
+      const added = []
+      const failed = []
+      try {
+        for (const preset of toAdd) {
+          const payload = toAddFieldPayload(
+            selectedTableCode.value,
+            currentTableBusinessCode.value,
+            preset,
+            nextSort
+          )
+          try {
+            const res = await addField(payload)
+            if (res.code === 200) {
+              added.push(preset.fieldName)
+              nextSort += 1
+              allFieldsForTable.value.push(payload)
+            } else {
+              failed.push(`${preset.fieldName}: ${res.message || '失败'}`)
+            }
+          } catch (e) {
+            failed.push(
+              `${preset.fieldName}: ${e.response?.data?.message || e.message || '失败'}`
+            )
+          }
+        }
+        if (added.length > 0) {
+          ElMessage.success(`已添加 ${added.length} 个字段：${added.join('、')}`)
+          await loadFields()
+        }
+        if (failed.length > 0) {
+          ElMessage.warning(`部分失败：${failed.join('；')}`)
+        }
+        if (added.length > 0 && failed.length === 0) {
+          commonFieldDialogVisible.value = false
+        } else if (added.length > 0) {
+          allFieldsForTable.value = await fetchAllFieldsForTable()
+          let physicalColumns = []
+          try {
+            const phyRes = await getPhysicalColumnNames(
+              selectedTableCode.value,
+              currentTableBusinessCode.value
+            )
+            if (phyRes.code === 200 && Array.isArray(phyRes.data)) {
+              physicalColumns = phyRes.data
+            }
+          } catch {
+            physicalColumns = []
+          }
+          commonPresetRows.value = buildCommonFieldPresetRows(
+            selectedTableCode.value,
+            allFieldsForTable.value,
+            physicalColumns
+          )
+          commonFieldSelectedKeys.value = []
+          await nextTick()
+          syncCommonPresetTableSelection()
+        }
+      } finally {
+        commonFieldSubmitting.value = false
+      }
+    }
+
+    const handleSyncMissingFieldsFromPhysical = async () => {
+      if (!selectedTableCode.value) {
+        ElMessage.warning('请先选择表')
+        return
+      }
+      getCurrentTableBusinessCode()
+      try {
+        await ElMessageBox.confirm(
+          `将从业务库读取表「${selectedTableCode.value}」的物理列，把元数据中尚未登记的列补写入（不修改物理表、不删除已有元数据字段）。是否继续？`,
+          '同步缺失字段',
+          { type: 'warning', confirmButtonText: '确定', cancelButtonText: '取消' }
+        )
+      } catch {
+        return
+      }
+      syncMissingFieldsSubmitting.value = true
+      try {
+        const res = await syncMissingFieldsFromPhysical(
+          selectedTableCode.value,
+          currentTableBusinessCode.value
+        )
+        if (res.code === 200 && res.data) {
+          const added = res.data.added || []
+          const skipped = res.data.skipped || []
+          if (added.length > 0) {
+            ElMessage.success(`已补登记 ${added.length} 个字段：${added.join('、')}`)
+            await loadFields()
+          } else {
+            ElMessage.info('没有需要补登记的字段' + (skipped.length ? `（物理列均已登记：${skipped.length} 个）` : ''))
+          }
+        }
+      } catch (e) {
+        ElMessage.error(e.response?.data?.message || e.message || '同步失败')
+      } finally {
+        syncMissingFieldsSubmitting.value = false
+      }
     }
 
     const handleAdd = () => {
@@ -1462,6 +1785,7 @@ export default {
       selectedRows,
       pagination,
       form,
+      isEditingPrimaryKey,
       fieldRules,
       baseFieldTypes,
       typeParams,
@@ -1491,7 +1815,23 @@ export default {
       syncEnumToValidateRule,
       syncValidateRuleToEnum,
       // 辅助函数
-      isPrimaryKey
+      isPrimaryKey,
+      commonFieldDialogVisible,
+      commonPresetRows,
+      commonFieldSelectedKeys,
+      commonFieldSubmitting,
+      commonPresetTableRef,
+      commonFieldCodeExample,
+      commonPresetStatusTagType,
+      addableCommonFieldCount,
+      openCommonFieldDialog,
+      handleCommonPresetSelectionChange,
+      selectAllAddableCommonFields,
+      clearCommonFieldSelection,
+      handleCommonFieldDialogClosed,
+      handleCommonFieldSubmit,
+      syncMissingFieldsSubmitting,
+      handleSyncMissingFieldsFromPhysical
     }
   }
 }
@@ -1530,5 +1870,27 @@ export default {
 .precision-scale-form-item .el-form-item__content {
   flex: 1;
   margin-left: 0 !important;
+}
+
+.pk-field-alert {
+  margin-bottom: 16px;
+}
+
+.common-field-intro {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+}
+
+.common-field-intro code {
+  font-size: 12px;
+  padding: 0 4px;
+  background: #f4f4f5;
+  border-radius: 2px;
+}
+
+.common-field-toolbar {
+  margin-bottom: 8px;
 }
 </style>
