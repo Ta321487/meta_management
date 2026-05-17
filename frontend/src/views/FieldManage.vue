@@ -429,6 +429,7 @@ export default {
     const commonPresetRows = ref([])
     const commonFieldSelectedKeys = ref([])
     const commonFieldSubmitting = ref(false)
+    const syncingPresetSelection = ref(false)
     const syncMissingFieldsSubmitting = ref(false)
     const commonPresetTableRef = ref(null)
     const allFieldsForTable = ref([])
@@ -869,15 +870,22 @@ export default {
       return []
     }
 
-    const syncCommonPresetTableSelection = () => {
+    const syncCommonPresetTableSelection = async () => {
       const table = commonPresetTableRef.value
       if (!table) return
+      const keysToSelect = [...commonFieldSelectedKeys.value]
+      syncingPresetSelection.value = true
+      await nextTick()
       table.clearSelection()
+      await nextTick()
       commonPresetRows.value.forEach((row) => {
-        if (row.selectable && commonFieldSelectedKeys.value.includes(row.key)) {
+        if (row.selectable && keysToSelect.includes(row.key)) {
           table.toggleRowSelection(row, true)
         }
       })
+      await nextTick()
+      commonFieldSelectedKeys.value = keysToSelect
+      syncingPresetSelection.value = false
     }
 
     const openCommonFieldDialog = async () => {
@@ -917,6 +925,7 @@ export default {
     }
 
     const handleCommonPresetSelectionChange = (rows) => {
+      if (syncingPresetSelection.value) return
       commonFieldSelectedKeys.value = (rows || []).map((r) => r.key)
     }
 
@@ -930,8 +939,13 @@ export default {
 
     const clearCommonFieldSelection = async () => {
       commonFieldSelectedKeys.value = []
+      const table = commonPresetTableRef.value
+      if (!table) return
+      syncingPresetSelection.value = true
       await nextTick()
-      commonPresetTableRef.value?.clearSelection()
+      table.clearSelection()
+      await nextTick()
+      syncingPresetSelection.value = false
     }
 
     const handleCommonFieldDialogClosed = () => {

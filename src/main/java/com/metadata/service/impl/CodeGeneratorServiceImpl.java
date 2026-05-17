@@ -259,6 +259,21 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
         // 生成Vue代码
         codeMap.put("List.vue", vueCodeGenerator.generateVueList(tableCode, businessCode));
         codeMap.put("Form.vue", vueCodeGenerator.generateVueForm(tableCode, businessCode));
+        if (vueCodeGenerator.tableHasDetailPage(tableCode)) {
+            codeMap.put("Detail.vue", vueCodeGenerator.generateVueDetail(tableCode, businessCode));
+        }
+        if (vueCodeGenerator.tableHasReportPage(tableCode)) {
+            codeMap.put("Report.vue", vueCodeGenerator.generateVueReport(tableCode, businessCode));
+        }
+        if (vueCodeGenerator.tableHasProcessPage(tableCode)) {
+            codeMap.put("Process.vue", vueCodeGenerator.generateVueProcess(tableCode, businessCode));
+        }
+        if (vueCodeGenerator.tableHasImportPage(tableCode)) {
+            codeMap.put("Import.vue", vueCodeGenerator.generateVueImport(tableCode, businessCode, vueCodeGenerator.tableUsesBatchImportPage(tableCode)));
+        }
+        if (vueCodeGenerator.tableHasExportPage(tableCode)) {
+            codeMap.put("Export.vue", vueCodeGenerator.generateVueExport(tableCode, businessCode));
+        }
         // 生成登录页
         try {
             codeMap.put("Login.vue", vueCodeGenerator.generateLoginPage(businessCode, captchaEnabled));
@@ -497,6 +512,21 @@ public class CodeGeneratorServiceImpl implements CodeGeneratorService {
             String tableCode = t.getTableCode();
             files.put(base + "/List.vue", vueCodeGenerator.generateVueList(tableCode, businessCode));
             files.put(base + "/Form.vue", vueCodeGenerator.generateVueForm(tableCode, businessCode));
+            if (vueCodeGenerator.tableHasDetailPage(tableCode)) {
+                files.put(base + "/Detail.vue", vueCodeGenerator.generateVueDetail(tableCode, businessCode));
+            }
+            if (vueCodeGenerator.tableHasReportPage(tableCode)) {
+                files.put(base + "/Report.vue", vueCodeGenerator.generateVueReport(tableCode, businessCode));
+            }
+            if (vueCodeGenerator.tableHasProcessPage(tableCode)) {
+                files.put(base + "/Process.vue", vueCodeGenerator.generateVueProcess(tableCode, businessCode));
+            }
+            if (vueCodeGenerator.tableHasImportPage(tableCode)) {
+                files.put(base + "/Import.vue", vueCodeGenerator.generateVueImport(tableCode, businessCode, vueCodeGenerator.tableUsesBatchImportPage(tableCode)));
+            }
+            if (vueCodeGenerator.tableHasExportPage(tableCode)) {
+                files.put(base + "/Export.vue", vueCodeGenerator.generateVueExport(tableCode, businessCode));
+            }
             files.put(base + "/api.js", vueCodeGenerator.generateApi(tableCode, businessCode));
         }
         return files;

@@ -109,6 +109,11 @@ public class VueCodeGenerator {
         data.put("businessCode", businessCode);
         data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
         data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        boolean hasDetailPage = tableHasDetailPage(tableCode);
+        data.put("hasDetailPage", hasDetailPage);
+        if (hasDetailPage) {
+            data.put("detailRoutePrefix", resolveDetailRoutePrefix(tableCode, businessCode));
+        }
 
         return templateManager.processTemplate("vue_list.vue.ftl", data);
     }
@@ -152,6 +157,120 @@ public class VueCodeGenerator {
         data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
 
         return templateManager.processTemplate("vue_form.vue.ftl", data);
+    }
+
+    /**
+     * 生成 Vue 详情页面（只读，与表单字段同源）
+     */
+    public String generateVueDetail(String tableCode, String businessCode) throws CodeGenException {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+        }
+        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(fields);
+        List<MetadataField> formLayoutFields = fields.stream()
+                .filter(CodeGenUtils::fieldParticipatesInForm)
+                .collect(Collectors.toList());
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(formLayoutFields, relations);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("table", table);
+        data.put("fields", fieldList);
+        data.put("primaryKeyCamelCase", primaryKeyCamelCase);
+        data.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+        data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        data.put("formRoutePrefix", resolveFormRoutePrefix(tableCode, businessCode));
+
+        return templateManager.processTemplate("vue_detail.vue.ftl", data);
+    }
+
+    public String generateVueReport(String tableCode, String businessCode) throws CodeGenException {
+        Map<String, Object> data = buildListPageTemplateData(tableCode, businessCode);
+        Map<String, Object> group = findFirstSelectField((List<Map<String, Object>>) data.get("fields"));
+        if (group != null) {
+            data.put("groupFieldCamelCase", group.get("camelCaseName"));
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldMeta = (Map<String, Object>) group.get("field");
+            data.put("groupFieldLabel", fieldMeta != null ? fieldMeta.get("label") : "");
+        }
+        return templateManager.processTemplate("vue_report.vue.ftl", data);
+    }
+
+    public String generateVueProcess(String tableCode, String businessCode) throws CodeGenException {
+        Map<String, Object> data = buildFormPageTemplateData(tableCode, businessCode);
+        Map<String, Object> statusField = findStatusField((List<Map<String, Object>>) data.get("fields"));
+        data.put("hasStatusField", statusField != null);
+        if (statusField != null) {
+            data.put("statusFieldCamelCase", statusField.get("camelCaseName"));
+        }
+        return templateManager.processTemplate("vue_process.vue.ftl", data);
+    }
+
+    public String generateVueImport(String tableCode, String businessCode, boolean batchImport) throws CodeGenException {
+        Map<String, Object> data = buildFormPageTemplateData(tableCode, businessCode);
+        List<Map<String, Object>> importFields = ((List<Map<String, Object>>) data.get("fields")).stream()
+                .filter(f -> !"primary_key".equals(getFieldFormComponent(f)))
+                .collect(Collectors.toList());
+        data.put("importFields", importFields);
+        data.put("importPageTitle", batchImport ? "批量导入" : "数据导入");
+        return templateManager.processTemplate("vue_import.vue.ftl", data);
+    }
+
+    public String generateVueExport(String tableCode, String businessCode) throws CodeGenException {
+        Map<String, Object> data = buildListPageTemplateData(tableCode, businessCode);
+        List<Map<String, Object>> exportFields = ((List<Map<String, Object>>) data.get("fields")).stream()
+                .filter(f -> !"primary_key".equals(getFieldFormComponent(f)))
+                .collect(Collectors.toList());
+        data.put("exportFields", exportFields);
+        return templateManager.processTemplate("vue_export.vue.ftl", data);
+    }
+
+    public boolean tableHasReportPage(String tableCode) {
+        return tableHasNodeKind(tableCode, "REPORT");
+    }
+
+    public boolean tableHasProcessPage(String tableCode) {
+        return tableHasNodeKind(tableCode, "PROCESS");
+    }
+
+    public boolean tableHasImportPage(String tableCode) {
+        return tableHasNodeKind(tableCode, "IMPORT");
+    }
+
+    public boolean tableHasExportPage(String tableCode) {
+        return tableHasNodeKind(tableCode, "EXPORT");
+    }
+
+    public boolean tableUsesBatchImportPage(String tableCode) {
+        if (tableCode == null) {
+            return false;
+        }
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        if (nodes == null) {
+            return false;
+        }
+        return nodes.stream()
+                .filter(n -> n.getIsEnabled() == null || n.getIsEnabled() == 1)
+                .anyMatch(n -> "BATCH_IMPORT_PAGE".equalsIgnoreCase(n.getNodeType()));
+    }
+
+    private boolean tableHasNodeKind(String tableCode, String kind) {
+        if (tableCode == null || kind == null) {
+            return false;
+        }
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        if (nodes == null) {
+            return false;
+        }
+        return nodes.stream()
+                .filter(n -> n.getIsEnabled() == null || n.getIsEnabled() == 1)
+                .map(n -> resolveNodePageKind(n.getNodeType()))
+                .anyMatch(spec -> spec != null && kind.equals(spec.kind));
     }
     
     /**
@@ -316,62 +435,42 @@ public class VueCodeGenerator {
             // 有配置的功能节点，生成对应的路由
             for (MetadataFunctionNode node : nodes) {
                 // 对已配置路由信息或需要默认生成路由的节点生成路由
-                if (node.getRoutePath() != null && !node.getRoutePath().isEmpty() || 
-                    node.getJumpRelation() != null && !node.getJumpRelation().isEmpty() || 
-                    (node.getNodeType() != null && (node.getNodeType().toUpperCase().contains("LIST") || 
-                                                   node.getNodeType().toUpperCase().contains("FORM") || 
-                                                   node.getNodeType().toUpperCase().contains("DETAIL")))) {
-                    
+                NodePageKind pageKind = resolveNodePageKind(node.getNodeType());
+                if (node.getRoutePath() != null && !node.getRoutePath().isEmpty()
+                        || node.getJumpRelation() != null && !node.getJumpRelation().isEmpty()
+                        || pageKind != null) {
+
                     Map<String, Object> route = new HashMap<>();
-                    
-                    // 生成路由路径
+
                     String pathValue = "";
                     if (node.getRoutePath() != null && !node.getRoutePath().isEmpty()) {
-                        // 使用配置的 routePath
                         pathValue = node.getRoutePath();
                     } else if (node.getJumpRelation() != null && !node.getJumpRelation().isEmpty()) {
-                        // 使用配置的 jumpRelation 作为路径
                         pathValue = node.getJumpRelation();
-                    } else {
-                        // 没有配置 routePath 和 jumpRelation，根据节点类型生成默认路径
-                        // 使用组件目录作为基础路径
+                    } else if (pageKind != null) {
                         String basePath = componentName.toLowerCase();
-                        if (node.getNodeType().toUpperCase().contains("LIST")) {
-                            pathValue = "/" + businessCode + "/" + basePath + "/list";
-                        } else if (node.getNodeType().toUpperCase().contains("FORM")) {
-                            pathValue = "/" + businessCode + "/" + basePath + "/form/:id?";
-                        } else if (node.getNodeType().toUpperCase().contains("DETAIL")) {
-                            pathValue = "/" + businessCode + "/" + basePath + "/detail/:id?";
-                        } else {
-                            // 其他类型不生成默认路径
-                            continue;
-                        }
+                        pathValue = "/" + businessCode + "/" + basePath + "/" + pageKind.pathSegment
+                                + (pageKind.idParam ? "/:id?" : "");
+                    } else {
+                        continue;
                     }
                     route.put("path", pathValue);
-                    
-                    // 生成路由名称
-                    String nameValue = node.getNodeCode() != null && !node.getNodeCode().isEmpty() ? 
-                                      node.getNodeCode() : componentName + "List";
+
+                    String nameValue = node.getNodeCode() != null && !node.getNodeCode().isEmpty()
+                            ? node.getNodeCode() : componentName + "List";
                     route.put("name", nameValue);
-                    
-                    // 生成组件路径
-                    String componentPath = "";
+
+                    String componentPath;
                     if (node.getComponentPath() != null && !node.getComponentPath().isEmpty()) {
-                        // 如果组件路径以 views/ 开头，直接使用，否则使用默认路径
                         if (node.getComponentPath().startsWith("views/")) {
                             componentPath = "@/" + node.getComponentPath();
                         } else {
                             componentPath = "@/views/" + node.getComponentPath();
                         }
-                    } else if (node.getNodeType().toUpperCase().contains("LIST")) {
-                        // 没有配置 componentPath，使用默认路径
-                        componentPath = "@/views/" + componentDir + "/List.vue";
-                    } else if (node.getNodeType().toUpperCase().contains("FORM")) {
-                        componentPath = "@/views/" + componentDir + "/Form.vue";
-                    } else if (node.getNodeType().toUpperCase().contains("DETAIL")) {
-                        componentPath = "@/views/" + componentDir + "/Form.vue";
+                    } else if (pageKind != null) {
+                        componentPath = "@/views/" + componentDir + "/" + pageKind.vueFile;
                     } else {
-                        componentPath = "@/views/" + componentDir + "/Form.vue";
+                        componentPath = "@/views/" + componentDir + "/List.vue";
                     }
                     route.put("component", "() => import('" + componentPath + "')");
                     
@@ -579,7 +678,7 @@ public class VueCodeGenerator {
             String path = route.get("path") != null ? route.get("path").toString() : "";
             String nodeType = meta.get("nodeType") != null ? meta.get("nodeType").toString() : "";
             boolean listLike = path.contains("/list")
-                    || (CodeGenUtils.isSidebarMenuNodeType(nodeType) && !path.contains("/form") && !path.contains("/detail"));
+                    || ("LIST_PAGE".equalsIgnoreCase(nodeType) && !path.contains("/form") && !path.contains("/detail"));
             if (show && listLike && !tableCode.isEmpty()) {
                 if (menuTables.contains(tableCode)) {
                     meta.put("isMenuVisible", 0);
@@ -693,5 +792,254 @@ public class VueCodeGenerator {
             e.printStackTrace();
         }
         return tableRules;
+    }
+
+    /**
+     * 表是否配置了详情页功能节点（DETAIL_PAGE 或含 /detail 的路由）
+     */
+    public boolean tableHasDetailPage(String tableCode) {
+        if (tableCode == null || tableCode.isEmpty()) {
+            return false;
+        }
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        if (nodes == null || nodes.isEmpty()) {
+            return false;
+        }
+        return nodes.stream()
+                .filter(n -> n.getIsEnabled() == null || n.getIsEnabled() == 1)
+                .anyMatch(this::isDetailNode);
+    }
+
+    private boolean isDetailNode(MetadataFunctionNode node) {
+        if (node == null) {
+            return false;
+        }
+        String type = node.getNodeType() != null ? node.getNodeType().toUpperCase() : "";
+        if ("DETAIL_PAGE".equals(type)) {
+            return true;
+        }
+        String path = firstNonBlank(node.getRoutePath(), node.getJumpRelation());
+        return path != null && path.toLowerCase().contains("/detail");
+    }
+
+    private boolean isFormNode(MetadataFunctionNode node) {
+        if (node == null) {
+            return false;
+        }
+        String type = node.getNodeType() != null ? node.getNodeType().toUpperCase() : "";
+        if ("FORM_PAGE".equals(type)) {
+            return true;
+        }
+        String path = firstNonBlank(node.getRoutePath(), node.getJumpRelation());
+        return path != null && path.toLowerCase().contains("/form");
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (v != null && !v.trim().isEmpty()) {
+                return v.trim();
+            }
+        }
+        return null;
+    }
+
+    private String normalizeRoutePrefix(String path, String defaultPrefix) {
+        if (path == null || path.isEmpty()) {
+            return defaultPrefix;
+        }
+        String normalized = path.replace(":id?", "").replace(":id", "").trim();
+        if (!normalized.endsWith("/")) {
+            normalized = normalized + "/";
+        }
+        if (!normalized.startsWith("/")) {
+            normalized = "/" + normalized;
+        }
+        return normalized;
+    }
+
+    private String defaultRoutePrefix(String businessCode, String componentNameLower, String segment) {
+        return "/" + businessCode + "/" + componentNameLower + "/" + segment + "/";
+    }
+
+    public String resolveDetailRoutePrefix(String tableCode, String businessCode) {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        String componentLower = CodeGenUtils.convertToComponentName(tableCode).toLowerCase();
+        String defaultPrefix = defaultRoutePrefix(businessCode, componentLower, "detail");
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        if (nodes == null) {
+            return defaultPrefix;
+        }
+        for (MetadataFunctionNode node : nodes) {
+            if (node.getIsEnabled() != null && node.getIsEnabled() == 0) {
+                continue;
+            }
+            if (!isDetailNode(node)) {
+                continue;
+            }
+            String path = firstNonBlank(node.getRoutePath(), node.getJumpRelation());
+            if (path != null) {
+                return normalizeRoutePrefix(path, defaultPrefix);
+            }
+        }
+        return defaultPrefix;
+    }
+
+    public String resolveFormRoutePrefix(String tableCode, String businessCode) {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        String componentLower = CodeGenUtils.convertToComponentName(tableCode).toLowerCase();
+        String defaultPrefix = defaultRoutePrefix(businessCode, componentLower, "form");
+        List<MetadataFunctionNode> nodes = nodeMapper.selectByRelatedTableCode(tableCode);
+        if (nodes == null) {
+            return defaultPrefix;
+        }
+        for (MetadataFunctionNode node : nodes) {
+            if (node.getIsEnabled() != null && node.getIsEnabled() == 0) {
+                continue;
+            }
+            if (!isFormNode(node)) {
+                continue;
+            }
+            String path = firstNonBlank(node.getRoutePath(), node.getJumpRelation());
+            if (path != null) {
+                return normalizeRoutePrefix(path, defaultPrefix);
+            }
+        }
+        return defaultPrefix;
+    }
+
+    private static final class NodePageKind {
+        final String kind;
+        final String pathSegment;
+        final String vueFile;
+        final boolean idParam;
+
+        NodePageKind(String kind, String pathSegment, String vueFile, boolean idParam) {
+            this.kind = kind;
+            this.pathSegment = pathSegment;
+            this.vueFile = vueFile;
+            this.idParam = idParam;
+        }
+    }
+
+    private NodePageKind resolveNodePageKind(String nodeType) {
+        if (nodeType == null || nodeType.isEmpty()) {
+            return null;
+        }
+        String t = nodeType.toUpperCase();
+        if ("LIST_PAGE".equals(t) || (t.contains("LIST") && !t.contains("BATCH"))) {
+            return new NodePageKind("LIST", "list", "List.vue", false);
+        }
+        if ("FORM_PAGE".equals(t) || (t.contains("FORM") && !t.contains("PLATFORM"))) {
+            return new NodePageKind("FORM", "form", "Form.vue", true);
+        }
+        if ("DETAIL_PAGE".equals(t) || t.contains("DETAIL")) {
+            return new NodePageKind("DETAIL", "detail", "Detail.vue", true);
+        }
+        if ("REPORT_PAGE".equals(t) || t.contains("REPORT")) {
+            return new NodePageKind("REPORT", "report", "Report.vue", false);
+        }
+        if ("PROCESS_PAGE".equals(t) || t.contains("PROCESS")) {
+            return new NodePageKind("PROCESS", "process", "Process.vue", false);
+        }
+        if ("BATCH_IMPORT_PAGE".equals(t)) {
+            return new NodePageKind("IMPORT", "batch-import", "Import.vue", false);
+        }
+        if ("IMPORT_PAGE".equals(t)) {
+            return new NodePageKind("IMPORT", "import", "Import.vue", false);
+        }
+        if ("BATCH_EXPORT_PAGE".equals(t) || t.contains("EXPORT")) {
+            return new NodePageKind("EXPORT", "export", "Export.vue", false);
+        }
+        return null;
+    }
+
+    private Map<String, Object> buildListPageTemplateData(String tableCode, String businessCode) throws CodeGenException {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+        }
+        List<MetadataField> allFields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(allFields);
+        List<MetadataField> fields = allFields.stream()
+                .filter(f -> !"primary_key".equals(f.getFormComponent()))
+                .collect(Collectors.toList());
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(fields, relations);
+        Map<String, Object> data = new HashMap<>();
+        data.put("table", table);
+        data.put("fields", fieldList);
+        data.put("primaryKeyCamelCase", primaryKeyCamelCase);
+        data.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+        data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        return data;
+    }
+
+    private Map<String, Object> buildFormPageTemplateData(String tableCode, String businessCode) throws CodeGenException {
+        businessCode = businessCode == null ? "DEFAULT" : businessCode;
+        MetadataTable table = tableService.getByCode(tableCode);
+        if (table == null) {
+            throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
+        }
+        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        String primaryKeyCamelCase = CodeGenUtils.getPrimaryKeyCamelCase(fields);
+        List<MetadataField> formLayoutFields = fields.stream()
+                .filter(CodeGenUtils::fieldParticipatesInForm)
+                .collect(Collectors.toList());
+        List<MetadataTableRelation> relations = relationService.listBySlaveTableCode(tableCode, businessCode);
+        List<Map<String, Object>> fieldList = CodeGenUtils.prepareFieldList(formLayoutFields, relations);
+        Map<String, Object> data = new HashMap<>();
+        data.put("table", table);
+        data.put("fields", fieldList);
+        data.put("primaryKeyCamelCase", primaryKeyCamelCase);
+        data.put("componentName", CodeGenUtils.convertToComponentName(table.getTableCode()));
+        data.put("businessCode", businessCode);
+        data.put("businessName", CodeGenUtils.getBusinessName(businessCode, businessSystemService));
+        data.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        return data;
+    }
+
+    private Map<String, Object> findFirstSelectField(List<Map<String, Object>> fieldList) {
+        if (fieldList == null) {
+            return null;
+        }
+        for (Map<String, Object> fm : fieldList) {
+            if ("select".equals(getFieldFormComponent(fm))) {
+                return fm;
+            }
+        }
+        return null;
+    }
+
+    private Map<String, Object> findStatusField(List<Map<String, Object>> fieldList) {
+        if (fieldList == null) {
+            return null;
+        }
+        for (Map<String, Object> fm : fieldList) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> fieldMeta = (Map<String, Object>) fm.get("field");
+            if (fieldMeta == null) {
+                continue;
+            }
+            Object fn = fieldMeta.get("fieldName");
+            if (fn != null && fn.toString().matches("(?i).*(status|approve|process|flow).*")) {
+                return fm;
+            }
+        }
+        return null;
+    }
+
+    private String getFieldFormComponent(Map<String, Object> fieldMap) {
+        @SuppressWarnings("unchecked")
+        Map<String, Object> fieldMeta = (Map<String, Object>) fieldMap.get("field");
+        if (fieldMeta == null || fieldMeta.get("formComponent") == null) {
+            return "";
+        }
+        return fieldMeta.get("formComponent").toString();
     }
 }

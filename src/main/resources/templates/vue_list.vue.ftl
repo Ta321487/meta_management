@@ -84,8 +84,11 @@
         />
         </#if>
 </#list>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="${hasDetailPage?then(260, 200)}" fixed="right">
           <template #default="{ row }">
+            <#if hasDetailPage>
+            <el-button type="primary" link @click="handleView(row)">查看</el-button>
+            </#if>
             <el-button type="primary" link @click="handleEdit(row)">编辑</el-button>
             <el-button type="danger" link @click="handleDelete(row)">删除</el-button>
           </template>
@@ -162,11 +165,17 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+<#if hasDetailPage>
+import { useRouter } from 'vue-router'
+</#if>
 import { ${componentName}Api<#list relatedLoadTargets as rt>, ${rt.relatedTableClassName}Api</#list> } from '../api'
 
 export default {
   name: '${componentName}List',
   setup() {
+    <#if hasDetailPage>
+    const router = useRouter()
+    </#if>
     const tableData = ref([])
     const dialogVisible = ref(false)
     const dialogTitle = ref('新增')
@@ -356,6 +365,17 @@ export default {
       dialogVisible.value = true
     }
 
+    <#if hasDetailPage>
+    const handleView = (row) => {
+      const id = row.${primaryKeyCamelCase}
+      if (id === null || id === undefined || id === '') {
+        ElMessage.warning('无法查看：缺少主键')
+        return
+      }
+      router.push('${detailRoutePrefix}' + id)
+    }
+    </#if>
+
     const handleSubmit = async () => {
       await formRef.value.validate(async (valid) => {
         if (valid) {
@@ -453,6 +473,7 @@ export default {
       handleCurrentChange,
       handleAdd,
       handleEdit,
+      <#if hasDetailPage>handleView,</#if>
       handleSubmit,
       handleDelete,
       handleBatchDelete,

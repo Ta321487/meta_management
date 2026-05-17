@@ -10,7 +10,7 @@
     <div v-else-if="spec" class="preview-root">
       <el-alert type="info" show-icon :closable="false" class="tip">
         <template #title>模拟下载 ZIP 后的前端 + Mock 后端</template>
-        路由与校验规则与生成代码同源；打开预览时若无数据会自动按字段类型填充示例（每表 8 条）。亦可手动「填充 / 覆盖填充」。数据在服务端内存，重启后清空。
+        路由与校验规则与生成代码同源；侧栏菜单与 ZIP 一致（列表、报表、流程、导入、导出等）。列表可「查看」详情、「编辑」表单。打开预览时若无数据会自动填充示例（每表 8 条）。数据在服务端内存，重启后清空。
       </el-alert>
       <el-row :gutter="12" class="toolbar">
         <el-col :span="16">
@@ -44,6 +44,7 @@
             :list-model="currentTable.list"
             :mock-api-base="currentTable.mockApiBase"
             @add="openForm()"
+            @view="openDetail($event)"
             @edit="openForm($event)"
           />
           <GeneratedFormPreview
@@ -54,7 +55,38 @@
             @saved="onFormSaved"
             @cancel="onFormCancel"
           />
-          <el-empty v-if="!currentTable" description="请从左侧选择菜单" />
+          <GeneratedDetailPreview
+            v-if="view === 'detail' && currentTable"
+            :detail-model="currentTable.form"
+            :mock-api-base="currentTable.mockApiBase"
+            :record-id="detailId"
+            @back="onDetailBack"
+            @edit="openFormFromDetail"
+          />
+          <GeneratedReportPreview
+            v-if="view === 'report' && currentTable"
+            ref="reportRef"
+            :list-model="currentTable.list"
+            :mock-api-base="currentTable.mockApiBase"
+          />
+          <GeneratedProcessPreview
+            v-if="view === 'process' && currentTable"
+            ref="processRef"
+            :form-model="currentTable.form"
+            :mock-api-base="currentTable.mockApiBase"
+          />
+          <GeneratedImportPreview
+            v-if="view === 'import' && currentTable"
+            :form-model="currentTable.form"
+            :mock-api-base="currentTable.mockApiBase"
+            :batch-import="activePath.includes('batch-import')"
+          />
+          <GeneratedExportPreview
+            v-if="view === 'export' && currentTable"
+            :list-model="currentTable.list"
+            :mock-api-base="currentTable.mockApiBase"
+          />
+          <el-empty v-if="!currentTable && !loading" description="请从左侧选择菜单" />
         </el-main>
       </el-container>
       <el-collapse class="api-collapse">
@@ -79,6 +111,11 @@ import request from '../../utils/request'
 import { seedBusinessMock } from '../../utils/previewMockSeed'
 import GeneratedListPreview from './GeneratedListPreview.vue'
 import GeneratedFormPreview from './GeneratedFormPreview.vue'
+import GeneratedDetailPreview from './GeneratedDetailPreview.vue'
+import GeneratedReportPreview from './GeneratedReportPreview.vue'
+import GeneratedProcessPreview from './GeneratedProcessPreview.vue'
+import GeneratedImportPreview from './GeneratedImportPreview.vue'
+import GeneratedExportPreview from './GeneratedExportPreview.vue'
 
 const props = defineProps({
   modelValue: Boolean,
@@ -100,8 +137,12 @@ const spec = ref(null)
 const activePath = ref('')
 const view = ref('list')
 const editId = ref(null)
+const detailId = ref(null)
+const formFromDetail = ref(false)
 const dataMode = ref('mock')
 const listRef = ref(null)
+const reportRef = ref(null)
+const processRef = ref(null)
 const seeding = ref(false)
 const ROWS_PER_TABLE = 8
 
@@ -122,27 +163,80 @@ const currentTable = computed(() => {
   return spec.value.tables[0]
 })
 
+function resolveViewFromRoute(route) {
+  const path = route?.path || activePath.value || ''
+  const nodeType = (route?.meta?.nodeType || '').toUpperCase()
+  if (path.includes('/form') || nodeType === 'FORM_PAGE') return 'form'
+  if (path.includes('/detail') || nodeType === 'DETAIL_PAGE') return 'detail'
+  if (path.includes('/report') || nodeType.includes('REPORT')) return 'report'
+  if (path.includes('/process') || nodeType.includes('PROCESS')) return 'process'
+  if (path.includes('/import') || path.includes('/batch-import') || nodeType.includes('IMPORT')) return 'import'
+  if (path.includes('/export') || nodeType.includes('EXPORT')) return 'export'
+  return 'list'
+}
+
 function onMenuSelect(path) {
   activePath.value = path
-  view.value = path.includes('/form') ? 'form' : 'list'
+  const route = (spec.value?.routes || []).find(r => r.path === path)
+  view.value = resolveViewFromRoute(route)
   editId.value = null
+  detailId.value = null
+}
+
+function resolveRowPk(row) {
+  const pk = currentTable.value?.form?.primaryKeyCamelCase || 'id'
+  return row ? (row[pk] ?? row.id) : null
 }
 
 function openForm(row) {
+  formFromDetail.value = false
   view.value = 'form'
-  const pk = currentTable.value?.form?.primaryKeyCamelCase || 'id'
-  editId.value = row ? (row[pk] ?? row.id) : null
+  editId.value = resolveRowPk(row)
+  detailId.value = null
+}
+
+function openDetail(row) {
+  formFromDetail.value = false
+  view.value = 'detail'
+  detailId.value = resolveRowPk(row)
+  editId.value = null
+}
+
+function openFormFromDetail() {
+  formFromDetail.value = true
+  editId.value = detailId.value
+  view.value = 'form'
 }
 
 function onFormSaved() {
-  view.value = 'list'
+  formFromDetail.value = false
   editId.value = null
-  listRef.value?.load?.()
+  detailId.value = null
+  const route = (spec.value?.routes || []).find(r => r.path === activePath.value)
+  view.value = resolveViewFromRoute(route)
+  refreshActiveView()
 }
 
 function onFormCancel() {
-  view.value = 'list'
+  if (formFromDetail.value && editId.value != null) {
+    detailId.value = editId.value
+    editId.value = null
+    formFromDetail.value = false
+    view.value = 'detail'
+    return
+  }
+  formFromDetail.value = false
+  const route = (spec.value?.routes || []).find(r => r.path === activePath.value)
+  view.value = resolveViewFromRoute(route)
   editId.value = null
+  detailId.value = null
+}
+
+function onDetailBack() {
+  const route = (spec.value?.routes || []).find(r => r.path === activePath.value)
+  view.value = resolveViewFromRoute(route)
+  detailId.value = null
+  refreshActiveView()
 }
 
 async function loadSpec() {
@@ -161,7 +255,7 @@ async function loadSpec() {
       const first = menuRoutes.value[0]
       if (first) {
         activePath.value = first.path
-        view.value = first.path.includes('/form') ? 'form' : 'list'
+        view.value = resolveViewFromRoute(first)
       }
       await autoSeedIfEmpty()
     }
@@ -183,7 +277,7 @@ async function autoSeedIfEmpty() {
     if (total > 0) {
       ElMessage.success(`已自动填充示例数据（共 ${total} 条）`)
       await nextTick()
-      listRef.value?.load?.()
+      refreshActiveView()
     }
   } catch (e) {
     console.warn('auto seed failed', e)
@@ -215,7 +309,7 @@ async function fillSampleData(clearFirst) {
         : `已填充 ${total} 条${skipped ? `（${skipped} 张表已有数据已跳过）` : ''}`
     )
     await nextTick()
-    listRef.value?.load?.()
+    refreshActiveView()
   } catch (e) {
     ElMessage.error(e.message || '填充失败')
   } finally {
@@ -226,7 +320,13 @@ async function fillSampleData(clearFirst) {
 async function resetMock() {
   await request.post(`/codegen/preview/business/${encodeURIComponent(props.businessCode)}/mock/reset`)
   ElMessage.success('已清空 Mock 数据')
-  listRef.value?.load?.()
+  refreshActiveView()
+}
+
+function refreshActiveView() {
+  if (view.value === 'list') listRef.value?.load?.()
+  else if (view.value === 'report') reportRef.value?.load?.()
+  else if (view.value === 'process') processRef.value?.load?.()
 }
 
 watch(

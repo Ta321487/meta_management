@@ -648,16 +648,28 @@ public class CodeGenUtils {
         return s;
     }
 
-    /** 是否宜出现在侧栏菜单（仅列表类入口） */
+    /** 是否宜出现在侧栏菜单（列表/报表/批量导入导出等入口；表单/详情/单条导入不进菜单） */
     public static boolean isSidebarMenuNodeType(String nodeType) {
         if (nodeType == null || nodeType.isEmpty()) {
             return true;
         }
         String t = nodeType.toUpperCase();
-        if (t.contains("FORM") || t.contains("DETAIL") || t.contains("IMPORT") || t.contains("EDIT")) {
+        if ("FORM_PAGE".equals(t) || "DETAIL_PAGE".equals(t) || "IMPORT_PAGE".equals(t) || "PROCESS_PAGE".equals(t)) {
             return false;
         }
-        return t.contains("LIST") || t.contains("MENU") || t.contains("PAGE");
+        if ("LIST_PAGE".equals(t) || "REPORT_PAGE".equals(t) || "BATCH_IMPORT_PAGE".equals(t) || "BATCH_EXPORT_PAGE".equals(t)) {
+            return true;
+        }
+        if (t.contains("BATCH_IMPORT") || t.contains("BATCH_EXPORT") || t.contains("REPORT")) {
+            return true;
+        }
+        if (t.contains("FORM") || t.contains("DETAIL") || t.contains("PROCESS")) {
+            return false;
+        }
+        if (t.contains("IMPORT") && !t.contains("BATCH")) {
+            return false;
+        }
+        return t.contains("LIST");
     }
 
     /**

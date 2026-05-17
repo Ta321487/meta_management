@@ -368,6 +368,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
             nodeTypeNameMap.put("DETAIL_PAGE", "详情页");
             nodeTypeNameMap.put("PROCESS_PAGE", "流程流转页");
             nodeTypeNameMap.put("REPORT_PAGE", "报表展示页");
+            nodeTypeNameMap.put("IMPORT_PAGE", "导入页");
             nodeTypeNameMap.put("BATCH_IMPORT_PAGE", "批量导入页");
             nodeTypeNameMap.put("BATCH_EXPORT_PAGE", "批量导出页");
 
@@ -449,15 +450,22 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
                             // 详情页默认不在菜单中显示
                             node.setIsMenuVisible(0);
                         } else if (nodeType != null && nodeType.toUpperCase().contains("REPORT")) {
-                            // 报表页默认在菜单中显示
+                            node.setJumpRelation("/" + pathBase + "/report");
                             node.setIsMenuVisible(1);
-                        } else if (nodeType != null && (nodeType.toUpperCase().contains("BATCH_IMPORT") || nodeType.toUpperCase().contains("BATCH_EXPORT"))) {
-                            // 批量导入/导出页默认在菜单中显示
+                        } else if (nodeType != null && nodeType.toUpperCase().contains("PROCESS")) {
+                            node.setJumpRelation("/" + pathBase + "/process");
+                            node.setIsMenuVisible(0);
+                        } else if ("IMPORT_PAGE".equalsIgnoreCase(nodeType)) {
+                            node.setJumpRelation("/" + pathBase + "/import");
+                            node.setIsMenuVisible(0);
+                        } else if (nodeType != null && nodeType.toUpperCase().contains("BATCH_IMPORT")) {
+                            node.setJumpRelation("/" + pathBase + "/batch-import");
+                            node.setIsMenuVisible(1);
+                        } else if (nodeType != null && nodeType.toUpperCase().contains("BATCH_EXPORT")) {
+                            node.setJumpRelation("/" + pathBase + "/export");
                             node.setIsMenuVisible(1);
                         } else {
-                            // 其它类型不默认设置跳转关系
                             node.setJumpRelation("");
-                            // 其他类型节点默认不在菜单中显示
                             node.setIsMenuVisible(0);
                         }
                         node.setSort(sort++);
