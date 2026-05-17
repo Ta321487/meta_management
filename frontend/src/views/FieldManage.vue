@@ -111,10 +111,19 @@
           </template>
         </el-table-column>
         <el-table-column prop="sort" label="排序" width="80"/>
-        <el-table-column label="操作" width="280" fixed="right">
+        <el-table-column label="操作" width="340" fixed="right">
           <template #default="{ row }">
-            <el-space>
+            <el-space wrap>
               <el-button type="primary" size="small" @click="handleEdit(row)">编辑</el-button>
+              <el-button
+                  type="warning"
+                  size="small"
+                  plain
+                  :disabled="isPrimaryKey(row)"
+                  @click="openMigrateDialog(row)"
+              >
+                迁移
+              </el-button>
               <el-button
                   :type="row.isEnabled === 1 ? 'warning' : 'success'"
                   size="small"
@@ -389,6 +398,109 @@
       </template>
     </el-dialog>
 
+    <!-- 迁移到其他表 -->
+    <el-dialog
+        v-model="migrateDialogVisible"
+        title="迁移字段到其他表"
+        width="620px"
+        :close-on-click-modal="false"
+        destroy-on-close
+    >
+      <el-alert
+        v-if="migrateSourceRow"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        将「{{ migrateSourceRow.label || migrateSourceRow.fieldName }}」（{{ migrateSourceRow.fieldCode }} /
+        {{ migrateSourceRow.fieldName }}）从表「{{ selectedTableCode }}」迁到目标表：登记元数据，缺列时 ADD COLUMN。
+      </el-alert>
+      <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px">
+        <div class="migrate-hints-title">操作前请知悉</div>
+        <ul class="migrate-hints-list">
+          <li>主键字段不可迁移；目标表不能已有相同<strong>字段编码</strong>或<strong>物理列名</strong>。</li>
+          <li>「迁移物理数据」仅当源表与目标表在<strong>同一物理库</strong>时可用；跨库请关闭此项，自行在库工具中搬数据。</li>
+          <li>下方「行对齐键」是<strong>主键列</strong>（多为 <code>id</code>），用于判断两表哪一行对应哪一行；<strong>被迁移的是你选中的业务列</strong>（如 <code>status</code>），不是 <code>id</code>。</li>
+          <li>关闭「迁移数据」时，目标表新列仅为空或默认值，不会从源表拷贝。</li>
+          <li>关闭「删除源表字段」时，源表仍保留元数据与物理列，需自行再删。</li>
+          <li>迁移后请检查<strong>表关联</strong>、<strong>业务规则</strong>是否仍指向源表字段；预览/ZIP 请在对表重新生成。</li>
+          <li>任一步失败将整体回滚，不会只改一半。</li>
+        </ul>
+      </el-alert>
+      <el-form label-width="120px">
+        <el-form-item label="目标表" required>
+          <el-select
+            v-model="migrateForm.targetTableCode"
+            placeholder="请选择目标表"
+            filterable
+            style="width: 100%"
+            @change="loadMigrateTargetJoinFields"
+          >
+            <el-option
+              v-for="t in migrateTargetTableOptions"
+              :key="t.tableCode"
+              :label="`${t.tableName}（${t.tableCode}）`"
+              :value="t.tableCode"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="迁移物理数据">
+          <el-switch v-model="migrateForm.migrateData" />
+          <span v-if="migrateForm.migrateData" style="margin-left: 8px; font-size: 12px; color: #909399;">
+            执行 UPDATE 目标表 JOIN 源表
+          </span>
+          <span v-else style="margin-left: 8px; font-size: 12px; color: #e6a23c;">
+            不拷贝数据，仅元数据 + ADD COLUMN
+          </span>
+        </el-form-item>
+        <template v-if="migrateForm.migrateData && migrateSourceRow">
+          <div class="migrate-join-hint">
+            被迁移列：<strong>{{ migrateSourceRow.fieldName }}</strong>（{{ migrateSourceRow.label }}）。
+            下方填写的是<strong>主键对齐键</strong>，用于 JOIN 找「同一行」，不是要迁移的列。
+          </div>
+          <p v-if="migrateJoinExample" class="migrate-join-sql">{{ migrateJoinExample }}</p>
+        </template>
+        <el-form-item v-if="migrateForm.migrateData" label="源表行对齐键">
+          <el-input :model-value="migrateForm.joinSourceField" readonly>
+            <template #append>主键</template>
+          </el-input>
+          <div class="migrate-field-tip">自动取当前源表主键列，不可改</div>
+        </el-form-item>
+        <el-form-item v-if="migrateForm.migrateData" label="目标表行对齐键">
+          <el-select
+            v-model="migrateForm.joinTargetField"
+            placeholder="请先选择目标表"
+            :disabled="!migrateForm.targetTableCode"
+            :loading="migrateTargetFieldsLoading"
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in migrateTargetJoinOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <div class="migrate-field-tip">默认目标表主键；与源表主键列名相同时会优先选中</div>
+        </el-form-item>
+        <el-form-item label="删除源表字段">
+          <el-switch v-model="migrateForm.removeFromSource" />
+          <span v-if="migrateForm.removeFromSource" style="margin-left: 8px; font-size: 12px; color: #909399;">
+            成功后 DROP COLUMN 并删源表元数据
+          </span>
+          <span v-else style="margin-left: 8px; font-size: 12px; color: #e6a23c;">
+            源表字段仍保留
+          </span>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="migrateDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="migrateSubmitting" @click="handleMigrateSubmit">开始迁移</el-button>
+      </template>
+    </el-dialog>
+
     <!-- 约束列表对话框 -->
     <el-dialog
         v-model="constraintDialogVisible"
@@ -433,6 +545,7 @@ import {
   getFieldList,
   getPhysicalColumnNames,
   getTableList,
+  migrateFieldToTable,
   syncMissingFieldsFromPhysical,
   updateField
 } from '../api'
@@ -449,6 +562,7 @@ import {
   physicalColumnRules
 } from '../utils/identifierInput'
 import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
+import { mergeOptionsWithValues, resolveFieldOptionItems } from '../utils/fieldOptionUtils'
 
 export default {
   name: 'FieldManage',
@@ -483,8 +597,102 @@ export default {
     const commonFieldSubmitting = ref(false)
     const syncingPresetSelection = ref(false)
     const syncMissingFieldsSubmitting = ref(false)
+    const migrateDialogVisible = ref(false)
+    const migrateSubmitting = ref(false)
+    const migrateSourceRow = ref(null)
+    const migrateForm = reactive({
+      targetTableCode: '',
+      migrateData: true,
+      removeFromSource: true,
+      joinSourceField: 'id',
+      joinTargetField: ''
+    })
+    const migrateTargetFields = ref([])
+    const migrateTargetFieldsLoading = ref(false)
     const commonPresetTableRef = ref(null)
     const allFieldsForTable = ref([])
+
+    const migrateTargetTableOptions = computed(() =>
+      tables.value.filter((t) => t.tableCode && t.tableCode !== selectedTableCode.value)
+    )
+
+    const resolveTablePrimaryKeyFieldName = (fields) => {
+      const pk = (fields || []).find(
+        (f) => f.formComponent === 'primary_key' || f.fieldName === 'id' || f.fieldName === 'uuid'
+      )
+      return pk?.fieldName || 'id'
+    }
+
+    const migrateJoinExample = computed(() => {
+      const col = migrateSourceRow.value?.fieldName
+      if (!col || !migrateForm.migrateData) return ''
+      const srcKey = (migrateForm.joinSourceField || 'id').trim() || 'id'
+      const tgtKey = (migrateForm.joinTargetField || '').trim() || srcKey
+      return `UPDATE 目标表 t JOIN 源表 s ON t.${tgtKey} = s.${srcKey} SET t.${col} = s.${col}`
+    })
+
+    const buildJoinKeyOptions = (fields, sourcePkName) => {
+      const pkName = resolveTablePrimaryKeyFieldName(fields)
+      const names = [...new Set((fields || []).map((f) => f.fieldName).filter(Boolean))]
+      const sorted = names.sort((a, b) => {
+        if (a === pkName) return -1
+        if (b === pkName) return 1
+        if (a === sourcePkName) return -1
+        if (b === sourcePkName) return 1
+        return a.localeCompare(b)
+      })
+      return sorted.map((name) => {
+        let suffix = ''
+        if (name === pkName) suffix = '（主键，推荐）'
+        else if (name === sourcePkName && name !== pkName) suffix = '（与源表主键同名）'
+        return { value: name, label: `${name}${suffix}` }
+      })
+    }
+
+    const migrateTargetJoinOptions = computed(() =>
+      buildJoinKeyOptions(migrateTargetFields.value, migrateForm.joinSourceField)
+    )
+
+    const pickDefaultTargetJoinField = (fields, sourcePkName) => {
+      const pkName = resolveTablePrimaryKeyFieldName(fields)
+      const names = (fields || []).map((f) => f.fieldName).filter(Boolean)
+      if (names.includes(sourcePkName)) return sourcePkName
+      return pkName
+    }
+
+    const loadMigrateTargetJoinFields = async (tableCode) => {
+      if (!tableCode) {
+        migrateTargetFields.value = []
+        migrateForm.joinTargetField = ''
+        return
+      }
+      const targetTable = tables.value.find((t) => t.tableCode === tableCode)
+      const bc = targetTable?.businessCode || currentTableBusinessCode.value || ''
+      migrateTargetFieldsLoading.value = true
+      try {
+        const res = await getFieldList(tableCode, {
+          businessCode: bc,
+          includeDisabled: true,
+          current: 1,
+          size: 500
+        })
+        let fields = []
+        if (res.code === 200 && res.data) {
+          if (Array.isArray(res.data)) {
+            fields = res.data
+          } else if (Array.isArray(res.data.records)) {
+            fields = res.data.records
+          }
+        }
+        migrateTargetFields.value = fields
+        migrateForm.joinTargetField = pickDefaultTargetJoinField(fields, migrateForm.joinSourceField)
+      } catch {
+        migrateTargetFields.value = []
+        migrateForm.joinTargetField = migrateForm.joinSourceField
+      } finally {
+        migrateTargetFieldsLoading.value = false
+      }
+    }
 
     const commonFieldCodeExample = computed(() =>
       buildPresetFieldCode(selectedTableCode.value || 'mdm_customer', 'F_CT')
@@ -1107,6 +1315,93 @@ export default {
       }
     }
 
+    const openMigrateDialog = (row) => {
+      if (isPrimaryKey(row)) {
+        ElMessage.warning('主键字段不能迁移')
+        return
+      }
+      migrateSourceRow.value = row
+      migrateForm.targetTableCode = ''
+      migrateForm.migrateData = true
+      migrateForm.removeFromSource = true
+      const pkName = resolveTablePrimaryKeyFieldName(fieldData.value)
+      migrateForm.joinSourceField = pkName
+      migrateForm.joinTargetField = ''
+      migrateTargetFields.value = []
+      migrateDialogVisible.value = true
+    }
+
+    const handleMigrateSubmit = async () => {
+      if (!migrateSourceRow.value?.id) {
+        return
+      }
+      if (!migrateForm.targetTableCode) {
+        ElMessage.warning('请选择目标表')
+        return
+      }
+      if (migrateForm.migrateData && !migrateForm.joinTargetField) {
+        ElMessage.warning('请选择目标表行对齐键')
+        return
+      }
+      const src = migrateSourceRow.value
+      const targetLabel =
+        migrateTargetTableOptions.value.find((t) => t.tableCode === migrateForm.targetTableCode)?.tableName
+        || migrateForm.targetTableCode
+      let confirmMsg = `将字段「${src.label || src.fieldName}」迁移到表「${targetLabel}」？\n`
+      if (migrateForm.migrateData) {
+        confirmMsg += '· 将在目标表 ADD COLUMN（若缺列），并按关联列拷贝物理数据\n'
+      } else {
+        confirmMsg += '· 不拷贝物理数据\n'
+      }
+      if (migrateForm.removeFromSource) {
+        confirmMsg += '· 迁移成功后从当前表删除该字段（DROP COLUMN）'
+      } else {
+        confirmMsg += '· 保留当前表字段'
+      }
+      try {
+        await ElMessageBox.confirm(confirmMsg, '确认迁移', {
+          type: 'warning',
+          confirmButtonText: '开始迁移',
+          cancelButtonText: '取消'
+        })
+      } catch {
+        return
+      }
+      migrateSubmitting.value = true
+      try {
+        const payload = {
+          fieldId: src.id,
+          targetTableCode: migrateForm.targetTableCode,
+          businessCode: currentTableBusinessCode.value || undefined,
+          migrateData: migrateForm.migrateData,
+          removeFromSource: migrateForm.removeFromSource,
+          joinSourceField: migrateForm.joinSourceField || 'id',
+          joinTargetField: migrateForm.joinTargetField || undefined
+        }
+        const res = await migrateFieldToTable(payload)
+        if (res.code === 200) {
+          const d = res.data || {}
+          let msg = `已迁移到 ${d.targetTableCode}`
+          if (d.dataMigrated) {
+            msg += '，已拷贝数据'
+          }
+          if (d.removedFromSource) {
+            msg += '，已从源表删除'
+          }
+          ElMessage.success(msg)
+          if (d.warnings?.length) {
+            ElMessage.warning(d.warnings.join('；'))
+          }
+          migrateDialogVisible.value = false
+          await loadFields()
+        }
+      } catch (e) {
+        ElMessage.error(e.response?.data?.message || e.message || '迁移失败')
+      } finally {
+        migrateSubmitting.value = false
+      }
+    }
+
     const handleSyncMissingFieldsFromPhysical = async () => {
       if (!selectedTableCode.value) {
         ElMessage.warning('请先选择表')
@@ -1301,18 +1596,17 @@ export default {
         validateRuleObj = {}
       }
 
-      // 更新校验规则
+      // 更新校验规则（保留已有 options 的 label）
       validateRuleObj.operator = 'IN'
       validateRuleObj.values = values
+      validateRuleObj.options = mergeOptionsWithValues(values, validateRuleObj.options || [])
       validateRuleObj.message = validateRuleObj.message || '请选择有效值'
       validateRuleObj.trigger = validateRuleObj.trigger || 'blur'
 
-      // 清理不应该存在的字段：删除value字段（IN约束应该只有values数组）
       if ('value' in validateRuleObj) {
         delete validateRuleObj.value
       }
 
-      // 转换为JSON字符串
       form.validateRule = JSON.stringify(validateRuleObj, null, 2)
       ElMessage.success('枚举值已同步到校验规则')
     }
@@ -1519,10 +1813,13 @@ export default {
                       .filter(val => val !== null && val !== undefined && val !== '')
                       .map(val => String(val).trim())
                       .filter(val => val.length > 0 && !val.startsWith('_utf8mb4') && !val.startsWith('_gbk') && !val.startsWith('_'))
+                  validateRuleObj.options = mergeOptionsWithValues(
+                    validateRuleObj.values,
+                    validateRuleObj.options || []
+                  )
                   validateRuleObj.message = validateRuleObj.message || '请选择有效值'
                   validateRuleObj.trigger = validateRuleObj.trigger || 'blur'
 
-                  // 清理不应该存在的字段：删除value字段（IN约束应该只有values数组）
                   if ('value' in validateRuleObj) {
                     delete validateRuleObj.value
                   }
@@ -1530,12 +1827,20 @@ export default {
                   submitForm.validateRule = JSON.stringify(validateRuleObj, null, 2)
                 }
               } catch (e) {
-                // 解析失败，使用提取的枚举值重新构建校验规则
                 const values = enumValuesStr.split(',').map(v => v.trim()).filter(v => v.length > 0)
                 if (values.length > 0) {
+                  let prevRule = {}
+                  try {
+                    if (submitForm.validateRule?.trim() && submitForm.validateRule !== '{}') {
+                      prevRule = JSON.parse(submitForm.validateRule) || {}
+                    }
+                  } catch {
+                    prevRule = {}
+                  }
                   validateRuleObj = {
                     operator: 'IN',
                     values: values,
+                    options: mergeOptionsWithValues(values, prevRule.options || []),
                     message: '请选择有效值',
                     trigger: 'blur'
                   }
@@ -1563,13 +1868,21 @@ export default {
               submitForm.fieldType = computedFieldType.value
 
               // 构建校验规则对象（确保不包含value字段）
+              let prevRule = {}
+              try {
+                if (submitForm.validateRule && submitForm.validateRule.trim() && submitForm.validateRule !== '{}') {
+                  prevRule = JSON.parse(submitForm.validateRule) || {}
+                }
+              } catch {
+                prevRule = {}
+              }
               validateRuleObj = {
                 operator: 'IN',
                 values: values,
+                options: mergeOptionsWithValues(values, prevRule.options || []),
                 message: '请选择有效值',
                 trigger: 'blur'
               }
-              // 确保不包含value字段
               if ('value' in validateRuleObj) {
                 delete validateRuleObj.value
               }
@@ -1854,36 +2167,7 @@ export default {
       loadBusinessSystems()
     })
 
-    const normalizeOptionItem = (o) => {
-      if (o == null) return null
-      if (typeof o === 'object' && !Array.isArray(o)) {
-        const value = o.value ?? o.label
-        const label = o.label ?? o.value
-        if (value == null && label == null) return null
-        return { value, label: label ?? value }
-      }
-      return { value: o, label: o }
-    }
-
-    /** 列表展示：从 validateRule 解析为 { value, label }[] */
-    const parseFieldOptionItems = (row) => {
-      const raw = row?.validateRule
-      if (!raw || String(raw).trim() === '' || String(raw).trim() === '{}') {
-        return []
-      }
-      try {
-        const obj = JSON.parse(String(raw).trim())
-        let list = []
-        if (Array.isArray(obj.options) && obj.options.length) {
-          list = obj.options
-        } else if (obj.operator === 'IN' && Array.isArray(obj.values) && obj.values.length) {
-          list = obj.values
-        }
-        return list.map(normalizeOptionItem).filter(Boolean)
-      } catch {
-        return []
-      }
-    }
+    const parseFieldOptionItems = (row) => resolveFieldOptionItems(row)
 
     const showOptionCode = (opt) =>
       opt.value != null && String(opt.label) !== String(opt.value)
@@ -1967,6 +2251,17 @@ export default {
       handleCommonFieldDialogClosed,
       handleCommonFieldSubmit,
       syncMissingFieldsSubmitting,
+      migrateDialogVisible,
+      migrateSubmitting,
+      migrateSourceRow,
+      migrateForm,
+      migrateTargetTableOptions,
+      migrateJoinExample,
+      migrateTargetJoinOptions,
+      migrateTargetFieldsLoading,
+      loadMigrateTargetJoinFields,
+      openMigrateDialog,
+      handleMigrateSubmit,
       handleSyncMissingFieldsFromPhysical,
       parseFieldOptionItems,
       showOptionCode,
@@ -2032,6 +2327,63 @@ export default {
 
 .common-field-toolbar {
   margin-bottom: 8px;
+}
+
+.migrate-hints-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.migrate-hints-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.65;
+  color: #606266;
+}
+
+.migrate-hints-list li {
+  margin-bottom: 4px;
+}
+
+.migrate-hints-list code {
+  font-size: 11px;
+  padding: 0 3px;
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 2px;
+}
+
+.migrate-join-hint {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #303133;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  background: #ecf5ff;
+  border-radius: 4px;
+  border: 1px solid #d9ecff;
+}
+
+.migrate-join-sql {
+  font-size: 11px;
+  font-family: ui-monospace, Consolas, monospace;
+  color: #606266;
+  margin: 0 0 12px;
+  padding: 6px 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.migrate-field-tip {
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+
+.migrate-field-tip code {
+  font-size: 11px;
 }
 
 .field-options-empty {

@@ -1,5 +1,6 @@
 package com.metadata.service;
 
+import com.metadata.common.FieldMigrateRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.entity.MetadataField;
@@ -101,4 +102,9 @@ public interface MetadataFieldService {
      * 从业务库物理表补登记尚未写入元数据的列（不修改物理表、不删除元数据字段）。
      */
     Map<String, Object> syncMissingFieldsFromPhysical(String tableCode, String businessCode);
+
+    /**
+     * 将字段从当前表迁移到另一张表：目标表补元数据与 ADD COLUMN（若缺列），可选拷贝数据、删除源表字段。
+     */
+    Map<String, Object> migrateField(FieldMigrateRequest request);
 }

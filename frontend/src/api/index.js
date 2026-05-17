@@ -38,6 +38,7 @@ export const getPhysicalColumnNames = (tableCode, businessCode) =>
   request.get(`/field/physicalColumns/${tableCode}`, { params: businessCode ? { businessCode } : {} })
 export const syncMissingFieldsFromPhysical = (tableCode, businessCode) =>
   request.post(`/field/syncFromPhysical/${tableCode}`, null, { params: businessCode ? { businessCode } : {} })
+export const migrateFieldToTable = (data) => request.post('/field/migrate', data)
 export const addField = (data) => request.post('/field/add', data)
 export const updateField = (data) => request.post('/field/update', data)
 export const deleteField = (id) => request.delete(`/field/delete/${id}`)

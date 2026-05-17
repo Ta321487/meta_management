@@ -1,5 +1,7 @@
 // 生成模拟数据的工具函数（与元数据 validationRules / 表单组件同源）
 
+import { resolveFieldOptionItems } from './fieldOptionUtils'
+
 function generateRandomDigitString(length) {
   let result = ''
   for (let i = 0; i < length; i++) {
@@ -19,7 +21,7 @@ function parseValidateRuleInput(field) {
   if (field.validationRules && typeof field.validationRules === 'object') {
     return field.validationRules
   }
-  const raw = field.validateRule
+  const raw = fieldValidateRuleRaw(field)
   if (!raw) return null
   if (typeof raw === 'object') return raw
   try {
@@ -29,8 +31,12 @@ function parseValidateRuleInput(field) {
   }
 }
 
+function fieldValidateRuleRaw(field) {
+  return field?.validateRule ?? field?.field?.validateRule
+}
+
 function parseValidateRuleRaw(field) {
-  const raw = field?.validateRule
+  const raw = fieldValidateRuleRaw(field)
   if (!raw) return null
   if (typeof raw === 'object') return raw
   try {
@@ -87,6 +93,17 @@ function pickFromEnumFieldType(fieldType) {
     .filter(Boolean)
   if (!values.length) return null
   return values[Math.floor(Math.random() * values.length)]
+}
+
+/** 与 ZIP/预览同源：从 validateRule + fieldType 解析选项后随机取存库 value */
+function pickFromResolvedFieldOptions(field) {
+  const items = resolveFieldOptionItems({
+    validateRule: fieldValidateRuleRaw(field),
+    fieldType: field?.fieldType || field?.field?.fieldType
+  })
+  if (!items.length) return null
+  const item = items[Math.floor(Math.random() * items.length)]
+  return item.value
 }
 
 function formComponentOf(field) {
@@ -256,7 +273,11 @@ export function generateMockValue(field) {
   const label = labelOf(field)
   const dbLen = field.fieldLength ?? field.field?.fieldLength ?? 255
 
-  // 1. 下拉 / IN / options（含 select 组件）
+  // 1. 下拉 / IN / options（与 ZIP 同源解析，只写入存库 value）
+  const fromResolved = pickFromResolvedFieldOptions(field)
+  if (fromResolved != null && fromResolved !== '') {
+    return fromResolved
+  }
   const fromPick = pickInOrOptions(vr, rawJson)
   if (fromPick != null && fromPick !== '') {
     return fromPick
@@ -358,7 +379,7 @@ export function toMockFieldShape(field) {
     fieldName: resolveListFieldProp(field) || meta.fieldName || field.fieldName,
     fieldType: field.fieldType || meta.fieldType,
     fieldLength: meta.fieldLength ?? field.fieldLength,
-    validateRule: meta.validateRule ?? field.validateRule,
+    validateRule: meta.validateRule ?? field.validateRule ?? field.field?.validateRule,
     validationRules: field.validationRules || meta.validationRules,
     formComponent: meta.formComponent || field.formComponent,
     label: field.label || meta.label || field.label

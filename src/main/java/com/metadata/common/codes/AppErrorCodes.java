@@ -59,6 +59,12 @@ public final class AppErrorCodes {
     public static final int FIELD_BATCH_STATUS_PARAM_INVALID = 1114;
     /** 不允许禁用主键字段 */
     public static final int FIELD_PRIMARY_CANNOT_DISABLE = 1115;
+    /** 字段不允许迁移（如主键） */
+    public static final int FIELD_MIGRATE_NOT_ALLOWED = 1116;
+    /** 目标表已存在同编码/同名列 */
+    public static final int FIELD_MIGRATE_TARGET_CONFLICT = 1117;
+    /** 跨库无法迁移数据 */
+    public static final int FIELD_MIGRATE_DATA_CATALOG_MISMATCH = 1118;
 
     // ---------- 业务系统 12xx ----------
     public static final int BIZ_SYSTEM_NOT_FOUND = 1201;

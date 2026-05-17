@@ -2,6 +2,7 @@ package com.metadata.controller;
 
 import com.metadata.common.BatchDeleteRequest;
 import com.metadata.common.DeleteConstraintRequest;
+import com.metadata.common.FieldMigrateRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.Result;
@@ -116,6 +117,12 @@ public class MetadataFieldController {
             @Parameter(description = "表编码") @PathVariable String tableCode,
             @Parameter(description = "业务系统编码") @RequestParam(required = false) String businessCode) {
         return Result.success(fieldService.syncMissingFieldsFromPhysical(tableCode, businessCode));
+    }
+
+    @PostMapping("/migrate")
+    @Operation(summary = "迁移字段到其他表", description = "目标表登记元数据并 ADD COLUMN（若缺列）；可选拷贝数据、删除源表字段")
+    public Result<Map<String, Object>> migrateField(@RequestBody FieldMigrateRequest request) {
+        return Result.success(fieldService.migrateField(request));
     }
 
     /**

@@ -1,3 +1,14 @@
+import { resolveFieldOptionItems } from './fieldOptionUtils'
+
+/** 预览 spec 字段：validateRule 在 field.field 上，与 ZIP 入参 prepareFieldList 一致 */
+function fieldValidateRule(field) {
+  return field?.validateRule ?? field?.field?.validateRule
+}
+
+function fieldFieldType(field) {
+  return field?.fieldType || field?.field?.fieldType
+}
+
 export function fc(field) {
   return field?.formComponent || field?.field?.formComponent || 'input'
 }
@@ -27,7 +38,22 @@ function mapOptionEntry(o) {
 }
 
 export function selectOptions(field) {
+  const resolved = resolveFieldOptionItems({
+    validateRule: fieldValidateRule(field),
+    fieldType: fieldFieldType(field)
+  })
+  if (resolved.some(o => String(o.label) !== String(o.value))) {
+    return resolved
+  }
+
   const vr = field?.validationRules || {}
+  if (vr.hasOptions && Array.isArray(vr.options) && vr.options.length) {
+    const mapped = vr.options.map(mapOptionEntry)
+    if (mapped.some(o => String(o.label) !== String(o.value))) {
+      return mapped
+    }
+  }
+  if (resolved.length) return resolved
   if (vr.hasOptions && Array.isArray(vr.options) && vr.options.length) {
     return vr.options.map(mapOptionEntry)
   }

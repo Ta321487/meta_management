@@ -45,6 +45,20 @@ public final class FieldMessages {
 
     public static final String PRIMARY_KEY_CANNOT_DISABLE = "主键字段不允许禁用";
 
+    public static final String FIELD_MIGRATE_PRIMARY = "主键字段不允许迁移";
+
+    public static final String FIELD_MIGRATE_SAME_TABLE = "目标表不能与源表相同";
+
+    public static final String FIELD_MIGRATE_TARGET_FIELD_CODE_EXISTS = "目标表已存在相同字段编码";
+
+    public static final String FIELD_MIGRATE_TARGET_FIELD_NAME_EXISTS = "目标表已存在相同物理列名";
+
+    public static final String FIELD_MIGRATE_DATA_CATALOG_MISMATCH = "源表与目标表不在同一物理库，无法自动迁移数据，请取消「迁移数据」或先在同一库内调整表配置";
+
+    public static final String FIELD_MIGRATE_TARGET_TABLE_NOT_FOUND = "目标表不存在或未登记";
+
+    public static final String FIELD_MIGRATE_JOIN_INVALID = "关联列名格式不正确";
+
     public static String alterNamedOpFailed(String operationType, Object detail) {
         String d = detail != null ? detail.toString() : "";
         return String.format(ALTER_NAMED_OP_FAILED_FMT, operationType, d);

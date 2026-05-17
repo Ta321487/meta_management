@@ -2,6 +2,7 @@ package com.metadata.service.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.metadata.common.FieldMigrateRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
 import com.metadata.common.codes.ApiMessages;
@@ -36,6 +37,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -1008,5 +1010,200 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
             }
         }
         logService.logSuccess("admin", "BATCH_EDIT", "批量更新字段状态：ids=" + ids + ", status=" + status);
+    }
+
+    @Override
+    @Transactional
+    public Map<String, Object> migrateField(FieldMigrateRequest request) {
+        if (request == null || request.getFieldId() == null) {
+            throw BizException.badRequest("请指定要迁移的字段");
+        }
+        if (request.getTargetTableCode() == null || request.getTargetTableCode().trim().isEmpty()) {
+            throw BizException.badRequest("请指定目标表");
+        }
+
+        MetadataField source = fieldMapper.selectById(request.getFieldId());
+        if (source == null) {
+            throw BizException.of(AppErrorCodes.FIELD_NOT_FOUND, FieldMessages.FIELD_NOT_FOUND);
+        }
+
+        if (isPrimaryKeyField(source)) {
+            throw BizException.of(AppErrorCodes.FIELD_MIGRATE_NOT_ALLOWED, FieldMessages.FIELD_MIGRATE_PRIMARY);
+        }
+
+        String sourceTableCode = source.getTableCode();
+        String targetTableCode = request.getTargetTableCode().trim();
+        if (sourceTableCode.equals(targetTableCode)) {
+            throw BizException.of(AppErrorCodes.FIELD_MIGRATE_NOT_ALLOWED, FieldMessages.FIELD_MIGRATE_SAME_TABLE);
+        }
+
+        String bc = request.getBusinessCode() != null ? request.getBusinessCode().trim() : "";
+        if (bc.isEmpty() && source.getBusinessCode() != null) {
+            bc = source.getBusinessCode();
+        }
+
+        MetadataTable targetTable = tableMapper.selectByCode(targetTableCode, bc);
+        if (targetTable == null) {
+            throw BizException.of(AppErrorCodes.TABLE_NOT_FOUND, FieldMessages.FIELD_MIGRATE_TARGET_TABLE_NOT_FOUND);
+        }
+        if (bc.isEmpty() && targetTable.getBusinessCode() != null) {
+            bc = targetTable.getBusinessCode();
+        }
+        String targetBc = targetTable.getBusinessCode() != null && !targetTable.getBusinessCode().isEmpty()
+                ? targetTable.getBusinessCode() : bc;
+
+        if (fieldMapper.countByCode(targetTableCode, source.getFieldCode(), targetBc) > 0) {
+            throw BizException.of(AppErrorCodes.FIELD_MIGRATE_TARGET_CONFLICT,
+                    FieldMessages.FIELD_MIGRATE_TARGET_FIELD_CODE_EXISTS);
+        }
+
+        List<MetadataField> targetFields = fieldMapper.selectByTableCode(targetTableCode, targetBc, true);
+        boolean nameConflict = targetFields.stream()
+                .anyMatch(f -> source.getFieldName().equalsIgnoreCase(f.getFieldName()));
+        if (nameConflict) {
+            throw BizException.of(AppErrorCodes.FIELD_MIGRATE_TARGET_CONFLICT,
+                    FieldMessages.FIELD_MIGRATE_TARGET_FIELD_NAME_EXISTS);
+        }
+
+        boolean migrateData = request.getMigrateData() == null || Boolean.TRUE.equals(request.getMigrateData());
+        boolean removeFromSource = request.getRemoveFromSource() == null || Boolean.TRUE.equals(request.getRemoveFromSource());
+
+        String joinSource = request.getJoinSourceField() != null && !request.getJoinSourceField().trim().isEmpty()
+                ? CodeValidator.normalizeIdentifier(request.getJoinSourceField().trim())
+                : "id";
+        String joinTarget = request.getJoinTargetField() != null && !request.getJoinTargetField().trim().isEmpty()
+                ? CodeValidator.normalizeIdentifier(request.getJoinTargetField().trim())
+                : joinSource;
+        if (!CodeValidator.isValidIdentifier(joinSource) || !CodeValidator.isValidIdentifier(joinTarget)) {
+            throw BizException.of(AppErrorCodes.FIELD_MIGRATE_NOT_ALLOWED, FieldMessages.FIELD_MIGRATE_JOIN_INVALID);
+        }
+
+        String sourceCatalog = businessCatalogResolver.resolveCatalog(sourceTableCode, bc);
+        String targetCatalog = businessCatalogResolver.resolveCatalog(targetTableCode, targetBc);
+        String sourcePhy = codeGeneratorService.convertToTableName(sourceTableCode);
+        String targetPhy = codeGeneratorService.convertToTableName(targetTableCode);
+
+        boolean sameCatalog = sourceCatalog != null && sourceCatalog.equals(targetCatalog);
+        if (migrateData && (sourceCatalog == null || sourceCatalog.isEmpty() || targetCatalog == null || targetCatalog.isEmpty())) {
+            migrateData = false;
+        }
+        if (migrateData && !sameCatalog) {
+            throw BizException.of(AppErrorCodes.FIELD_MIGRATE_DATA_CATALOG_MISMATCH,
+                    FieldMessages.FIELD_MIGRATE_DATA_CATALOG_MISMATCH);
+        }
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("sourceTableCode", sourceTableCode);
+        result.put("targetTableCode", targetTableCode);
+        result.put("fieldCode", source.getFieldCode());
+        result.put("fieldName", source.getFieldName());
+
+        MetadataField targetField = copyFieldForMigrate(source);
+        targetField.setTableCode(targetTableCode);
+        targetField.setBusinessCode(targetBc);
+        if (targetField.getIsEnabled() == null) {
+            targetField.setIsEnabled(1);
+        }
+
+        boolean targetColExists = physicalColumnExists(targetCatalog, targetPhy, source.getFieldName());
+        result.put("targetColumnExisted", targetColExists);
+
+        if (!targetColExists) {
+            if (targetCatalog == null || targetCatalog.isEmpty()) {
+                throw BizException.badRequest("目标表无法解析物理库，无法 ADD COLUMN");
+            }
+            try {
+                MetadataField ddlField = copyFieldForMigrate(source);
+                ddlField.setTableCode(targetTableCode);
+                ddlField.setBusinessCode(targetBc);
+                String alterSql = codeGeneratorService.generateAlterTableAddColumnSQL(targetTableCode, ddlField);
+                Map<String, Object> sqlResult = sqlExecuteService.executeSql(alterSql, true, targetCatalog);
+                if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
+                    throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED,
+                            FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + sqlResult.get("message"));
+                }
+                result.put("addColumn", true);
+                logService.logSuccess("admin", "FIELD_MIGRATE_ADD_COLUMN",
+                        "迁移字段 ADD COLUMN: " + targetTableCode + "." + source.getFieldName());
+            } catch (Exception e) {
+                if (e instanceof BizException) {
+                    throw (BizException) e;
+                }
+                throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED,
+                        FieldMessages.ALTER_ADD_COLUMN_FAILED_PREFIX + e.getMessage(), e);
+            }
+        } else {
+            result.put("addColumn", false);
+        }
+
+        boolean sourceColExists = physicalColumnExists(sourceCatalog, sourcePhy, source.getFieldName());
+        boolean targetReady = targetColExists || Boolean.TRUE.equals(result.get("addColumn"));
+        if (migrateData && sameCatalog && sourceColExists && targetReady) {
+            String dataSql = "UPDATE `" + targetPhy + "` t "
+                    + "INNER JOIN `" + sourcePhy + "` s ON t.`" + joinTarget + "` = s.`" + joinSource + "` "
+                    + "SET t.`" + source.getFieldName() + "` = s.`" + source.getFieldName() + "`";
+            Map<String, Object> dataResult = sqlExecuteService.executeSql(dataSql, true, targetCatalog);
+            if (!Boolean.TRUE.equals(dataResult.get("success"))) {
+                throw BizException.of(AppErrorCodes.FIELD_ALTER_DDL_FAILED,
+                        "迁移数据失败: " + dataResult.get("message"));
+            }
+            result.put("dataMigrated", true);
+            result.put("dataSql", dataSql);
+            Object affected = dataResult.get("affectedRows");
+            if (affected != null) {
+                result.put("affectedRows", affected);
+            }
+        } else {
+            result.put("dataMigrated", false);
+        }
+
+        String originalMessage = extractMessageFromValidateRule(targetField.getValidateRule());
+        fieldMapper.insert(targetField);
+        MetadataField latestTarget = fieldMapper.selectByCode(targetTableCode, targetField.getFieldCode(), targetBc);
+        if (latestTarget != null) {
+            mergeMessageIntoValidateRule(targetField, latestTarget, originalMessage);
+        }
+        result.put("targetFieldId", latestTarget != null ? latestTarget.getId() : targetField.getId());
+
+        if (removeFromSource) {
+            delete(source.getId());
+            result.put("removedFromSource", true);
+        } else {
+            result.put("removedFromSource", false);
+        }
+
+        List<String> warnings = new ArrayList<>();
+        if (!removeFromSource) {
+            warnings.add("源表仍保留该字段元数据与物理列，请确认是否需要手工删除");
+        }
+        if (!migrateData) {
+            warnings.add("未迁移物理数据，目标表新列为空或默认值");
+        }
+        warnings.add("请检查「表关联」「业务规则」是否仍引用源表的字段编码");
+        result.put("warnings", warnings);
+
+        logService.logSuccess("admin", "FIELD_MIGRATE",
+                "字段迁移: " + sourceTableCode + "." + source.getFieldName() + " -> " + targetTableCode);
+        return result;
+    }
+
+    private static boolean isPrimaryKeyField(MetadataField field) {
+        return field != null && ("primary_key".equals(field.getFormComponent())
+                || "id".equals(field.getFieldName()) || "uuid".equals(field.getFieldName()));
+    }
+
+    private static MetadataField copyFieldForMigrate(MetadataField source) {
+        MetadataField f = new MetadataField();
+        f.setFieldCode(source.getFieldCode());
+        f.setFieldName(source.getFieldName());
+        f.setFieldType(source.getFieldType());
+        f.setLabel(source.getLabel());
+        f.setIsRequired(source.getIsRequired());
+        f.setFormComponent(source.getFormComponent());
+        f.setInForm(source.getInForm());
+        f.setValidateRule(source.getValidateRule());
+        f.setSort(source.getSort());
+        f.setIsEnabled(source.getIsEnabled());
+        return f;
     }
 }
