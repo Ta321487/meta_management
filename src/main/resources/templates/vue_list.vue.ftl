@@ -75,6 +75,25 @@
             {{ ${field.camelCaseName}FkLabel(row) }}
           </template>
         </el-table-column>
+        <#elseif field.useSwitchDisplay!false>
+        <el-table-column label="${field.field.label}" width="100" align="center">
+          <template #default="{ row }">
+            <el-switch
+              :model-value="row.${field.camelCaseName}"
+              :active-value="${field.switchActiveValue}"
+              :inactive-value="${field.switchInactiveValue}"
+              disabled
+            />
+          </template>
+        </el-table-column>
+        <#elseif field.useTagDisplay!false>
+        <el-table-column label="${field.field.label}" min-width="100">
+          <template #default="{ row }">
+            <el-tag :type="${field.camelCaseName}TagType(row)" size="small" effect="light">
+              {{ ${field.camelCaseName}Label(row) }}
+            </el-tag>
+          </template>
+        </el-table-column>
         <#else>
         <el-table-column 
           prop="${field.camelCaseName}" 
@@ -122,6 +141,12 @@
         <el-form-item label="${field.field.label}" prop="${field.camelCaseName}">
           <#if field.field.formComponent == "input">
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
+          <#elseif field.useSwitchDisplay!false>
+          <el-switch
+            v-model="form.${field.camelCaseName}"
+            :active-value="${field.switchActiveValue}"
+            :inactive-value="${field.switchInactiveValue}"
+          />
           <#elseif field.field.formComponent == "select">
           <el-select v-model="form.${field.camelCaseName}" placeholder="请选择" style="width: 100%">
             <#if (field.validationRules?? && field.validationRules.hasOptions!false)>
@@ -221,6 +246,33 @@ export default {
     </#list>
 
     <#list fields as field>
+    <#if field.useTagDisplay!false>
+    const ${field.camelCaseName}Label = (row) => {
+      const val = row.${field.camelCaseName}
+      if (val === null || val === undefined || val === '') return '—'
+      const options = [
+        <#if field.validationRules?? && field.validationRules.options?is_sequence>
+        <#list field.validationRules.options as option>
+        <#if option?is_string>
+        { label: '${option?js_string}', value: '${option?js_string}' },
+        <#else>
+        { label: '${(option.label!option.value)?js_string}', value: ${option.value!option.label} },
+        </#if>
+        </#list>
+        </#if>
+      ]
+      const hit = options.find(o => o.value === val || String(o.value) === String(val))
+      return hit ? hit.label : String(val)
+    }
+    const ${field.camelCaseName}TagType = (row) => {
+      const text = String(${field.camelCaseName}Label(row)).toLowerCase()
+      if (/草稿|draft|待/.test(text)) return 'info'
+      if (/生效|确认|启用|正常|通过/.test(text)) return 'success'
+      if (/作废|取消|禁用|删除|关闭|驳回/.test(text)) return 'danger'
+      if (/警告|暂停/.test(text)) return 'warning'
+      return 'info'
+    }
+    </#if>
     <#if field.isForeignKey!false>
     const ${field.camelCaseName}FkLabel = (row) => {
       const val = row.${field.camelCaseName}

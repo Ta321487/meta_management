@@ -247,6 +247,7 @@ public class MetadataBusinessRuleServiceImpl implements MetadataBusinessRuleServ
     @Override
     @Transactional
     public void add(MetadataBusinessRule rule) {
+        rule.setRuleCode(CodeValidator.normalizeCode(rule.getRuleCode()));
         if (!CodeValidator.isValidCode(rule.getRuleCode())) {
             throw BizException.of(AppErrorCodes.BUSINESS_RULE_CODE_INVALID, "规则编码格式不正确");
         }

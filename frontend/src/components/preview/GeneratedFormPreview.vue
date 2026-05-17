@@ -33,6 +33,14 @@
               >
                 <el-option v-for="o in fkOptions(field)" :key="o.id" :label="o.label" :value="o.value" />
               </el-select>
+              <el-switch
+                v-else-if="switchMeta(field)"
+                v-model="form[field.camelCaseName]"
+                :active-value="switchMeta(field).activeValue"
+                :inactive-value="switchMeta(field).inactiveValue"
+                :active-text="switchMeta(field).activeLabel"
+                :inactive-text="switchMeta(field).inactiveLabel"
+              />
               <el-select
                 v-else-if="fc(field) === 'select'"
                 v-model="form[field.camelCaseName]"
@@ -82,6 +90,11 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { buildGeneratedFormRules, validateUniqueCombo } from '../../utils/generatedPreviewRules'
 import { createPreviewMockApi } from '../../utils/previewMockApi'
+import { resolveSwitchMeta, selectOptions } from '../../utils/previewFieldUtils'
+
+function switchMeta(field) {
+  return resolveSwitchMeta(field)
+}
 
 const props = defineProps({
   formModel: { type: Object, required: true },
@@ -110,13 +123,6 @@ function fc(field) {
 function fieldLabel(field) {
   return field.label || field.field?.label || field.camelCaseName
 }
-function selectOptions(field) {
-  const vr = field.validationRules || {}
-  if (!vr.hasOptions || !vr.options) return []
-  return (vr.options || []).map(o =>
-    typeof o === 'string' ? { label: o, value: o } : { label: o.label ?? o.value, value: o.value ?? o.label }
-  )
-}
 function fkOptions() {
   return [
     { id: 1, label: '示例-1', value: 1 },
@@ -127,7 +133,14 @@ function fkOptions() {
 function initForm() {
   Object.keys(form).forEach(k => delete form[k])
   formFields.value.forEach(f => {
-    form[f.camelCaseName] = fc(f) === 'number' ? null : ''
+    const sw = resolveSwitchMeta(f)
+    if (sw) {
+      form[f.camelCaseName] = sw.inactiveValue
+    } else if (fc(f) === 'number') {
+      form[f.camelCaseName] = null
+    } else {
+      form[f.camelCaseName] = ''
+    }
   })
 }
 

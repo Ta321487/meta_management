@@ -8,39 +8,39 @@
     </div>
     <div ref="editorContainer" class="json-editor"></div>
     
-    <!-- 正则表达式测试对话框 -->
+    <!-- 校验规则测试对话框 -->
     <el-dialog
       v-model="testDialogVisible"
-      title="正则表达式测试"
-      width="500px"
+      :title="testDialogTitle"
+      width="520px"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
     >
       <el-form label-position="top" size="small">
-        <el-form-item label="原始JSON中的正则">
+        <el-form-item :label="testRawRuleLabel">
           <el-input
             v-model="rawRegexpFromJson"
             readonly
             type="textarea"
             rows="4"
-            placeholder="未检测到正则表达式"
+            :placeholder="testRawRulePlaceholder"
             style="font-family: monospace;"
           />
         </el-form-item>
-        <el-form-item label="解析后的正则表达式">
+        <el-form-item :label="testParsedRuleLabel">
           <el-input
             v-model="testRegexp"
             readonly
             type="textarea"
             rows="4"
-            placeholder="未检测到正则表达式"
+            :placeholder="testParsedRulePlaceholder"
             style="font-family: monospace;"
           />
         </el-form-item>
         <el-form-item label="测试输入">
           <el-input
             v-model="testInput"
-            placeholder="请输入要测试的内容"
+            :placeholder="testInputPlaceholder"
             @keyup.enter="runTest"
           />
         </el-form-item>
@@ -124,6 +124,62 @@ import { ElMessage } from 'element-plus'
 import { Check, Close } from '@element-plus/icons-vue'
 import { normalizeRegexPattern } from '../utils/regexUtils'
 
+/** 解析 IN + options，供规则测试（存库值与展示文案分离） */
+function buildInTestMeta(parsed) {
+  const values = Array.isArray(parsed?.values) ? parsed.values : []
+  const labelByValue = new Map()
+  const valueByLabel = new Map()
+  if (Array.isArray(parsed?.options)) {
+    for (const opt of parsed.options) {
+      if (opt && typeof opt === 'object' && !Array.isArray(opt)) {
+        const v = opt.value !== undefined && opt.value !== null ? opt.value : opt.label
+        const label = opt.label != null ? String(opt.label).trim() : String(v)
+        if (v !== undefined && v !== null) {
+          labelByValue.set(String(v), label)
+          valueByLabel.set(label, v)
+        }
+      }
+    }
+  }
+  for (const v of values) {
+    const key = String(v)
+    if (!labelByValue.has(key)) {
+      labelByValue.set(key, key)
+    }
+  }
+  const allowedParts = values.map((v) => {
+    const lab = labelByValue.get(String(v))
+    return lab && lab !== String(v) ? `${v}（${lab}）` : String(v)
+  })
+  const summaryLine = allowedParts.length
+    ? `仅允许存库值：${allowedParts.join('、')}`
+    : '未配置 values'
+  return { values, labelByValue, valueByLabel, allowedParts, summaryLine }
+}
+
+function matchInConstraint(testInputValue, meta, parsed) {
+  const raw = String(testInputValue ?? '').trim()
+  if (raw === '') {
+    return { match: false, message: parsed?.message || '不能为空' }
+  }
+  let candidate = raw
+  if (meta.valueByLabel.has(raw)) {
+    candidate = meta.valueByLabel.get(raw)
+  }
+  const matched = meta.values.find((v) => String(v) === String(candidate))
+  if (matched === undefined) {
+    const hint = meta.allowedParts.join('、')
+    return {
+      match: false,
+      message: parsed?.message || (hint ? `不在允许范围内，可选：${hint}` : '不在允许范围内')
+    }
+  }
+  const lab = meta.labelByValue.get(String(matched))
+  const successMsg =
+    lab && lab !== String(matched) ? `通过：存库值 ${matched}（${lab}）` : `通过：${matched}`
+  return { match: true, message: successMsg }
+}
+
 export default {
   name: 'JsonEditor',
   props: {
@@ -164,7 +220,9 @@ export default {
     const testRegexp = ref('')
     const testInput = ref('')
     const testResult = ref(null)
-    
+    /** in | pattern | range | required | other */
+    const testMode = ref('other')
+
     // 示例功能相关变量
     const exampleDialogVisible = ref(false)
     const selectedExample = ref('')
@@ -248,6 +306,26 @@ export default {
         code: '{"operator": "IN", "values": ["value1", "value2", "value3"], "message": "请选择有效值", "trigger": "blur"}'
       },
       {
+        key: 'status_with_options',
+        title: '状态字段（含 options）',
+        description: 'TINYINT/INT 状态列：IN 约束 + options 供表单下拉与列表展示（请改 label/value）',
+        code: JSON.stringify(
+          {
+            operator: 'IN',
+            values: [0, 1, 2],
+            options: [
+              { label: '选项一', value: 0 },
+              { label: '选项二', value: 1 },
+              { label: '选项三', value: 2 }
+            ],
+            message: '请选择有效值',
+            trigger: 'change'
+          },
+          null,
+          2
+        )
+      },
+      {
         key: 'regexp',
         title: '正则表达式验证',
         description: '使用正则表达式验证输入格式',
@@ -312,11 +390,36 @@ export default {
     })
     
     // 计算属性：测试结果消息
+    const testDialogTitle = computed(() =>
+      testMode.value === 'pattern' ? '正则表达式测试' : '校验规则测试'
+    )
+    const testRawRuleLabel = computed(() =>
+      testMode.value === 'pattern' ? '原始 JSON 中的 pattern' : '当前校验规则 JSON'
+    )
+    const testParsedRuleLabel = computed(() => {
+      if (testMode.value === 'in') return '允许取值说明'
+      if (testMode.value === 'pattern') return '解析后的正则表达式'
+      if (testMode.value === 'range') return '数值/长度范围'
+      if (testMode.value === 'required') return '约束说明'
+      return '解析摘要'
+    })
+    const testRawRulePlaceholder = computed(() =>
+      testMode.value === 'pattern' ? '未检测到 pattern' : '暂无规则内容'
+    )
+    const testParsedRulePlaceholder = computed(() =>
+      testMode.value === 'pattern' ? '未检测到正则表达式' : '打开测试时将显示摘要'
+    )
+    const testInputPlaceholder = computed(() => {
+      if (testMode.value === 'in') {
+        return '输入存库值或选项文案，如 1 或 生效（不是 0～2 任意数）'
+      }
+      return '请输入要测试的内容'
+    })
+
     const testResultMessage = computed(() => {
       if (!testResult.value) return '请点击测试按钮开始测试'
       if (testResult.value.match) {
-        // 匹配成功，显示通过
-        return '通过'
+        return testResult.value.message || '通过'
       } else {
         // 匹配失败
         if (testResult.value.message === null || testResult.value.message === undefined || testResult.value.message === '') {
@@ -668,33 +771,42 @@ export default {
             return
         }
         
-        // 检测IN约束
+        // 检测IN约束（离散枚举，非连续区间）
         if (parsed && parsed.operator === 'IN' && parsed.values) {
-            // 处理IN约束
+            testMode.value = 'in'
+            const meta = buildInTestMeta(parsed)
             rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
-            testRegexp.value = JSON.stringify(parsed.values, null, 2)
+            testRegexp.value = meta.summaryLine
             console.log('  检测到IN约束:', parsed)
         } else if (parsed && parsed.required) {
+            testMode.value = 'required'
             // 处理必填字段约束
             rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
             testRegexp.value = 'required: true'
             console.log('  检测到必填字段约束:', parsed)
-        } else if (parsed && parsed.min !== undefined && parsed.max !== undefined) {
-            // 处理between约束 - 增强检测，只要存在min和max属性就识别为between约束
+        } else if (
+            parsed &&
+            parsed.operator !== 'IN' &&
+            parsed.min !== undefined &&
+            parsed.max !== undefined
+        ) {
+            testMode.value = 'range'
             rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
             testRegexp.value = `between ${parsed.min} and ${parsed.max}`
             console.log('  检测到between约束:', parsed)
-        } else if (parsed && parsed.min !== undefined) {
+        } else if (parsed && parsed.operator !== 'IN' && parsed.min !== undefined) {
+            testMode.value = 'range'
             // 处理只有min属性的约束
             rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
             testRegexp.value = `min: ${parsed.min}`
             console.log('  检测到min约束:', parsed)
-        } else if (parsed && parsed.max !== undefined) {
-            // 处理只有max属性的约束
+        } else if (parsed && parsed.operator !== 'IN' && parsed.max !== undefined) {
+            testMode.value = 'range'
             rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
             testRegexp.value = `max: ${parsed.max}`
             console.log('  检测到max约束:', parsed)
         } else if (parsed && parsed.type) {
+            testMode.value = 'type'
             // 处理带有type属性的约束
             rawRegexpFromJson.value = JSON.stringify(parsed, null, 2)
             
@@ -709,8 +821,7 @@ export default {
                 console.log('  检测到type约束，但没有对应内置正则:', parsed)
             }
         } else if (parsed && parsed.pattern) {
-            // 处理pattern约束
-            // 获取解析后的pattern
+            testMode.value = 'pattern'
             rawRegex = parsed.pattern
             
             // 使用公共工具函数归一化并修复正则表达式
@@ -741,7 +852,7 @@ export default {
             // 调试：显示rawRegex的字符编码，便于理解转义情况
             console.log('  字符编码:', JSON.stringify(rawRegex))
         } else {
-            // 其他约束类型，显示原始JSON
+            testMode.value = 'other'
             rawRegexpFromJson.value = jsonContent
             testRegexp.value = ''
             console.log('  检测到其他约束类型:', parsed)
@@ -789,34 +900,10 @@ export default {
             return
         }
         
-        // 检测IN约束
         if (parsed && parsed.operator === 'IN' && parsed.values) {
-          // IN约束测试逻辑
-          console.log('IN约束测试过程：')
-          console.log('  测试输入:', testInputValue)
-          console.log('  IN约束:', parsed)
-          console.log('  可选项:', parsed.values)
-          
-          // 检查测试输入是否在values数组中
-          // 支持字符串和数字类型的匹配
-          const values = parsed.values
-          let matchResult = false
-          let message = ''
-          
-          for (const value of values) {
-            if (String(value) === String(testInputValue)) {
-              matchResult = true
-              break
-            }
-          }
-          
-          if (!matchResult) {
-            // 使用JSON中的message字段
-            message = parsed.message || ''
-          }
-          
-          console.log('  匹配结果:', matchResult, ' 消息:', message)
-          testResult.value = { match: matchResult, message }
+          const meta = buildInTestMeta(parsed)
+          const result = matchInConstraint(testInputValue, meta, parsed)
+          testResult.value = { match: result.match, message: result.message }
           return
         } else if (parsed && parsed.required) {
           // 必填字段约束测试逻辑
@@ -837,7 +924,12 @@ export default {
           console.log('  匹配结果:', matchResult, ' 消息:', message)
           testResult.value = { match: matchResult, message }
           return
-        } else if (parsed && parsed.min !== undefined && parsed.max !== undefined) {
+        } else if (
+          parsed &&
+          parsed.operator !== 'IN' &&
+          parsed.min !== undefined &&
+          parsed.max !== undefined
+        ) {
           // between约束测试逻辑
           console.log('between约束测试过程：')
           console.log('  测试输入:', testInputValue)
@@ -887,7 +979,7 @@ export default {
           console.log('  匹配结果:', matchResult, ' 消息:', message)
           testResult.value = { match: matchResult, message }
           return
-        } else if (parsed && parsed.min !== undefined) {
+        } else if (parsed && parsed.operator !== 'IN' && parsed.min !== undefined) {
           // 只有min属性的约束测试逻辑
           console.log('min约束测试过程：')
           console.log('  测试输入:', testInputValue)
@@ -936,7 +1028,7 @@ export default {
           console.log('  匹配结果:', matchResult, ' 消息:', message)
           testResult.value = { match: matchResult, message }
           return
-        } else if (parsed && parsed.max !== undefined) {
+        } else if (parsed && parsed.operator !== 'IN' && parsed.max !== undefined) {
           // 只有max属性的约束测试逻辑
           console.log('max约束测试过程：')
           console.log('  测试输入:', testInputValue)
@@ -1165,6 +1257,12 @@ export default {
       clearJson,
       // 测试功能相关
       testDialogVisible,
+      testDialogTitle,
+      testRawRuleLabel,
+      testParsedRuleLabel,
+      testRawRulePlaceholder,
+      testParsedRulePlaceholder,
+      testInputPlaceholder,
       rawRegexpFromJson,
       testRegexp,
       testInput,

@@ -9,9 +9,10 @@
 
     <el-card shadow="never">
       <el-alert type="info" :closable="false" show-icon class="tip">
-        �?Mock 拉取当前表数据并导出�?CSV（与 ZIP 导出页一致）�?      </el-alert>
+        从 Mock 拉取当前表数据并导出为 CSV（与 ZIP 导出页一致）。
+      </el-alert>
       <el-button type="primary" :loading="exporting" @click="exportAll">导出 CSV</el-button>
-      <p v-if="lastCount >= 0" class="hint">上次导出 {{ lastCount }} �?/p>
+      <p v-if="lastCount >= 0" class="hint">上次导出 {{ lastCount }} 条</p>
     </el-card>
   </div>
 </template>
@@ -67,7 +68,7 @@ async function exportAll() {
     a.click()
     URL.revokeObjectURL(a.href)
     lastCount.value = rows.length
-    ElMessage.success(`已导�?${rows.length} 条`)
+    ElMessage.success(`已导出 ${rows.length} 条`)
   } catch (e) {
     ElMessage.error('导出失败')
   } finally {
@@ -82,4 +83,3 @@ defineExpose({ load: () => {} })
 .tip { margin-bottom: 16px; }
 .hint { margin-top: 12px; color: #909399; font-size: 13px; }
 </style>
-

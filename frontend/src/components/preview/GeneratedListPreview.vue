@@ -26,11 +26,27 @@
           :key="col.prop"
           :prop="col.prop"
           :label="col.label || col.prop"
-          min-width="120"
-          show-overflow-tooltip
+          :min-width="col.switch ? 100 : 120"
+          :align="col.switch ? 'center' : 'left'"
+          :show-overflow-tooltip="!col.switch && !col.tag"
         >
           <template #default="{ row }">
-            {{ formatCell(row[col.prop]) }}
+            <el-switch
+              v-if="col.switch"
+              :model-value="row[col.prop]"
+              :active-value="col.switch.activeValue"
+              :inactive-value="col.switch.inactiveValue"
+              disabled
+            />
+            <el-tag
+              v-else-if="col.tag"
+              :type="tagTypeForOptionValue(col.field, row[col.prop])"
+              size="small"
+              effect="light"
+            >
+              {{ labelForOptionValue(col.field, row[col.prop]) }}
+            </el-tag>
+            <span v-else>{{ formatCell(row[col.prop]) }}</span>
           </template>
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
@@ -62,6 +78,13 @@ import { Plus } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { createPreviewMockApi } from '../../utils/previewMockApi'
 import { resolveListFieldProp } from '../../utils/mockDataGenerator'
+import {
+  labelForOptionValue,
+  resolveSwitchMeta,
+  tagTypeForOptionValue,
+  useSwitchDisplay,
+  useTagDisplay
+} from '../../utils/previewFieldUtils'
 
 const props = defineProps({
   listModel: { type: Object, required: true },
@@ -83,10 +106,17 @@ const api = computed(() =>
 const columns = computed(() =>
   (props.listModel.fields || [])
     .filter(f => f?.formComponent !== 'primary_key')
-    .map(f => ({
-      prop: resolveListFieldProp(f),
-      label: f.label || f.field?.label
-    }))
+    .map(f => {
+      const prop = resolveListFieldProp(f)
+      const sw = useSwitchDisplay(f) ? resolveSwitchMeta(f) : null
+      return {
+        prop,
+        label: f.label || f.field?.label,
+        field: f,
+        switch: sw,
+        tag: !sw && useTagDisplay(f)
+      }
+    })
     .filter(c => c.prop)
 )
 

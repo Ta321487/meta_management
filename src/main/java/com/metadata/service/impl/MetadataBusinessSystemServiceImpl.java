@@ -11,6 +11,7 @@ import com.metadata.mapper.MetadataBusinessSystemMapper;
 import com.metadata.mapper.MetadataModuleMapper;
 import com.metadata.mapper.MetadataTableMapper;
 import com.metadata.service.MetadataBusinessSystemService;
+import com.metadata.util.CodeValidator;
 import com.metadata.service.MetadataModuleService;
 import com.metadata.service.MySqlPhysicalCatalogService;
 import com.metadata.util.SpringContextUtil;
@@ -87,6 +88,12 @@ public class MetadataBusinessSystemServiceImpl implements MetadataBusinessSystem
     @Override
     @Transactional
     public void add(MetadataBusinessSystem businessSystem) {
+        if (StringUtils.hasText(businessSystem.getBusinessCode())) {
+            businessSystem.setBusinessCode(CodeValidator.normalizeCode(businessSystem.getBusinessCode()));
+            if (!CodeValidator.isValidCode(businessSystem.getBusinessCode())) {
+                throw BizException.badRequest("业务编码只能包含字母、数字和下划线，长度1-50");
+            }
+        }
         if (!StringUtils.hasText(businessSystem.getDatabaseName())) {
             throw BizException.of(AppErrorCodes.BIZ_SYSTEM_PHYSICAL_CATALOG_REQUIRED,
                     "默认物理库不能为空，请先在「库管理」登记目标库并在本处选择");

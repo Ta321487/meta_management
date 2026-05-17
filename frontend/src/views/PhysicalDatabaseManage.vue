@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="physical-database-manage">
     <el-card>
       <template #header>
@@ -48,6 +48,7 @@
       width="560px"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
@@ -85,7 +86,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
       </template>
     </el-dialog>
@@ -102,6 +103,7 @@ import {
   deletePhysicalDatabase,
   syncPhysicalDatabase
 } from '../api'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 const CHARSET_OPTIONS = [
   { value: 'utf8mb4', label: 'utf8mb4（推荐）' },
@@ -147,6 +149,10 @@ export default {
     const rules = {
       catalogName: [{ required: true, message: '请填写库名', trigger: 'blur' }]
     }
+
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
 
     const charsetOptions = CHARSET_OPTIONS
 
@@ -240,6 +246,7 @@ export default {
           await addPhysicalDatabase({ ...form })
           ElMessage.success('已添加')
         }
+        formGuard.markClean()
         dialogVisible.value = false
         loadData()
       } catch (e) {
@@ -320,6 +327,7 @@ export default {
       form,
       formRef,
       rules,
+      formGuard,
       charsetOptions,
       collationOptions,
       onCharsetChange,

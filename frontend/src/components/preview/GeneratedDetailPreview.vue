@@ -34,6 +34,7 @@
 import { ref, computed, watch } from 'vue'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { createPreviewMockApi } from '../../utils/previewMockApi'
+import { selectOptions } from '../../utils/previewFieldUtils'
 
 const props = defineProps({
   detailModel: { type: Object, required: true },
@@ -66,13 +67,6 @@ function descSpan(field) {
   return fc(field) === 'textarea' ? 2 : 1
 }
 
-function selectOptions(field) {
-  const vr = field.validationRules || {}
-  if (!vr.hasOptions || !vr.options) return []
-  return (vr.options || []).map(o =>
-    typeof o === 'string' ? { label: o, value: o } : { label: o.label ?? o.value, value: o.value ?? o.label }
-  )
-}
 
 function formatFieldValue(field, value) {
   if (value === null || value === undefined || value === '') return '—'

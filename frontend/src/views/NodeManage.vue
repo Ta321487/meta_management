@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="node-manage">
     <el-card>
       <template #header>
@@ -100,11 +100,16 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item label="节点编码" prop="nodeCode" v-if="!form.id">
-          <el-input v-model="form.nodeCode" placeholder="如：NODE_001" />
+          <el-input
+            v-model="form.nodeCode"
+            placeholder="如：NODE_001"
+            @blur="applyIdentifierBlur(form, 'nodeCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="节点名称" prop="nodeName">
           <el-input v-model="form.nodeName" placeholder="请输入节点名称" />
@@ -173,7 +178,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -191,6 +196,8 @@ import { ref, reactive, onMounted, watch, onActivated } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getModuleList, getNodeList, addNode, updateNode, deleteNode, batchDeleteNode, getTablesByModule, getBusinessSystemList } from '../api'
 import IconSelector from '../components/IconSelector.vue'
+import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'NodeManage',
@@ -233,10 +240,14 @@ export default {
       businessCode: ''
     })
     const rules = {
-      nodeCode: [{ required: true, message: '请输入节点编码', trigger: 'blur' }],
+      nodeCode: metadataCodeRules('节点编码'),
       nodeName: [{ required: true, message: '请输入节点名称', trigger: 'blur' }],
       nodeType: [{ required: true, message: '请选择节点类型', trigger: 'change' }]
     }
+
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
 
     const loadModules = async () => {
       // 当未选择业务系统时，清空模块列表
@@ -385,6 +396,9 @@ export default {
     }
 
     const handleSubmit = async () => {
+      if (!form.id) {
+        normalizeFormCodes(form, [{ key: 'nodeCode', mode: 'code' }])
+      }
       await formRef.value.validate(async (valid) => {
         if (valid) {
           try {
@@ -394,6 +408,7 @@ export default {
               await addNode(form)
             }
             ElMessage.success('操作成功')
+            formGuard.markClean()
             dialogVisible.value = false
             loadNodes()
           } catch (error) {
@@ -545,6 +560,8 @@ export default {
       pagination,
       form,
       rules,
+      formGuard,
+      applyIdentifierBlur,
       showIconSelector,
       loadModules,
       loadNodes,

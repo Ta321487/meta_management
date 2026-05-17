@@ -83,11 +83,16 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="560px"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
         <el-form-item label="业务编码" prop="businessCode" v-if="!form.id">
-          <el-input v-model="form.businessCode" placeholder="如：DEFAULT, PET_MANAGE, PARKING_MANAGE" />
+          <el-input
+            v-model="form.businessCode"
+            placeholder="如：DEFAULT, PET_MANAGE, PARKING_MANAGE"
+            @blur="applyIdentifierBlur(form, 'businessCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="业务系统名称" prop="businessName">
           <el-input v-model="form.businessName" placeholder="请输入业务系统名称" />
@@ -129,7 +134,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit" :loading="submitting">确定</el-button>
       </template>
     </el-dialog>
@@ -180,6 +185,8 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getBusinessSystemList, addBusinessSystem, updateBusinessSystem, deleteBusinessSystem, getModuleList, getAssociatedModules, associateModulesToBusinessSystem, getPhysicalDatabaseList, fillBusinessSystemPhysicalCatalog, ensureMissingPhysicalTables } from '../api'
 import dayjs from 'dayjs'
+import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'BusinessSystemManage',
@@ -227,10 +234,14 @@ export default {
     
     // 表单验证规则
     const rules = {
-      businessCode: [{ required: true, message: '请输入业务编码', trigger: 'blur' }],
+      businessCode: metadataCodeRules('业务编码'),
       businessName: [{ required: true, message: '请输入业务系统名称', trigger: 'blur' }],
       databaseName: [{ required: true, message: '请选择默认物理库（须与库管理登记一致）', trigger: 'change' }]
     }
+
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
     
     const physicalDbRows = ref([])
 
@@ -410,6 +421,9 @@ export default {
     // 提交表单
     const handleSubmit = async () => {
       if (!formRef.value) return
+      if (!form.id) {
+        normalizeFormCodes(form, [{ key: 'businessCode', mode: 'code' }])
+      }
       await formRef.value.validate(async (valid) => {
         if (valid) {
           submitting.value = true
@@ -453,6 +467,7 @@ export default {
               await addBusinessSystem(form)
               ElMessage.success('新增成功')
             }
+            formGuard.markClean()
             dialogVisible.value = false
             syncAfterSave.value = false
             loadData()
@@ -554,6 +569,8 @@ export default {
       pagination,
       form,
       rules,
+      formGuard,
+      applyIdentifierBlur,
       catalogSelectOptions,
       formatDate,
       handleSearch,

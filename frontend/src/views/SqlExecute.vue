@@ -186,7 +186,8 @@
 </template>
 
 <script>
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { useRouteLeaveGuard } from '../composables/useUnsavedFormGuard'
 import { ElMessage, ElLoading } from 'element-plus'
 import { InfoFilled, UploadFilled } from '@element-plus/icons-vue'
 import * as monaco from 'monaco-editor'
@@ -308,6 +309,11 @@ export default {
       }
     }
 
+    const sqlLeaveGuard = useRouteLeaveGuard(() => getSqlText(), {
+      message: '编辑器中的 SQL 尚未清空或执行，确定要离开本页吗？',
+      title: '未保存的 SQL'
+    })
+
     // 执行SQL
     const handleExecute = async () => {
       const sqlText = getSqlText()
@@ -386,6 +392,7 @@ export default {
       setSqlText('')
       result.value = null
       activeCollapse.value = []
+      sqlLeaveGuard.markClean()
     }
 
     // 导入相关方法
@@ -419,6 +426,7 @@ export default {
         reader.onload = (e) => {
           const content = e.target.result
           setSqlText(content)
+          sqlLeaveGuard.markClean()
           showImportDialog.value = false
           ElMessage.success('SQL文件导入成功')
           importLoading.value = false
@@ -452,6 +460,7 @@ export default {
         })
         
         setSqlText(response.data)
+        sqlLeaveGuard.markClean()
         showImportDialog.value = false
         ElMessage.success('网络SQL文件获取成功')
         importLoading.value = false
@@ -462,11 +471,13 @@ export default {
     }
 
     // 生命周期钩子
-    onMounted(() => {
+    onMounted(async () => {
       sessionStorage.removeItem(STORAGE_KEY_TARGET_CATALOG)
       targetCatalog.value = ''
       initEditor()
       loadCatalogOptions(false)
+      await nextTick()
+      sqlLeaveGuard.captureSnapshot()
     })
 
     onBeforeUnmount(() => {

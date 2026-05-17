@@ -1,13 +1,33 @@
-# 元数据管理系统 — 搭建指南（操作说明 + 逐步清单）
+# 元数据管理系统 — 使用说明书（操作说明 + 逐步清单）
 
-> **怎么用这份文档**  
+> 本文档描述平台各菜单、字段、按钮含义，以及从零配置示例业务系统 `DEMO_ERP` 的步骤与速查附录。与界面不一致时，以**当前仓库代码 + 本文**为准并回头改文档。
+
+> **怎么用**  
 > 
-> - **[第 0 章](#toc-0)**：**操作说明** — 每个菜单、按钮、字段是干什么的（查字典用）。  
-> - **[第 1～16 章](#toc-1)**：**逐步操作清单** — 按顺序在系统里点哪里、填什么（从零搭一套 `DEMO_ERP` 用）；**不是故事或比喻**，就是一份分章节的点击步骤表。  
+> | 目的 | 阅读顺序 |
+> | ---- | -------- |
+> | 从零搭 `DEMO_ERP` | [第 0 章](#toc-0) 通读 → [第 1～16 章](#toc-1) 逐步点界面 → [自检清单](#toc-checklist) |
+> | **查某个按钮/字段含义** | 第 0 章对应小节（0.5～0.16）+ [附录 A 路由](#toc-appendix-a) |
+> | **查校验规则 / 下拉选项怎么配** | [§9 字段清单](#toc-9) + [附录 G validateRule 完整参考](#toc-appendix-g) |
+> | **状态 IN 与「枚举值验证」示例有何区别** | [附录 G §2.3～§3](#toc-appendix-g) + [0.10 状态码](#toc-0-10) |
+> | **查预览 / Mock / ZIP 差异** | [附录 C 业务系统预览](#toc-appendix-c) + [附录 I Mock 规则](#toc-appendix-i) + [附录 J 节点与生成文件](#toc-appendix-j) |
+> | **未保存提示 / 编码自动去空格** | [0.19 录入体验](#toc-0-19) |
+> | **排错** | [附录 F](#toc-appendix-f) |
 > 
-> 约定：业务系统编码 **`DEMO_ERP`**；物理库名 **`demo_erp`**；包名 **`com.demo.erp`**。  
-> 登录：用户名 **`admin`**，密码 **`123456`**（若库中已修改，以实际为准）。  
-> 前端部署路径前缀：**`/metadata-system/`**（路由如 `/metadata-system/login`）。
+> - **[第 0 章](#toc-0)**：**操作说明（完整版）** — 每个菜单、按钮、列表列、弹窗字段；不省略界面文案。  
+> - **[第 1～16 章](#toc-1)**：**逐步操作清单** — 按顺序在系统里点哪里、填什么（从零搭一套 `DEMO_ERP`）；**不是故事**，是可执行的点击步骤表 + 示例值表格。  
+> - **[附录 A～J](#toc-appendix-a)**：路由、生成标签 API、预览、规则 JSON、示例总览、排错、产品边界、Mock、节点产物等**速查表**。  
+> 
+> **约定（全文统一）**  
+> 
+> | 项 | 值 |
+> | --- | --- |
+> | 业务系统编码 | `DEMO_ERP` |
+> | 物理库名 | `demo_erp` |
+> | Java 包名 | `com.demo.erp` |
+> | 登录账号 | 用户名 `admin`，密码 `123456`（若已改密以实际为准） |
+> | 前端部署前缀 | `/metadata-system/`（如 `/metadata-system/login`） |
+> | 主键字段编码 | 恒为 **`ID`**（不是 `MC_F_ID` 这类业务 fieldCode） |
 
 ### 已有数据库升级（开始按清单操作前）
 
@@ -52,12 +72,17 @@
   - [0.16 操作日志](#toc-0-16)  
   - [0.17 推荐搭建顺序](#toc-0-17)  
   - [0.18 编码对照表](#toc-0-18)  
+  - [0.19 录入体验（未保存提示与编码规范化）](#toc-0-19)  
   - [附录 A 路由对照](#toc-appendix-a)  
   - [附录 B 代码生成标签](#toc-appendix-b)  
   - [附录 C 业务系统预览](#toc-appendix-c)  
   - [附录 D 校验规则原文](#toc-appendix-d)  
   - [附录 E 示例数据总览](#toc-appendix-e)  
-  - [附录 F 排错](#toc-appendix-f)
+  - [附录 F 排错](#toc-appendix-f)  
+  - [附录 G validateRule 完整参考](#toc-appendix-g)  
+  - [附录 H 产品边界与交付范围](#toc-appendix-h)  
+  - [附录 I Mock 示例数据生成规则](#toc-appendix-i)  
+  - [附录 J 功能节点类型与生成产物](#toc-appendix-j)
 
 **逐步操作清单（第 1～16 章，按顺序执行）**
 
@@ -108,6 +133,14 @@
 | 业务规则 | 业务规则   | 按模块挂 JSON 规则（校验/搜索/显示/流程/报表/批量）                |
 
 **侧栏菜单顺序（与 `Layout.vue` 一致）**：库管理 → 业务系统管理 → 模块类型管理 → 模块管理 → 表管理 → 字段管理 → 功能节点 → 表关联 → 业务规则 → 操作日志 → 代码生成 → SQL 执行。
+
+**数据流（一句话）**：
+
+```text
+物理库登记 → 业务系统(包名+默认库) → 模块/模块类型 → 表+字段(类型/组件/validateRule)
+    → 表关联 → 功能节点(页面类型+路由) → 业务规则(JSON)
+        → 代码生成 / ZIP 下载 / 业务系统预览(Mock)
+```
 
 > **欢迎页**不在侧栏：登录后默认进入 `/welcome`，仅文案「欢迎使用…请从左侧菜单选择功能」。
 
@@ -187,6 +220,16 @@
 | **右键标签** | **关闭** / **关闭其他** / **全部关闭**（全部关闭后回欢迎页） |
 
 主内容区使用 `keep-alive` 缓存已打开页面组件状态（按 Vue 组件 `name` 缓存，关闭标签会从缓存移除）。
+
+#### 未保存修改提示（弹窗与 SQL 页）
+
+| 场景 | 行为 |
+| ---- | ---- |
+| **表 / 字段 / 模块 / 业务系统 / 库 / 关联 / 规则 / 模块类型** 等「新增/编辑」弹窗 | 打开时拍表单快照；点 **取消**、右上角 **×**、遮罩或 **Esc** 关闭时，若内容有改动会提示 **「未保存的修改」** → **继续编辑** / **放弃修改**；**确定** 保存成功后不再提示 |
+| **表管理 · 批量分配业务系统** 弹窗 | 同上 |
+| **SQL 执行** 页 Monaco 编辑器 | 离开本菜单或刷新浏览器前，若编辑器内容与上次「清空/导入/打开页」基准不一致，会提示是否离开 |
+
+未改动的弹窗直接关闭，不会误弹。详见 [0.19](#toc-0-19)。
 
 #### 修改密码弹窗（逐项）
 
@@ -515,7 +558,7 @@
 ### 0.9 表管理（详版）
 
 **路由**：`/table`  
-**作用**：维护**逻辑表**元数据（本页弹窗**不含字段**）；**新增表**保存时会自动补 1 条主键字段并在业务库建「仅主键列」的物理表，其余列在「字段管理」维护。字段保存会 `ALTER TABLE`；删表会 **DROP 物理表** 并级联删字段元数据。
+**作用**：维护**逻辑表**元数据（本页弹窗**不含字段**）；**新增表**保存时会自动补 1 条主键字段；**仅当能解析出目标物理库**时才在业务库执行 `CREATE TABLE`（通常只有主键一列），其余列在「字段管理」维护。字段保存会 `ALTER TABLE`；删表会 **DROP 物理表** 并级联删字段元数据。
 
 #### 页头按钮（左→右）
 
@@ -567,10 +610,24 @@
 | 表编码             | 显示  | 隐藏（用行数据） | 必填                                 |
 | 表名称             | ✓   | ✓        | 必填                                 |
 | 主键策略            | ✓   | ✓（不可改值）  | 必填                                 |
-| 业务系统            | ✓   | ✓        | —                                  |
+| 业务系统            | ✓   | ✓        | **非必填**；可留空先登记，见下「新增时不选业务系统」     |
 | 物理库名            | ✓   | ✓        | 下拉选库管理已登记库；可空=业务系统默认               |
 | 描述              | 多行  | 多行       | —                                  |
-| **取消** / **确定** | —   | —        | **无字段表单项**；新增成功提示去「字段管理」补列（已自动带主键） |
+| **取消** / **确定** | —   | —        | **无字段表单项**；见下成功提示                    |
+
+弹窗顶部说明（新增时）：本步只登记表；业务系统可留空、稍后批量分配；未指定业务系统/物理库时仅登记元数据。
+
+#### 新增表：业务系统 / 物理库与建表时机
+
+| 保存时填写情况 | 元数据 | 物理 `CREATE TABLE` |
+| ------------ | ------ | ------------------- |
+| **业务系统 + 物理库**（或仅业务系统且其有默认库） | ✓ | ✓（仅主键列） |
+| **都不填** | ✓（`business_code` 为空，列表显示「未关联」） | **不执行** |
+| 只填 **物理库名**、不填业务系统 | ✓ | ✓（用所填库） |
+
+成功后提示分两种：**已建物理表** → 提示去字段管理补列；**仅元数据** → 提示先批量分配业务系统，再在搜索区选该系统后点 **「补齐缺失物理表」**。
+
+表编码、物理库名在失焦/提交时会 **去首尾空格、中间空格转下划线**（表编码并转大写），见 [0.19](#toc-0-19)。
 
 #### 批量分配业务系统规则
 
@@ -616,7 +673,8 @@
 | 字段类型     | 完整 `VARCHAR(32)` / `ENUM('a','b')` 等     |
 | 显示名      | `label`，用于 UI 与生成代码                      |
 | 必填       | 是/否；`id` 在列表强制显示为是                       |
-| 表单组件     | `input` / `primary_key` / `none` 等       |
+| 表单组件     | `input` / `select` / `primary_key` / `none` 等 |
+| **选项**   | 从 `validateRule` 摘要：`options` 或 `IN.values`（如 `0=草稿 / 1=生效`）；无则 `—` |
 | **表单录入** | `inForm`：是=参与 Vue 表单生成；否=仅列表等            |
 | 状态       | 字段启用链                                    |
 | 排序       | `sort`，越小越靠前                             |
@@ -637,19 +695,26 @@
 
 | 区块     | 说明                                                        |
 | ------ | --------------------------------------------------------- |
-| 字段编码   | 仅新增；正则 `^[A-Za-z0-9_]{1,50}$`                             |
-| 字段名称   | 正则同上；见下方「智能默认」                                            |
+| 字段编码   | 仅新增；正则 `^[A-Za-z0-9_]{1,50}$`；失焦/提交时 **规范化**（空格→下划线，编码转大写） |
+| 字段名称   | 物理列名；同上规范化规则，**保留大小写**；见下方「智能默认」                         |
 | 字段类型   | 基础类型下拉 → 自动拼 `fieldType`                                  |
 | 长度     | `VARCHAR`/`CHAR`：默认 50，`CHAR` max 255，`VARCHAR` max 65535 |
 | 精度,小数位 | `DECIMAL`/`NUMERIC`：precision 1–65，scale ≤ precision      |
-| 枚举值    | 逗号分隔，支持中文逗号；旁 **刷新** → 写入校验规则 `IN`                        |
+| 枚举值    | **仅 ENUM 类型**显示；逗号分隔；旁 **刷新** → 写入校验规则 `IN`。TINYINT 状态码无此项，见 §9「状态码如何体现选项」 |
 | 显示名    | 必填                                                        |
 | 参与表单录入 | 开关；关 → `formComponent=none`，隐藏表单组件项                       |
 | 是否必填   | 选「是」→ 库层 NOT NULL                                         |
 | 表单组件   | `inForm=1` 且非主键时必选                                        |
 | 业务系统   | 默认当前表所属系统                                                 |
-| 校验规则   | Monaco JSON 编辑器；ENUM 有 **刷新到枚举值**                         |
+| 校验规则   | Monaco JSON；工具栏 **格式化 / 清空 / 测试 / 查看示例**；ENUM 有 **刷新到枚举值** |
 | 排序号    | 新增默认为当前表 max(sort)+1                                      |
+
+**校验规则 · 查看示例 / 测试**（与 [附录 G](#toc-appendix-g) 配合）：
+
+| 能力 | 说明 |
+| ---- | ---- |
+| **查看示例** | 内置模板（必填、长度、**枚举值验证**、**状态字段（含 options）** 等）；选中后 **应用** 写入编辑器，**文案须按业务自行修改** |
+| **测试** | 按当前 JSON 做模拟校验；`operator:IN` 时按 **`values` 存库值** 判断，可输入数字或 `options` 中的 **label**；通过时显示如 `通过：存库值 1（生效）`；**不是** 0～2 连续区间 |
 
 **智能默认（watch fieldName）**：
 
@@ -657,13 +722,20 @@
 | ----------------------------- | ------------------------------------ |
 | `id` / `uuid`                 | `sort=0`，`formComponent=primary_key` |
 | `create_time` / `update_time` | `DATETIME`，`datepicker`，非必填          |
+| `status` / `*_status` / `state` / `is_enabled` 等 | `formComponent=select`；类型倾向 `TINYINT`；**不自动写入**校验规则 JSON |
 
-**智能默认（watch baseFieldType）**：非主键时推荐表单组件（如 INT→number，ENUM→select）；切换类型可能清空校验为 `{}`（编辑 ENUM 时尽量保留）。
+**智能默认（watch baseFieldType）**：非主键时推荐表单组件；`status` 类字段名 + `TINYINT/INT` 会推荐 **`select`** 而非 `number`；切换类型可能清空校验为 `{}`（编辑 ENUM 时尽量保留）。
 
 **ENUM 双向同步**：
 
 - 枚举值框 **刷新** → `syncEnumToValidateRule`  
 - 校验规则 **刷新到枚举值** → `syncValidateRuleToEnum`
+
+**TINYINT / INT 状态码（无枚举值框）**：
+
+- 须在 **校验规则 JSON** 中自行配置 `options` + `operator:IN` + `values`（见 [附录 G §2.3](#toc-appendix-g)）；可点 **查看示例 → 状态字段（含 options）** 作结构参考，**勿当作固定业务文案**。  
+- **`values`**：库里存的数（如 0、1、2）；**`options[].label`**：界面展示用，**不进 DDL**。  
+- 列表 **「选项」** 列保存后即可核对；表单组件选 **`select`**。
 
 #### 约束列表弹窗
 
@@ -764,6 +836,21 @@
 | 节点图标    | 同模块管理 IconSelector        |
 | 排序号     | 新增默认 max(sort)+1          |
 | 是否启用    | 单选 启用(1) / 禁用(0)          |
+
+#### 节点类型 → 生成什么（与 ZIP / 预览一致）
+
+| 节点类型（存库值） | 界面中文 | 典型路由片段 | 生成 Vue 文件名 | 是否常出现在侧栏菜单 |
+| ---------------- | -------- | ------------ | --------------- | ------------------ |
+| `LIST_PAGE` | 列表页 | `/xxx/list` | `XxxList.vue` | 是 |
+| `FORM_PAGE` | 表单页 | `/xxx/form` | `XxxForm.vue` | 是（或与列表二选一） |
+| `DETAIL_PAGE` | 详情页 | `/xxx/detail` | `XxxDetail.vue` | 常 **否**（从列表「查看」进入） |
+| `PROCESS_PAGE` | 流程流转页 | `/xxx/process` | `XxxProcess.vue` | 视配置 |
+| `REPORT_PAGE` | 报表展示页 | `/xxx/report` | `XxxReport.vue` | 视配置 |
+| `IMPORT_PAGE` / `BATCH_IMPORT_PAGE` | 导入 / 批量导入 | `/xxx/import` 等 | `XxxImport.vue` | 视配置 |
+| `BATCH_EXPORT_PAGE` | 批量导出 | `/xxx/export` | `XxxExport.vue` | 视配置 |
+| `CUSTOM_PAGE` | 自定义页面 | 自定 | 需手工扩展模板 | 视配置 |
+
+**规则**：某表在功能节点里**只要存在**对应类型的启用节点，ZIP 打包与路由整合时就会带上该 Vue 文件；**没有节点则不生成**（避免空页面）。清单里 WH 模块配了 `DETAIL_PAGE`，CFG 模块配了 `BATCH_IMPORT_PAGE`，用于演示详情与导入两类页面。
 
 #### 与「重建功能节点」关系
 
@@ -904,6 +991,18 @@
 
 显示 total / successCount / failCount；每项可展开看 errors、warnings、apiTests 子表；**折叠**、**重新测试**。
 
+#### 下载 ZIP 里通常有什么（按表 + 按节点）
+
+| 类别 | 内容 |
+| ---- | ---- |
+| 后端 | 每表 Entity / Mapper / Service(/Impl) / Controller；业务系统级 `Application`、CORS、可选 Auth/Captcha |
+| 前端 | 每表至少 List + Form；若存在 [详情/报表/流程/导入/导出节点](#toc-0-12) 则另有 `Detail.vue`、`Report.vue` 等 |
+| 路由 | `routes` 片段 + 「生成整合路由」合并模块 path + 各节点 path |
+| 配置 | `pom.xml`、`application.yml`、MyBatis、`.env`、开箱 README |
+| SQL | 可按业务系统批量生成多表 `CREATE TABLE` 拼接 |
+
+ZIP 是**交付给客户的业务工程**；本仓库 `meta-management` 平台本身不随 ZIP 交付（见 [附录 H](#toc-appendix-h)）。
+
 ---
 
 <a id="toc-0-16"></a>
@@ -960,6 +1059,40 @@ flowchart TD
 ```
 
 与第 1～16 章逐步清单一致；字段与 SQL 顺序可微调，但 **表元数据应早于大批量 SQL** 以便生成器有完整元数据。
+
+---
+
+<a id="toc-0-19"></a>
+
+### 0.19 录入体验：编码规范化与动态规则
+
+#### 技术标识自动规范化
+
+适用于 **表编码、字段编码、字段名称（物理列名）、模块/节点/规则/业务系统编码** 等「仅字母数字下划线」类输入。
+
+| 时机 | 行为 |
+| ---- | ---- |
+| 输入框 **失焦** | 去掉首尾空白；**中间空白（含全角空格）→ 单个下划线 `_`**；合并连续下划线 |
+| 点弹窗 **确定** 前 | 再执行一遍同上（防止未失焦就保存） |
+| **表编码 / 字段编码** 等元数据编码 | 规范化后 **转大写**（如 `product code` → `PRODUCT_CODE`） |
+| **字段名称**（物理列名） | **保留大小写**（如 `product code` → `product_code`） |
+
+自然语言类字段（表名称、显示名、描述）**不会**删中间空格。
+
+#### 校验规则与选项是「按字段动态」的
+
+| 层级 | 说明 |
+| ---- | ---- |
+| 存库 | 每条字段自己的 `validate_rule` JSON |
+| 展示 | 生成代码、业务系统预览、Mock、列表「选项」列均 **读当前字段配置** |
+| 示例模板 | 「查看示例」里的「草稿/生效/作废」等 **仅模板**；DEMO 清单中的 JSON 是 **示例值**，可改成任意业务文案 |
+| 无 `options` 仅有 `IN.values` | 平台会从 `values` **推导** 展示用 options（label 多为值的字符串） |
+
+改 JSON 并保存字段后，应 **覆盖填充** 预览 Mock 或重新生成 ZIP，才能看到新文案。
+
+#### 未保存修改（与 [0.3](#toc-0-3) 一致）
+
+编辑弹窗有改动时关闭需确认；保存成功或放弃后快照更新。SQL 执行页对编辑器内容同样保护。
 
 ---
 
@@ -1024,14 +1157,18 @@ flowchart TD
 
 #### validateRule 常用键（Element Plus 生成侧）
 
-| 键                     | 含义                |
-| --------------------- | ----------------- |
-| `min` / `max`         | 长度或数值范围           |
-| `type`                | 如 `number`        |
-| `message`             | 错误提示              |
-| `trigger`             | `blur` / `change` |
-| `operator` + `values` | ENUM 常用 `IN`      |
-| `integer`             | 是否整数              |
+> **完整说明、示例 JSON、易错对照**见 [附录 G](#toc-appendix-g)。
+
+| 键 | 含义 | 常见误用 |
+| --- | --- | --- |
+| `minLength` / `maxLength` | **字符串长度**（VARCHAR 客户名等） | 勿与 `min`/`max` 混用 |
+| `min` / `max` | **数值**上下界（数量、金额、TINYINT 若仍用 number 组件） | 写在 VARCHAR 上会被当成数字规则，列表 Mock 也不按「字数」生成 |
+| `type` | 如 `number` | 仅影响表单校验类型 |
+| `pattern` | 正则 | 客户编码 `\d{8}` 等 |
+| `options` | 下拉 **展示**（`{label,value}` 或字符串） | **必须**配合 `formComponent=select` 才有下拉 UI |
+| `operator` + `values` | 合法值 **IN**（校验 + Mock 抽样） | ENUM 可点「刷新」写入；仅有 `values` 无 `options` 时平台会**推导** options |
+| `message` / `trigger` | 错误文案；`blur` / `change` | — |
+| `integer` | 是否整数 | 行号等 |
 
 ---
 
@@ -1086,6 +1223,11 @@ flowchart TD
 | ------------ | -------------- | ---------------- | ------ |
 | Vue列表页       | `vueList`      | 表名+List.vue      | ✓      |
 | Vue表单页       | `vueForm`      | 表名+Form.vue      | ✓      |
+| Vue详情页       | `vueDetail`    | 表名+Detail.vue    | 有 `DETAIL_PAGE` 节点时生成；ZIP 打包 |
+| Vue报表页       | `vueReport`    | 表名+Report.vue    | 有 `REPORT_PAGE` 节点时 |
+| Vue流程页       | `vueProcess`   | 表名+Process.vue   | 有 `PROCESS_PAGE` 节点时 |
+| Vue导入页       | `vueImport`    | 表名+Import.vue    | 有 `IMPORT` / `BATCH_IMPORT` 节点时 |
+| Vue导出页       | `vueExport`    | 表名+Export.vue    | 有 `BATCH_EXPORT` 节点时 |
 | 登录页          | `login`        | Login.vue        | ✓      |
 | Routes       | `routes`       | router 片段        | 整合路由按钮 |
 | API请求文件      | `api`          | 表 API js         | 下载     |
@@ -1118,21 +1260,47 @@ flowchart TD
 
 <a id="toc-appendix-c"></a>
 
-## 附录 C：业务系统预览抽屉
+## 附录 C：业务系统预览抽屉（完整说明）
 
-入口：**业务系统预览**（需已选业务系统）。
+入口：**代码生成**页 → **业务系统预览**（须已选业务系统 `DEMO_ERP`）。预览与 ZIP 使用**同一套** `VueCodeGenerator` 模型（字段、路由、节点类型、校验规则解析一致）。
 
-| 区域   | 控件                  | 作用                        |
-| ---- | ------------------- | ------------------------- |
-| 顶栏说明 | Alert               | Mock 与 ZIP 工程关系           |
-| 工具栏  | Mock API / 真实后端(禁用) | 预览数据源                     |
-|      | **填充示例数据**          | 每表约 8 条 Mock              |
-|      | **覆盖填充**            | 清空后重填                     |
-|      | **清空**              | 重置 Mock 内存库               |
-| 左侧   | 菜单                  | 由生成路由+模块节点聚合              |
-| 主区   | 列表预览                | 增删改查调 Mock API            |
-|      | 表单预览                | 字段含外键时可能展示关联              |
-| 底部折叠 | 后端接口清单              | method / ZIP 路径 / Mock 路径 |
+### 界面分区
+
+| 区域 | 控件 | 作用 |
+| ---- | ---- | ---- |
+| 顶栏说明 | Alert | 说明 Mock 数据在服务端内存、与 ZIP 工程关系 |
+| 工具栏 | Mock API / 真实后端（禁用） | 预览固定走 Mock，不接真实业务库 |
+| | **填充示例数据** | 每启用表约 8 条；**填充前会自动重新拉取 spec**（含最新 validateRule） |
+| | **覆盖填充** | 先清空各表 Mock 再填充 |
+| | **清空** | 重置该业务系统全部 Mock 数据 |
+| 左侧 | 模块 + 功能节点菜单 | 与 ZIP 侧栏逻辑一致：列表/表单/详情/报表/流程/导入/导出等节点 |
+| 主区 | 按节点类型切换组件 | 见下表 |
+| 底部折叠 | 后端接口清单 | 每条记录：HTTP 方法、ZIP 内 API 路径、Mock 路径 |
+
+### 主区页面类型与操作
+
+| 节点类型 | 预览组件 | 典型操作 |
+| -------- | -------- | -------- |
+| `LIST_PAGE` | 列表 | 搜索、分页、新增、编辑、删除、**查看**（若该表配了详情节点） |
+| `FORM_PAGE` | 表单 | 新增/编辑保存；校验走 `generatedPreviewRules`（完整规则） |
+| `DETAIL_PAGE` | 详情 | 只读展示；从列表「查看」进入，可跳编辑 |
+| `REPORT_PAGE` | 报表 | 展示报表占位与规则驱动的维度/指标文案 |
+| `PROCESS_PAGE` | 流程 | 状态流转按钮（依赖表上是否有 status 类字段） |
+| `BATCH_IMPORT_PAGE` / `IMPORT_PAGE` | 导入 | 上传区 + 批量规则提示 |
+| `BATCH_EXPORT_PAGE` | 导出 | 导出条件 + 下载占位 |
+
+### Mock 与校验的关系（必读）
+
+| 场景 | 行为 |
+| ---- | ---- |
+| **填充 / 覆盖填充** | 调用 `mockDataGenerator`：优先 `IN` / `options` / ENUM 类型 / 正则 / **minLength·maxLength** / 数值 min·max（仅数字类型）/ 字段名启发 |
+| **表单点保存** | 走完整 `validateRule`（必填、唯一、格式等），与填充逻辑分离 |
+| **改字段规则后** | 须再点 **填充** 或 **覆盖填充**（会自动 refresh spec）；已填在内存的旧行不会自动变 |
+| **重启后端** | Mock 库清空，需重新打开预览并填充 |
+
+### 典型操作顺序
+
+打开预览 → **填充示例数据** → 进入某表列表页查看数据 → 新增/编辑验证表单项与校验 → 若配置了详情节点，从列表 **查看** 进入详情页。需对照 ZIP 接口路径时，展开底部接口清单。
 
 数据存服务端内存，**重启后端后 Mock 清空**。
 
@@ -1210,6 +1378,223 @@ flowchart TD
 | 包名改不了                     | 设计为业务系统维护               | 业务系统管理改 packageName                          |
 | 登录后空白                     | 后端未启动或 API 404          | 查网关与 `/metadata-system/api`                  |
 | ZIP 下载失败                  | 未登录或业务系统无表              | 先登录；保证有启用表                                   |
+| 状态下拉是空的 / 只有数字框          | `formComponent=number` 或未配 `options` | 改 `select` + [附录 G](#toc-appendix-g) JSON；字段列表看「选项」列 |
+| 填充后状态仍是乱数               | 未用 `IN`/`options` 或旧 Mock 未覆盖 | **覆盖填充**；检查 validateRule |
+| 改了校验规则预览不变              | spec 未刷新或旧 Mock 在内存        | **覆盖填充**（已含 refresh spec）；或关抽屉重开 |
+| 列表没有「查看」进详情             | 表未配 `DETAIL_PAGE` 节点         | 功能节点管理补节点；见 [附录 J](#toc-appendix-j) |
+| 生成代码里没有 Report/Import.vue | 表上无对应类型节点                 | 补功能节点后重新生成 / 下 ZIP |
+| ENUM 有值但 ZIP 里 select 无选项   | 仅有 `IN.values` 无 `options`（旧版） | 升级后解析器会推导；或 JSON 显式写 `options` |
+| `ADD COLUMN` 报 SQL 语法错，片段含 `"label":"草稿"` | 旧版把 `options` 对象整段拼进 CHECK | 升级后 CHECK 只用 `values` 标量；`options` 仅前端/Mock；重试保存字段 |
+| 新增表不选业务系统报错「没有字段」 | 旧版强制 DEFAULT 且查字段链路错误 | 现可仅元数据；分配系统后 **补齐缺失物理表** |
+| 校验规则「测试」输入中文也通过、像区间 | 误用 `min/max` 或误解 IN 测试 | IN 规则只认 `values` 离散集合；见编辑器 **允许取值说明** |
+| 关闭编辑弹窗数据丢失 | 未做未保存提示 | 有改动时会二次确认（[0.19](#toc-0-19)） |
+
+---
+
+<a id="toc-appendix-g"></a>
+
+## 附录 G：validateRule 完整参考
+
+字段 **校验规则** 存库为 `validate_rule` 文本（JSON 对象或对象数组）。保存字段后，生成器 `CodeGenUtils.parseValidationRule` 转为模板用的 `validationRules` Map。
+
+### 1. 语义约定（与代码一致）
+
+| 概念 | JSON 键 | 适用字段类型 | 生成/预览用途 |
+| ---- | ------- | ------------ | ------------- |
+| 字符串长度 | `minLength`, `maxLength`, `lengthMessage` | VARCHAR/CHAR/TEXT | 表单 rules；Mock 按长度生成中文名/编码 |
+| 数值范围 | `min`, `max`, `type:number`, `rangeMessage` | INT/BIGINT/TINYINT/DECIMAL… | 表单 rules；Mock 在范围内随机 **仅当** 组件为 number |
+| 正则 | `pattern`, `patternMessage` 或 `type:email` 等 | 多为字符串 | 表单 rules；Mock 可识别 `\d{n}`、手机、邮箱 |
+| 下拉选项（展示） | `options`: 字符串数组或 `{label,value}[]` | 配合 `select` | **Vue 下拉选项**、列表筛选项 |
+| 合法值集合 | `operator:"IN"`, `values` | ENUM、TINYINT 状态、任意离散值 | 校验；物理 CHECK；Mock 随机抽；无 `options` 时**自动推导** options |
+| 展示文案 | `options`: `{label,value}[]` | 配合 `select` | **仅 UI / 生成 / 预览**；**不写入** MySQL 列类型 DDL |
+| 跨字段 | `type:"crossField"`, `field1`, `operator`, `field2` | 高级 | 表单校验 |
+
+**不要混用**：VARCHAR 客户名用 `minLength`/`maxLength`，不要用 `min`/`max` 表示「1～128 个字符」。  
+**不要混用**：TINYINT 状态不要用 `min:0,max:2` 表示「三个状态」——那是连续数值区间；离散状态用 **`IN` + `values`**。
+
+#### 「枚举值验证」示例 vs「状态字段（含 options）」示例（查看示例里两条）
+
+| 对比项 | 枚举值验证（`in_array`） | 状态字段（含 options） |
+| ------ | ------------------------ | ------------------------ |
+| 典型字段类型 | `ENUM('a','b')` 或字符串枚举 | `TINYINT` / `INT` 存 0、1、2 |
+| `values` 含义 | 多为字符串枚举值 | **数字存库值** |
+| 是否含 `options` | 通常无 | **有** label，供下拉/列表 Tag |
+| 配置路径 | 可用「枚举值」框 **刷新** → `IN` | 在 JSON 手写或应用状态模板后改文案 |
+| 测试 / Mock | 按 `values` 匹配 | 按 `values` 匹配；展示用 `options` 的 label |
+
+两条都可从校验规则编辑器 **查看示例** 应用后再改；系统**不会**在填 `status` 字段名时自动灌入「草稿/生效/作废」。
+
+### 2. 按场景复制粘贴的示例
+
+#### 2.1 VARCHAR 长度（客户名称）
+
+```json
+{
+  "minLength": 1,
+  "maxLength": 128,
+  "message": "客户名称长度 1-128",
+  "trigger": "blur"
+}
+```
+
+`formComponent`: `input`。
+
+#### 2.2 VARCHAR 编码 + 正则（客户编码）
+
+```json
+{
+  "minLength": 1,
+  "maxLength": 32,
+  "pattern": "^[A-Za-z0-9_-]+$",
+  "message": "客户编码 1-32 位字母数字下划线",
+  "trigger": "blur"
+}
+```
+
+#### 2.3 TINYINT 状态（下拉 + 数值 0/1/2）— **清单推荐写法**
+
+```json
+{
+  "operator": "IN",
+  "values": [0, 1, 2],
+  "options": [
+    {"label": "草稿", "value": 0},
+    {"label": "生效", "value": 1},
+    {"label": "作废", "value": 2}
+  ],
+  "message": "请选择有效状态",
+  "trigger": "change"
+}
+```
+
+`formComponent`: **`select`**（勿用 `number`）。
+
+#### 2.4 ENUM 订单状态（界面枚举框刷新后典型结果）
+
+```json
+{
+  "operator": "IN",
+  "values": ["DRAFT", "CONFIRMED", "CANCELLED"],
+  "message": "无效状态",
+  "trigger": "change"
+}
+```
+
+`fieldType`: `ENUM('DRAFT','CONFIRMED','CANCELLED')`；`formComponent`: `select`。可再加 `"options":["DRAFT","CONFIRMED","CANCELLED"]` 显式指定展示文案。
+
+#### 2.5 数量 / 金额（数值组件）
+
+```json
+{
+  "type": "number",
+  "min": 0.0001,
+  "message": "数量必须大于 0",
+  "trigger": "blur"
+}
+```
+
+`formComponent`: `number`。
+
+#### 2.6 行号（整数 + 下限）
+
+```json
+{
+  "type": "number",
+  "integer": true,
+  "min": 1,
+  "message": "行号 >= 1",
+  "trigger": "blur"
+}
+```
+
+### 3. ENUM 与 TINYINT 配置路径对照
+
+| 步骤 | ENUM | TINYINT / INT 状态码 |
+| ---- | ---- | -------------------- |
+| 字段类型 | 选 ENUM，填枚举值 | 选 TINYINT |
+| 表单组件 | 自动倾向 `select` | 字段名含 `status` 等时倾向 `select`；**勿用 number** |
+| 选项来源 | 「枚举值」→ **刷新** → `IN` | JSON 写 `options` + `IN`；或 **查看示例 → 状态字段（含 options）** |
+| 列表「选项」列 | 刷新后可见 | 保存 JSON 后可见 `0=草稿 / …` |
+| 物理 CHECK | `IN ('a','b',…)` | `IN (0,1,2)`（只用 **values**，不用 options 对象） |
+| 规则测试 | 匹配 `values` | 可输入存库值或 label；通过显示「存库值（中文）」 |
+
+### 4. JSON 数组形式
+
+支持 `[{...},{...}]` 多段规则合并为一个对象后再解析（同名键后者覆盖）。
+
+---
+
+<a id="toc-appendix-h"></a>
+
+## 附录 H：产品边界与交付范围
+
+（与 `docs/project-conventions.md` 一致，便于只带本指南讲解。）
+
+| 层级 | 是什么 | 谁维护 | 能否整包给学生 |
+| ---- | ------ | ------ | -------------- |
+| **元数据平台** | 本仓库：库/表/字段/关联/节点/规则/代码生成/平台预览 | **作者（商用产品）** | **否** |
+| **业务系统** | 平台生成的 ZIP：如 `DEMO_ERP` | 作者生成骨架；客户在业务工程扩展 | **是**（指 ZIP，非本仓库） |
+
+**可交付**：生成后的业务源码包、建表 SQL、运行部署说明、演示数据。  
+**不交付**：不要把 `meta-management` 整体当作学生作业仓库（除非单独签平台二开）。
+
+**验收标准**：列表 / 表单 / 详情、规则校验、可运行部署 — 在 **业务 ZIP** 上验收，不以「是否实现平台 16 个菜单」为准。
+
+**预览的定位**：平台内 Mock 用于**售前与交付前自检**，不等于把平台送给客户当毕设题目。
+
+---
+
+<a id="toc-appendix-i"></a>
+
+## 附录 I：Mock 示例数据生成规则
+
+实现：`frontend/src/utils/mockDataGenerator.js`。用于 **业务系统预览** 的填充/覆盖填充，**不**替代表单保存时的完整校验。
+
+### 优先级（从高到低）
+
+1. `validationRules` 已解析的 `operator:IN` + `values`，或 `hasOptions` + `options`  
+2. 原始 `validateRule` JSON 里的 `IN` / `options`  
+3. `fieldType` 为 `ENUM(...)` 时从类型定义取值  
+4. `pattern`（如 `\d{8}`、手机、邮箱）  
+5. `min`/`max`：**仅**数字类型或 `formComponent=number`  
+6. `minLength`/`maxLength`：字符串长度；名称类字段倾向生成中文样例  
+7. 字段名启发（`code`→数字串、`status`→启用停用等）  
+8. 按类型的默认值
+
+### 与 validateRule 的对应
+
+| 你配了什么 | Mock 表现 |
+| ---------- | --------- |
+| `select` + `options` + `IN` | 随机取 0/1/2 或枚举值之一 |
+| 仅 `number` + `min:0,max:2` | 随机 0～2 的**数字**，无中文标签 |
+| `minLength`/`maxLength` on VARCHAR | 按长度生成字符串，非「模拟文本」前缀 |
+
+### 操作注意
+
+- 填充前会 **refresh spec**（拉最新字段与规则）。  
+- 改规则后请用 **覆盖填充**。  
+- 后端重启后 Mock 清空。
+
+---
+
+<a id="toc-appendix-j"></a>
+
+## 附录 J：功能节点类型与生成产物（DEMO_ERP 对照）
+
+| 模块 | 节点编码示例 | 节点类型 | 关联表 | 生成/预览页面 | 菜单显示 |
+| ---- | ------------ | -------- | ------ | ------------- | -------- |
+| MDM | `MDM_NODE_CUST_LIST` | LIST | mdm_customer | List | 是 |
+| MDM | `MDM_NODE_CUST_FORM` | FORM | mdm_customer | Form | 是 |
+| SALES | `SALES_NODE_ORDER_LIST` | LIST | sales_order | List | 是 |
+| SALES | `SALES_NODE_ORDER_FORM` | FORM | sales_order | Form | 是 |
+| WH | `WH_NODE_STOCK_LIST` | LIST | wh_stock | List | 是 |
+| WH | `WH_NODE_STOCK_DETAIL` | DETAIL | wh_stock | Detail | **否**（列表进入） |
+| CFG | `CFG_NODE_DICT_LIST` | LIST | sys_dict | List | 是 |
+| CFG | `CFG_NODE_DICT_IMPORT` | BATCH_IMPORT | sys_dict | Import | 是 |
+
+扩展演示时可自行增加：`REPORT_PAGE`（报表）、`PROCESS_PAGE`（流程）、`BATCH_EXPORT_PAGE`（导出），保存节点后重新 **生成代码** 或 **下载 ZIP**，在对应标签页可见 `Report.vue` 等。
+
+**跳转关系**（`jumpRelation`）格式：`源节点编码→目标节点编码`，用于生成器理解列表↔表单↔详情链路；清单中每条节点表均给出示例值。
 
 ---
 
@@ -1432,10 +1817,10 @@ flowchart TD
 
 1. 写入表元数据；
 2. 若该表下尚无任何字段，按所选 **主键策略** 自动补 **1 条主键**（`fieldCode=ID`，`fieldName=id` 或 `uuid`）；
-3. 在目标物理库执行 `CREATE TABLE`（此时物理表通常**只有主键一列**）；
-4. 第 9 章再到「字段管理」为该表 **新增字段**，每保存一列会对物理表 `ADD COLUMN`。
+3. **若已能解析物理库**（选了业务系统且其有默认库，和/或选了物理库名），则 `CREATE TABLE`（通常**只有主键一列**）；未选业务系统且未指定物理库时 **只登记元数据**，不建物理表；
+4. 第 9 章再到「字段管理」为该表 **新增字段**，每保存一列会对物理表 `ADD COLUMN`（须已有目标库）。
 
-每张表「新增表」弹窗内：**业务系统**均选 `演示ERP业务系统`；**物理库名**一律留空（沿用默认库 `demo_erp`）。
+**本清单推荐**：每张表「新增表」时 **业务系统** 选 `演示ERP业务系统`，**物理库名** 留空（沿用 `demo_erp`）。若需演示「先建表、后分配系统」，可先八表均不选业务系统，再在 §7 末用 **批量分配业务系统**，最后对 `DEMO_ERP` 点 **补齐缺失物理表**（见 [0.9](#toc-0-9)）。
 
 | 序号  | 表编码 `tableCode`    | 表名称 `tableName` | 主键策略 `pkStrategy` | 描述 `description` |
 | --- | ------------------ | --------------- | ----------------- | ---------------- |
@@ -1469,6 +1854,8 @@ flowchart TD
 <a id="toc-9"></a>
 
 ## 9. 字段管理
+
+> **本章是「填什么」的权威表格**；控件含义见 [0.10 字段管理](#toc-0-10)；规则 JSON 见 [附录 G](#toc-appendix-g)；配完后在列表 **「选项」** 列自检。
 
 **前提**：业务系统选 `演示ERP业务系统`；表下拉依次切换。
 
@@ -1505,49 +1892,76 @@ flowchart TD
 - 未单独说明的 `validateRule`：JSON 填 `{}`  
 - **参与表单录入**：表格中未单独写时均为 **开**（`in_form = 1`）。若某字段（如业务编码）由系统生成、**不在新增/编辑页出现表单项**，保存前关掉「参与表单录入」：界面会隐藏「表单组件」，库内 `in_form = 0` 且 `form_component` 存占位 `none`；**列表预览与列表代码生成仍可有该列**，仅表单预览 / Vue 表单页生成会排除该字段。
 
-下列 **不含主键行**（主键已由 §7 自动生成，`fieldCode=ID`）。列说明：**字段编码** | **字段名称** | …（参与表单录入未列时默认 **开**）
+下列 **不含主键行**（主键已由 §7 自动生成，`fieldCode=ID`）。列说明：**字段编码** | **字段名称** | … | **选项（展示）** | **validateRule** | sort（参与表单录入未列时默认 **开**）
+
+#### TINYINT / INT 状态码如何体现选项（与 ENUM 不同）
+
+| 场景 | 界面怎么配 | 清单/生成如何体现 |
+| ---- | ------- | ----------- |
+| **ENUM**（如订单状态） | 有「枚举值」框 → **刷新** 写入 `IN` | 类型列写 `ENUM('A','B')`；`formComponent=select` |
+| **TINYINT 等数值状态**（如客户 `status`） | **无**枚举值框；`formComponent` 选 **`select`**；在 **校验规则 JSON** 写 `options` + `operator:IN` + `values` | 须用下方 **「选项（展示）」** 列对照录入，勿仅用 `number`+`min/max`（下拉与 Mock 抽不到文案） |
+
+`status` 推荐 `validateRule`（整段粘贴到 Monaco，或 **查看示例 → 状态字段（含 options）** 后改文案；**填字段名不会自动写入**）：
+
+```json
+{
+  "operator": "IN",
+  "values": [0, 1, 2],
+  "options": [
+    {"label": "草稿", "value": 0},
+    {"label": "生效", "value": 1},
+    {"label": "作废", "value": 2}
+  ],
+  "message": "请选择有效状态",
+  "trigger": "change"
+}
+```
+
+仅写 `IN`+`values` 而未写 `options` 时，平台生成/预览会从 `values` 推导选项（label 默认为值的字符串形式）。规则编辑器 **测试** 可输入存库数字或中文 label，见 [0.10](#toc-0-10)。
+
+**§9 各表字段表列说明**：自 `mdm_customer` 起，含 **「选项（展示）」** 列；无下拉的字段填 `—`。`validateRule` 列过长时可用「见上方 JSON 块」或 [附录 G](#toc-appendix-g) 引用。其余表（`sales_order_line`、`wh_stock` 等）无状态枚举的字段，`选项` 均为 `—`，规则以 `validateRule` 列为准。
 
 ### 表 `mdm_customer`
 
-| fieldCode                                 | fieldName       | 类型与参数         | fieldType      | label  | 必填  | formComponent | validateRule                                                                 | sort |
-| ----------------------------------------- | --------------- | ------------- | -------------- | ------ | --- | ------------- | ---------------------------------------------------------------------------- | ---- |
-| `MC_F_CODE`                               | `customer_code` | VARCHAR 长度 32 | `VARCHAR(32)`  | `客户编码` | 是   | `input`       | `{"min":1,"max":32,"message":"客户编码长度1-32","trigger":"blur"}`                 | `10` |
-| `MC_F_NAME`                               | `customer_name` | VARCHAR 128   | `VARCHAR(128)` | `客户名称` | 是   | `input`       | `{"min":1,"max":128,"message":"客户名称长度1-128","trigger":"blur"}`               | `20` |
-| `MC_F_STATUS` | `status`        | TINYINT       | `TINYINT`      | `状态`   | 是   | `number`      | `{"type":"number","min":0,"max":2,"message":"状态0草稿1生效2作废","trigger":"blur"}` | `30` |
-| `MC_F_REMARK`                             | `remark`        | VARCHAR 512   | `VARCHAR(512)` | `备注`   | 否   | `textarea`    | `{}`                                                                         | `40` |
-| `MC_F_CT`                                 | `create_time`   | DATETIME      | `DATETIME`     | `创建时间` | 否   | `datepicker`  | `{}`                                                                         | `50` |
+| fieldCode     | fieldName       | 类型与参数         | fieldType      | label  | 必填  | formComponent | 选项（展示）              | validateRule | sort |
+| ------------- | --------------- | ------------- | -------------- | ------ | --- | ------------- | -------------------- | ------------ | ---- |
+| `MC_F_CODE`   | `customer_code` | VARCHAR 长度 32 | `VARCHAR(32)`  | `客户编码` | 是   | `input`       | —                    | `{"minLength":1,"maxLength":32,"message":"客户编码长度1-32","trigger":"blur"}` | `10` |
+| `MC_F_NAME`   | `customer_name` | VARCHAR 128   | `VARCHAR(128)` | `客户名称` | 是   | `input`       | —                    | `{"minLength":1,"maxLength":128,"message":"客户名称长度1-128","trigger":"blur"}` | `20` |
+| `MC_F_STATUS` | `status`        | TINYINT       | `TINYINT`      | `状态`   | 是   | `select`      | `0`草稿 / `1`生效 / `2`作废 | 见上方 JSON 块 | `30` |
+| `MC_F_REMARK` | `remark`      | VARCHAR 512   | `VARCHAR(512)` | `备注`   | 否   | `textarea`    | —                    | `{}`         | `40` |
+| `MC_F_CT`     | `create_time` | DATETIME      | `DATETIME`     | `创建时间` | 否   | `datepicker`  | —                    | `{}`         | `50` |
 
 **（可选演示）** 全部保存后，编辑 `MC_F_CODE`（客户编码）：关闭「参与表单录入」再保存 → 再打开「代码生成」中该表的 **Vue 表单页预览**，应不再出现客户编码输入项；**Vue 列表页预览**仍可有「客户编码」列。
 
 ### 表 `mdm_product`
 
-| fieldCode     | fieldName      | 类型与参数       | fieldType      | label  | 必填  | formComponent | validateRule                                                           | sort |
-| ------------- | -------------- | ----------- | -------------- | ------ | --- | ------------- | ---------------------------------------------------------------------- | ---- |
-| `MP_F_CODE`   | `product_code` | VARCHAR 64  | `VARCHAR(64)`  | `商品编码` | 是   | `input`       | `{"min":1,"max":64,"message":"商品编码长度1-64","trigger":"blur"}`           | `10` |
-| `MP_F_NAME`   | `product_name` | VARCHAR 256 | `VARCHAR(256)` | `商品名称` | 是   | `input`       | `{}`                                                                   | `20` |
-| `MP_F_STATUS` | `status`       | TINYINT     | `TINYINT`      | `状态`   | 是   | `number`      | `{"type":"number","min":0,"max":2,"message":"状态0-2","trigger":"blur"}` | `30` |
-| `MP_F_REMARK` | `remark`       | VARCHAR 512 | `VARCHAR(512)` | `备注`   | 否   | `textarea`    | `{}`                                                                   | `40` |
-| `MP_F_CT`     | `create_time`  | DATETIME    | `DATETIME`     | `创建时间` | 否   | `datepicker`  | `{}`                                                                   | `50` |
+| fieldCode     | fieldName      | 类型与参数       | fieldType      | label  | 必填  | formComponent | 选项（展示）              | validateRule | sort |
+| ------------- | -------------- | ----------- | -------------- | ------ | --- | ------------- | -------------------- | ------------ | ---- |
+| `MP_F_CODE`   | `product_code` | VARCHAR 64  | `VARCHAR(64)`  | `商品编码` | 是   | `input`       | —                    | `{"minLength":1,"maxLength":64,"message":"商品编码长度1-64","trigger":"blur"}` | `10` |
+| `MP_F_NAME`   | `product_name` | VARCHAR 256 | `VARCHAR(256)` | `商品名称` | 是   | `input`       | —                    | `{}`         | `20` |
+| `MP_F_STATUS` | `status`       | TINYINT     | `TINYINT`      | `状态`   | 是   | `select`      | 同客户 `status`（0/1/2） | 同上方 JSON 块 | `30` |
+| `MP_F_REMARK` | `remark`       | VARCHAR 512 | `VARCHAR(512)` | `备注`   | 否   | `textarea`    | —                    | `{}`         | `40` |
+| `MP_F_CT`     | `create_time`  | DATETIME    | `DATETIME`     | `创建时间` | 否   | `datepicker`  | —                    | `{}`         | `50` |
 
 ### 表 `mdm_warehouse`
 
-| fieldCode     | fieldName        | 类型与参数       | fieldType      | label  | 必填  | formComponent | validateRule | sort |
-| ------------- | ---------------- | ----------- | -------------- | ------ | --- | ------------- | ------------ | ---- |
-| `MW_F_CODE`   | `warehouse_code` | VARCHAR 32  | `VARCHAR(32)`  | `仓库编码` | 是   | `input`       | `{}`         | `10` |
-| `MW_F_NAME`   | `warehouse_name` | VARCHAR 128 | `VARCHAR(128)` | `仓库名称` | 是   | `input`       | `{}`         | `20` |
-| `MW_F_STATUS` | `status`         | TINYINT     | `TINYINT`      | `状态`   | 是   | `number`      | `{}`         | `30` |
-| `MW_F_REMARK` | `remark`         | VARCHAR 512 | `VARCHAR(512)` | `备注`   | 否   | `textarea`    | `{}`         | `40` |
-| `MW_F_CT`     | `create_time`    | DATETIME    | `DATETIME`     | `创建时间` | 否   | `datepicker`  | `{}`         | `50` |
+| fieldCode     | fieldName        | 类型与参数       | fieldType      | label  | 必填  | formComponent | 选项（展示）              | validateRule | sort |
+| ------------- | ---------------- | ----------- | -------------- | ------ | --- | ------------- | -------------------- | ------------ | ---- |
+| `MW_F_CODE`   | `warehouse_code` | VARCHAR 32  | `VARCHAR(32)`  | `仓库编码` | 是   | `input`       | —                    | `{}`         | `10` |
+| `MW_F_NAME`   | `warehouse_name` | VARCHAR 128 | `VARCHAR(128)` | `仓库名称` | 是   | `input`       | —                    | `{}`         | `20` |
+| `MW_F_STATUS` | `status`         | TINYINT     | `TINYINT`      | `状态`   | 是   | `select`      | 同客户 `status`（0/1/2） | 同上方 JSON 块 | `30` |
+| `MW_F_REMARK` | `remark`         | VARCHAR 512 | `VARCHAR(512)` | `备注`   | 否   | `textarea`    | —                    | `{}`         | `40` |
+| `MW_F_CT`     | `create_time`    | DATETIME    | `DATETIME`     | `创建时间` | 否   | `datepicker`  | —                    | `{}`         | `50` |
 
 ### 表 `sales_order`
 
-| fieldCode  | fieldName      | 类型与参数                                      | fieldType                               | label  | 必填  | formComponent | validateRule                                                                                       | sort |
-| ---------- | -------------- | ------------------------------------------ | --------------------------------------- | ------ | --- | ------------- | -------------------------------------------------------------------------------------------------- | ---- |
-| `SO_F_NO`  | `order_no`     | VARCHAR 32                                 | `VARCHAR(32)`                           | `订单号`  | 是   | `input`       | `{}`                                                                                               | `10` |
-| `SO_F_CID` | `customer_id`  | BIGINT                                     | `BIGINT`                                | `客户ID` | 是   | `number`      | `{}`                                                                                               | `20` |
-| `SO_F_ST`  | `order_status` | ENUM：`DRAFT,CONFIRMED,CANCELLED`，点「刷新」同步校验 | `ENUM('DRAFT','CONFIRMED','CANCELLED')` | `订单状态` | 是   | `select`      | `{"operator":"IN","values":["DRAFT","CONFIRMED","CANCELLED"],"message":"无效状态","trigger":"change"}` | `30` |
-| `SO_F_CT`  | `create_time`  | DATETIME                                   | `DATETIME`                              | `创建时间` | 否   | `datepicker`  | `{}`                                                                                               | `40` |
-| `SO_F_UT`  | `update_time`  | DATETIME                                   | `DATETIME`                              | `更新时间` | 否   | `datepicker`  | `{}`                                                                                               | `50` |
+| fieldCode  | fieldName      | 类型与参数 | fieldType | label  | 必填 | formComponent | 选项（展示） | validateRule | sort |
+| ---------- | -------------- | ----- | --------- | ------ | -- | ------------- | ------- | ------------ | ---- |
+| `SO_F_NO`  | `order_no`     | VARCHAR 32 | `VARCHAR(32)` | `订单号` | 是 | `input` | — | `{}` | `10` |
+| `SO_F_CID` | `customer_id`  | BIGINT | `BIGINT` | `客户ID` | 是 | `number` | — | `{}` | `20` |
+| `SO_F_ST`  | `order_status` | ENUM：`DRAFT,CONFIRMED,CANCELLED`；弹窗填枚举值后点 **刷新** | `ENUM('DRAFT','CONFIRMED','CANCELLED')` | `订单状态` | 是 | `select` | DRAFT / CONFIRMED / CANCELLED | `{"operator":"IN","values":["DRAFT","CONFIRMED","CANCELLED"],"options":["DRAFT","CONFIRMED","CANCELLED"],"message":"无效状态","trigger":"change"}` | `30` |
+| `SO_F_CT`  | `create_time`  | DATETIME | `DATETIME` | `创建时间` | 否 | `datepicker` | — | `{}` | `40` |
+| `SO_F_UT`  | `update_time`  | DATETIME | `DATETIME` | `更新时间` | 否 | `datepicker` | — | `{}` | `50` |
 
 ### 表 `sales_order_line`
 
@@ -2093,8 +2507,8 @@ SELECT * FROM table_that_does_not_exist_for_error_test_xyz;
 
 | 按钮             | 操作                                   |
 | -------------- | ------------------------------------ |
-| **业务系统预览**     | 打开抽屉 → 左侧切菜单看列表/表单 → **填充示例数据** → 关闭 |
-| **下载业务系统 ZIP** | 下载整包（可选，体积较大）                        |
+| **业务系统预览**     | 打开抽屉 → 左侧切菜单 → **填充示例数据** → 列表 **查看** 进详情（WH）→ 字典 **导入** 页（CFG）→ 见 [附录 C](#toc-appendix-c) |
+| **下载业务系统 ZIP** | 下载整包；解压核对是否有 `Detail.vue` / `Import.vue` 等（见 [附录 J](#toc-appendix-j)） |
 | **部署指南**       | 打开说明弹窗后关闭                            |
 
 ### 第二轮
@@ -2162,7 +2576,27 @@ SELECT * FROM table_that_does_not_exist_for_error_test_xyz;
 | 代码生成         | 全业务一次 + 单表一次 + 两种 Service 模式 + 预览/ZIP/测试/部署指南（可选）                     |
 | SQL          | SELECT + CREATE + INSERT + UPDATE + 错误语句 + 导入/格式化 + 目标库选择             |
 | 全局 UI        | 侧栏折叠、标签切换/拖拽/右键关闭、改密或退出                                               |
+| 状态字段选项       | `mdm_*`.`status` 均为 `select` + 附录 G JSON；字段列表「选项」列非 `—`              |
+| 预览 Mock      | 覆盖填充后状态下拉有文案；改规则后再覆盖填充一次                                            |
+| 详情/导入页       | WH 详情节点菜单隐藏、列表可进；CFG 批量导入节点在菜单可见                                      |
+| 未保存提示 / 编码规范化 | 弹窗关闭有确认；`product code` 类输入失焦可自动变 `product_code`；见 [0.19](#toc-0-19) |
+| 产品边界 | 已理解平台与 ZIP 业务系统的区别；见 [附录 H](#toc-appendix-h)                              |
+
+### 文档索引（附录速查）
+
+| 附录 | 何时翻 |
+| ---- | ------ |
+| A | 路由 path、组件名 |
+| B | 代码生成每个 Tab 的 codeType 与是否依赖选表 |
+| C | 业务系统预览全流程 |
+| D | 模块/业务系统表单校验原文 |
+| E | DEMO_ERP 表/模块数量总览 |
+| F | 现象 → 原因 → 处理 |
+| G | validateRule 怎么写、IN 与枚举示例区别、复制 JSON |
+| H | 对外讲商业边界、交付什么 |
+| I | Mock 填充逻辑与优先级 |
+| J | 节点类型对应哪个 Vue 文件 |
 
 ---
 
-*文档路径：`docs/full-system-simulation-guide.md`*
+*文档路径：`docs/full-system-simulation-guide.md` · 与 `docs/project-conventions.md` 产品边界一致*

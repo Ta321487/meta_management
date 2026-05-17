@@ -133,12 +133,16 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Override
     @Transactional
     public void add(MetadataField field) {
+        field.setFieldCode(CodeValidator.normalizeCode(field.getFieldCode()));
+        if (field.getFieldName() != null) {
+            field.setFieldName(CodeValidator.normalizeIdentifier(field.getFieldName()));
+        }
         if (!CodeValidator.isValidCode(field.getFieldCode())) {
             throw BizException.of(AppErrorCodes.FIELD_CODE_INVALID, FieldMessages.FIELD_CODE_INVALID);
         }
-        
-        // 元数据操作使用大写的字段编码
-        field.setFieldCode(field.getFieldCode().toUpperCase());
+        if (!CodeValidator.isValidIdentifier(field.getFieldName())) {
+            throw BizException.badRequest("字段名称只能包含字母、数字和下划线，长度1-50");
+        }
         
         // 确保businessCode不为null，如果没有提供则从表中获取
         if (field.getBusinessCode() == null || field.getBusinessCode().isEmpty()) {
@@ -315,6 +319,12 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
     @Override
     @Transactional
     public void update(MetadataField field) {
+        if (field.getFieldName() != null) {
+            field.setFieldName(CodeValidator.normalizeIdentifier(field.getFieldName()));
+            if (!CodeValidator.isValidIdentifier(field.getFieldName())) {
+                throw BizException.badRequest("字段名称只能包含字母、数字和下划线，长度1-50");
+            }
+        }
         // 元数据操作使用大写的字段编码进行查询
         String upperFieldCode = field.getFieldCode().toUpperCase();
         MetadataField existing = fieldMapper.selectByCode(field.getTableCode(), upperFieldCode);

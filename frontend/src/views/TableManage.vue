@@ -120,6 +120,7 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
@@ -130,10 +131,14 @@
           :closable="false"
           show-icon
           title="本步只登记表，不填字段"
-          description="保存后自动建主键列；业务字段请到「字段管理」添加。"
+          description="保存后自动建主键列；业务字段请到「字段管理」添加。业务系统可留空，稍后批量分配；未指定业务系统/物理库时仅登记元数据，分配后可用「补建物理表」。"
         />
         <el-form-item label="表编码" prop="tableCode" v-if="!form.id">
-          <el-input v-model="form.tableCode" placeholder="如：TABLE_001" />
+          <el-input
+            v-model="form.tableCode"
+            placeholder="如：TABLE_001"
+            @blur="applyIdentifierBlur(form, 'tableCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="表名称" prop="tableName">
           <el-input v-model="form.tableName" placeholder="请输入表名称" />
@@ -196,7 +201,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -205,6 +210,7 @@
     <el-dialog
       :close-on-click-modal="false"
       :close-on-press-escape="false"
+      :before-close="assignFormGuard.handleBeforeClose"
       v-model="assignDialogVisible"
       title="批量分配业务系统"
       width="500px"
@@ -222,7 +228,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="assignDialogVisible = false">取消</el-button>
+        <el-button @click="assignFormGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleAssignSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -245,6 +251,8 @@ import {
   importMissingMetadataTables,
   getPhysicalDatabaseList
 } from '../api'
+import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'TableManage',
@@ -287,10 +295,15 @@ export default {
       isEnabled: 1
     })
     const rules = {
-      tableCode: [{ required: true, message: '请输入表编码', trigger: 'blur' }],
+      tableCode: metadataCodeRules('表编码'),
       tableName: [{ required: true, message: '请输入表名称', trigger: 'blur' }],
       pkStrategy: [{ required: true, message: '请选择主键策略', trigger: 'change' }]
     }
+
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
+    const assignFormGuard = useDialogFormGuard(assignForm, assignDialogVisible)
 
     const pkStrategyOptions = [
       { value: 'AUTO', label: 'id 自增' },
@@ -513,6 +526,9 @@ export default {
 
     const handleSubmit = async () => {
       try {
+        if (!form.id) {
+          normalizeFormCodes(form, [{ key: 'tableCode', mode: 'code' }])
+        }
         // 先验证表单
         await formRef.value.validate()
         
@@ -534,8 +550,15 @@ export default {
           ElMessage.success('操作成功')
         } else {
           await addTable(form)
-          ElMessage.success('表创建成功：已自动生成主键并建物理表（当前仅主键列），请到「字段管理」补充其余列')
+          const hasBs = normalizeBusinessCode(form.businessCode) !== ''
+          const hasDb = normalizeBusinessCode(form.databaseName) !== ''
+          if (hasBs || hasDb) {
+            ElMessage.success('表创建成功：已自动生成主键并建物理表（当前仅主键列），请到「字段管理」补充其余列')
+          } else {
+            ElMessage.success('表创建成功：已登记元数据并生成主键字段。请批量分配业务系统后，在筛选该业务系统下执行「补建物理表」')
+          }
         }
+        formGuard.markClean()
         dialogVisible.value = false
         loadData()
       } catch (error) {
@@ -720,7 +743,7 @@ export default {
         await batchAssignBusinessSystem({ tableCodes, businessCode: assignForm.businessCode })
         ElMessage.success('批量分配业务系统成功')
         
-        // 关闭对话框并刷新数据
+        assignFormGuard.markClean()
         assignDialogVisible.value = false
         loadData()
         // 清空选中状态
@@ -751,6 +774,9 @@ export default {
       handleImportMetadataTables,
       form,
       rules,
+      formGuard,
+      assignFormGuard,
+      applyIdentifierBlur,
       pkStrategyOptions,
       pkStrategyOptionLabel,
       formatPkStrategyLabel,

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="module-manage">
     <el-card>
       <template #header>
@@ -130,11 +130,16 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="600px"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="模块编码" prop="moduleCode" v-if="!form.id">
-          <el-input v-model="form.moduleCode" placeholder="如：MODULE_001" />
+          <el-input
+            v-model="form.moduleCode"
+            placeholder="如：MODULE_001"
+            @blur="applyIdentifierBlur(form, 'moduleCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="模块名称" prop="moduleName">
           <el-input v-model="form.moduleName" placeholder="请输入模块名称" />
@@ -197,7 +202,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -228,6 +233,8 @@ import {
   getBusinessSystemList
 } from '../api'
 import IconSelector from '../components/IconSelector.vue'
+import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'ModuleManage',
@@ -267,12 +274,16 @@ export default {
     })
     const showIconSelector = ref(false)
     const rules = {
-      moduleCode: [{ required: true, message: '请输入模块编码', trigger: 'blur' }],
+      moduleCode: metadataCodeRules('模块编码'),
       moduleName: [{ required: true, message: '请输入模块名称', trigger: 'blur' }],
       moduleType: [{ required: true, message: '请选择模块类型', trigger: 'change' }],
       sort: [{ required: true, message: '请输入排序号', trigger: 'blur' }],
       routePath: [{ pattern: '^(/[a-zA-Z0-9_-]+)*$', message: '路由路径格式不正确', trigger: 'blur' }]
     }
+
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
 
     const loadData = async () => {
       try {
@@ -423,6 +434,9 @@ export default {
 
     const handleSubmit = async () => {
       if (!formRef.value) return
+      if (!form.id) {
+        normalizeFormCodes(form, [{ key: 'moduleCode', mode: 'code' }])
+      }
       await formRef.value.validate(async (valid) => {
         if (valid) {
           try {
@@ -432,6 +446,7 @@ export default {
               await addModule(form)
             }
             ElMessage.success('操作成功')
+            formGuard.markClean()
             dialogVisible.value = false
             loadData()
           } catch (error) {
@@ -590,6 +605,8 @@ export default {
       searchForm,
       form,
       rules,
+      formGuard,
+      applyIdentifierBlur,
       pagination,
       showIconSelector,
       loadTables,

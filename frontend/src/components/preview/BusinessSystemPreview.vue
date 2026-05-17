@@ -10,7 +10,7 @@
     <div v-else-if="spec" class="preview-root">
       <el-alert type="info" show-icon :closable="false" class="tip">
         <template #title>模拟下载 ZIP 后的前端 + Mock 后端</template>
-        路由与校验规则与生成代码同源；侧栏菜单与 ZIP 一致（列表、报表、流程、导入、导出等）。列表可「查看」详情、「编辑」表单。打开预览时若无数据会自动填充示例（每表 8 条）。数据在服务端内存，重启后清空。
+        路由与校验规则与生成代码同源；侧栏菜单与 ZIP 一致。填充/覆盖填充前会重新加载最新字段与校验规则，并按 validationRules（IN、长度、select 等）生成示例数据。数据在服务端内存，重启后清空。
       </el-alert>
       <el-row :gutter="12" class="toolbar">
         <el-col :span="16">
@@ -284,8 +284,29 @@ async function autoSeedIfEmpty() {
   }
 }
 
+async function refreshSpec() {
+  if (!props.businessCode) return false
+  try {
+    const res = await request.get(`/codegen/preview/business/${encodeURIComponent(props.businessCode)}/spec`, {
+      params: {
+        packageName: props.packageName || undefined,
+        useInterface: props.useInterface,
+        captchaEnabled: props.captchaEnabled
+      }
+    })
+    if (res.code === 200 && res.data) {
+      spec.value = res.data
+      return true
+    }
+  } catch (e) {
+    console.warn('refresh spec failed', e)
+  }
+  return false
+}
+
 async function fillSampleData(clearFirst) {
   if (!spec.value) return
+  await refreshSpec()
   if (clearFirst) {
     try {
       await ElMessageBox.confirm('将清空各表现有 Mock 数据并重新生成示例，是否继续？', '覆盖填充', {

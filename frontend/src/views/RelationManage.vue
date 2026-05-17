@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="relation-manage">
     <el-card>
       <template #header>
@@ -78,6 +78,7 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="700px"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
@@ -92,7 +93,11 @@
           </el-select>
         </el-form-item>
         <el-form-item label="关联编码" prop="relationCode" v-if="!form.id">
-          <el-input v-model="form.relationCode" placeholder="如：RELATION_001" />
+          <el-input
+            v-model="form.relationCode"
+            placeholder="如：RELATION_001"
+            @blur="applyIdentifierBlur(form, 'relationCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="关联名称" prop="relationName">
           <el-input v-model="form.relationName" placeholder="请输入关联名称" />
@@ -153,7 +158,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -164,6 +169,8 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getTableList, getFieldList, addRelation, updateRelation, deleteRelation, getAllRelations, createForeignKey, syncForeignKeys, getBusinessSystemList } from '../api'
+import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'RelationManage',
@@ -195,9 +202,13 @@ export default {
       relationType: 'ONE_TO_MANY',
       createForeignKey: false
     })
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
+
     const rules = {
       businessCode: [{ required: true, message: '请选择业务系统', trigger: 'change' }],
-      relationCode: [{ required: true, message: '请输入关联编码', trigger: 'blur' }],
+      relationCode: metadataCodeRules('关联编码'),
       relationName: [{ required: true, message: '请输入关联名称', trigger: 'blur' }],
       mainTableCode: [{ required: true, message: '请选择主表', trigger: 'change' }],
       slaveTableCode: [{ required: true, message: '请选择从表', trigger: 'change' }],
@@ -395,6 +406,9 @@ export default {
     }
 
     const handleSubmit = async () => {
+      if (!form.id) {
+        normalizeFormCodes(form, [{ key: 'relationCode', mode: 'code' }])
+      }
       await formRef.value.validate(async (valid) => {
         if (valid) {
           try {
@@ -415,6 +429,7 @@ export default {
             if (!form.createForeignKey || form.id) {
               ElMessage.success('操作成功')
             }
+            formGuard.markClean()
             dialogVisible.value = false
             loadRelations()
           } catch (error) {
@@ -497,6 +512,8 @@ export default {
       pagination,
       form,
       rules,
+      formGuard,
+      applyIdentifierBlur,
       handleBusinessCodeChange,
       handleMainTableChange,
       handleSlaveTableChange,

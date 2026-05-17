@@ -65,7 +65,8 @@ public class SqlGenerator {
             throw new CodeGenException("TABLE_NOT_FOUND", "表不存在: " + tableCode);
         }
 
-        List<MetadataField> fields = fieldService.listByTableCode(tableCode);
+        // 建表 DDL 需包含刚自动插入的主键等元数据字段，不按业务系统启用链路过滤
+        List<MetadataField> fields = fieldService.listByTableCode(tableCode, "", true);
         if (fields.isEmpty()) {
             throw new CodeGenException("FIELD_NOT_FOUND", "表没有配置字段: " + tableCode);
         }

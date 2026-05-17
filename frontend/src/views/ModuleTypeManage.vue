@@ -1,4 +1,4 @@
-﻿<template>
+<template>
 
   <div class="page-module-type">
 
@@ -144,6 +144,7 @@
       width="560px"
       :close-on-click-modal="false"
       :close-on-press-escape="false"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px">
@@ -152,6 +153,7 @@
             v-model="form.typeCode"
             :disabled="!!form.id"
             placeholder="如：DATA_MANAGE"
+            @blur="applyIdentifierBlur(form, 'typeCode', 'moduleType')"
           />
         </el-form-item>
         <el-form-item label="类型名称" prop="typeName">
@@ -190,7 +192,7 @@
 
       <template #footer>
 
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
 
         <el-button type="primary" @click="handleSubmit">保存</el-button>
 
@@ -211,8 +213,8 @@ import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { getModuleTypeList, addModuleType, updateModuleType, deleteModuleType, batchDeleteModuleType } from '../api'
-
-
+import { applyIdentifierBlur, moduleTypeCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
 
@@ -235,17 +237,16 @@ export default {
     const form = reactive({ id: null, typeCode: '', typeName: '', defaultNodes: [], description: '' })
 
     const rules = {
-      typeCode: [
-        { required: true, message: '请输入类型编码', trigger: 'blur' },
-        { pattern: /^[A-Z][A-Z0-9_]*$/, message: '编码须为大写字母、数字或下划线，且以字母开头', trigger: 'blur' }
-      ],
+      typeCode: moduleTypeCodeRules(),
       typeName: [{ required: true, message: '请输入类型名称', trigger: 'blur' }],
       defaultNodes: [
         { type: 'array', required: true, min: 1, message: '请至少选择一个默认节点', trigger: 'change' }
       ]
     }
 
-
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
 
     const searchForm = reactive({
 
@@ -569,6 +570,7 @@ export default {
 
     const handleSubmit = async () => {
       if (!formRef.value) return
+      normalizeFormCodes(form, [{ key: 'typeCode', mode: 'moduleType' }])
       await formRef.value.validate(async (valid) => {
         if (!valid) return
         try {
@@ -579,6 +581,7 @@ export default {
             await addModuleType(form)
             ElMessage.success('添加成功')
           }
+          formGuard.markClean()
           dialogVisible.value = false
           loadData()
         } catch (e) {
@@ -618,6 +621,8 @@ export default {
       formRef,
 
       rules,
+      formGuard,
+      applyIdentifierBlur,
       guideCollapse,
       collapsePanelTitle,
       typeTemplates,

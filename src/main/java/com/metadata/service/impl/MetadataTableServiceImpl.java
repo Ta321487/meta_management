@@ -88,21 +88,25 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         if (!CodeValidator.isValidCode(table.getTableCode())) {
             throw BizException.of(AppErrorCodes.TABLE_CODE_INVALID, "表编码格式不正确");
         }
+        table.setTableCode(CodeValidator.normalizeCode(table.getTableCode()));
         if (tableMapper.countByCode(table.getTableCode()) > 0) {
             throw BizException.of(AppErrorCodes.TABLE_CODE_DUPLICATE, "表编码已存在");
         }
-        // 确保businessCode不为null，使用DEFAULT作为默认值
-        if (table.getBusinessCode() == null || table.getBusinessCode().isEmpty()) {
-            table.setBusinessCode("DEFAULT");
+        boolean businessExplicit = StringUtils.hasText(table.getBusinessCode());
+        if (!businessExplicit) {
+            table.setBusinessCode("");
         }
-        MetadataBusinessSystem businessSystem = businessSystemService.getByCode(table.getBusinessCode());
-        if (businessSystem != null && businessSystem.getIsEnabled() != null && businessSystem.getIsEnabled() == 0) {
-            throw BizException.badRequest("业务系统已停用，无法新增表");
-        }
-        // 表级未指定物理库时，继承业务系统默认库名
-        if (businessSystem != null && (table.getDatabaseName() == null || table.getDatabaseName().trim().isEmpty())
-                && businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
-            table.setDatabaseName(businessSystem.getDatabaseName().trim());
+        MetadataBusinessSystem businessSystem = null;
+        if (businessExplicit) {
+            businessSystem = businessSystemService.getByCode(table.getBusinessCode().trim());
+            if (businessSystem != null && businessSystem.getIsEnabled() != null && businessSystem.getIsEnabled() == 0) {
+                throw BizException.badRequest("业务系统已停用，无法新增表");
+            }
+            // 表级未指定物理库时，继承业务系统默认库名
+            if (businessSystem != null && (table.getDatabaseName() == null || table.getDatabaseName().trim().isEmpty())
+                    && businessSystem.getDatabaseName() != null && !businessSystem.getDatabaseName().trim().isEmpty()) {
+                table.setDatabaseName(businessSystem.getDatabaseName().trim());
+            }
         }
         if (table.getDatabaseName() != null && StringUtils.hasText(table.getDatabaseName())) {
             MetadataPhysicalDatabase pdb = physicalDatabaseMapper.selectByCatalogName(table.getDatabaseName().trim());
@@ -115,25 +119,26 @@ public class MetadataTableServiceImpl implements MetadataTableService {
 
         ensureDefaultPrimaryKeyFieldIfMissing(table);
 
-        // 生成并执行CREATE TABLE SQL
-        try {
-            String phyCatalog = businessCatalogResolver.resolveCatalog(table);
-            if (phyCatalog != null && !phyCatalog.isEmpty()) {
-                mySqlPhysicalCatalogService.requireCatalogOnInstance(phyCatalog);
+        String phyCatalog = businessCatalogResolver.resolveCatalog(table);
+        if (StringUtils.hasText(phyCatalog)) {
+            try {
+                mySqlPhysicalCatalogService.requireCatalogOnInstance(phyCatalog.trim());
+                String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode(), table.getBusinessCode());
+                Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog.trim());
+                if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
+                    throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED,
+                            "创建数据库表失败: " + sqlResult.get("message"));
+                }
+                logService.logSuccess("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL成功: " + table.getTableCode());
+            } catch (BizException e) {
+                throw e;
+            } catch (Exception e) {
+                logService.logError("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL失败: " + table.getTableCode(), e.getMessage());
+                throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED, "创建数据库表失败: " + e.getMessage(), e);
             }
-            String createTableSql = codeGeneratorService.generateCreateTableSQL(table.getTableCode(), table.getBusinessCode());
-            Map<String, Object> sqlResult = sqlExecuteService.executeSql(createTableSql, false, phyCatalog);
-            if (!Boolean.TRUE.equals(sqlResult.get("success"))) {
-                throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED,
-                        "创建数据库表失败: " + sqlResult.get("message"));
-            }
-            logService.logSuccess("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL成功: " + table.getTableCode());
-        } catch (BizException e) {
-            throw e;
-        } catch (Exception e) {
-            // SQL执行失败，记录日志并抛出异常
-            logService.logError("admin", "CREATE_TABLE_SQL", "执行CREATE TABLE SQL失败: " + table.getTableCode(), e.getMessage());
-            throw BizException.of(AppErrorCodes.TABLE_CREATE_DDL_FAILED, "创建数据库表失败: " + e.getMessage(), e);
+        } else {
+            logService.logSuccess("admin", "ADD_METADATA_ONLY",
+                    "新增表（仅元数据，未建物理表）: " + table.getTableCode());
         }
 
         logService.logSuccess("admin", "ADD", "新增表：" + JSON.toJSONString(table));
@@ -633,10 +638,7 @@ public class MetadataTableServiceImpl implements MetadataTableService {
         primaryKeyField.setIsEnabled(1);
         primaryKeyField.setInForm(0);
         String bc = table.getBusinessCode();
-        if (bc == null || bc.isEmpty()) {
-            bc = "DEFAULT";
-        }
-        primaryKeyField.setBusinessCode(bc);
+        primaryKeyField.setBusinessCode(bc != null ? bc : "");
         fieldMapper.insert(primaryKeyField);
         logService.logSuccess("admin", "AUTO_CREATE_PK_FIELD", "自动创建主键字段: " + table.getTableCode());
     }

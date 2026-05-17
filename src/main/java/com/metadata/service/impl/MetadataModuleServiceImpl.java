@@ -59,7 +59,7 @@ public class MetadataModuleServiceImpl implements MetadataModuleService {
         if (module == null) {
             throw BizException.of(AppErrorCodes.MODULE_OBJECT_REQUIRED, "模块对象不能为空");
         }
-        // 校验编码
+        module.setModuleCode(CodeValidator.normalizeCode(module.getModuleCode()));
         if (!CodeValidator.isValidCode(module.getModuleCode())) {
             throw BizException.of(AppErrorCodes.MODULE_CODE_INVALID, "模块编码格式不正确");
         }

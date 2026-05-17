@@ -7,6 +7,7 @@ import com.metadata.entity.MetadataModuleType;
 import com.metadata.exception.BizException;
 import com.metadata.mapper.MetadataModuleTypeMapper;
 import com.metadata.service.MetadataModuleTypeService;
+import com.metadata.util.CodeValidator;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -45,8 +46,12 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
 
     @Override
     public void add(MetadataModuleType type) {
-        if (type.getTypeCode() == null || type.getTypeCode().trim().isEmpty()) {
+        type.setTypeCode(CodeValidator.normalizeModuleTypeCode(type.getTypeCode()));
+        if (type.getTypeCode() == null || type.getTypeCode().isEmpty()) {
             throw BizException.of(AppErrorCodes.MODULE_TYPE_CODE_REQUIRED, "模块类型编码不能为空");
+        }
+        if (!CodeValidator.isValidModuleTypeCode(type.getTypeCode())) {
+            throw BizException.badRequest("模块类型编码须为大写字母、数字或下划线，且以字母开头");
         }
         if (type.getTypeName() == null || type.getTypeName().trim().isEmpty()) {
             throw BizException.of(AppErrorCodes.MODULE_TYPE_NAME_REQUIRED, "模块类型名称不能为空");
@@ -66,8 +71,12 @@ public class MetadataModuleTypeServiceImpl implements MetadataModuleTypeService 
             throw BizException.of(AppErrorCodes.MODULE_TYPE_ID_REQUIRED, "模块类型ID不能为空");
         }
 
-        if (type.getTypeCode() == null || type.getTypeCode().trim().isEmpty()) {
+        type.setTypeCode(CodeValidator.normalizeModuleTypeCode(type.getTypeCode()));
+        if (type.getTypeCode() == null || type.getTypeCode().isEmpty()) {
             throw BizException.of(AppErrorCodes.MODULE_TYPE_CODE_REQUIRED, "模块类型编码不能为空");
+        }
+        if (!CodeValidator.isValidModuleTypeCode(type.getTypeCode())) {
+            throw BizException.badRequest("模块类型编码须为大写字母、数字或下划线，且以字母开头");
         }
         if (type.getTypeName() == null || type.getTypeName().trim().isEmpty()) {
             throw BizException.of(AppErrorCodes.MODULE_TYPE_NAME_REQUIRED, "模块类型名称不能为空");

@@ -53,3 +53,6 @@ scripts/
 plans/
 .trae/
 
+README.md
+.cursor/rules/product-boundary.mdc
+docs/project-conventions.md

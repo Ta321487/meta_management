@@ -26,7 +26,7 @@
     </el-row>
 
     <el-card shadow="never" class="table-card">
-      <template #header>最近数�?/template>
+      <template #header>最近数据</template>
       <el-table v-loading="loading" :data="recentRows" border stripe>
         <el-table-column
           v-for="col in columns"
@@ -84,10 +84,10 @@ async function loadData() {
     if (groupField.value) {
       const key = resolveListFieldProp(groupField.value)
       const allRes = await api.value.list()
-      const rows = Array.isArray(allRes.data) ? allRes.data : allRes.data?.records || []
+      const rows = Array.isArray(allRes.data) ? allRes.data : (allRes.data?.records || [])
       const map = {}
       rows.forEach(r => {
-        const k = r[key] == null || r[key] === '' ? '未填�? : String(r[key])
+        const k = r[key] == null || r[key] === '' ? '未填写' : String(r[key])
         map[k] = (map[k] || 0) + 1
       })
       stats.groups = Object.keys(map).map(k => ({ label: k, count: map[k] }))
@@ -110,5 +110,3 @@ defineExpose({ load: loadData })
 .card-title { font-weight: 600; margin-bottom: 12px; }
 .table-card { margin-top: 8px; }
 </style>
-
-

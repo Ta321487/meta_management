@@ -75,6 +75,27 @@
           </template>
         </el-table-column>
         <el-table-column prop="formComponent" label="表单组件" width="120"/>
+        <el-table-column label="选项" min-width="200">
+          <template #default="{ row }">
+            <span v-if="!parseFieldOptionItems(row).length" class="field-options-empty">—</span>
+            <div v-else class="field-options-cell">
+              <el-tag
+                v-for="(opt, idx) in parseFieldOptionItems(row)"
+                :key="`${opt.value}-${idx}`"
+                size="small"
+                :type="optionTagType(opt, idx)"
+                effect="light"
+                class="field-opt-tag"
+              >
+                <span
+                  v-if="showOptionCode(opt)"
+                  class="field-opt-code"
+                >{{ opt.value }}</span>
+                <span class="field-opt-label">{{ opt.label }}</span>
+              </el-tag>
+            </div>
+          </template>
+        </el-table-column>
         <el-table-column prop="inForm" label="表单录入" width="100">
           <template #default="{ row }">
             <el-tag :type="row.inForm === 0 ? 'info' : 'success'">
@@ -128,17 +149,23 @@
         v-model="dialogVisible"
         :title="dialogTitle"
         width="600px"
+        :before-close="formGuard.handleBeforeClose"
         @close="handleDialogClose"
     >
       <el-form :model="form" :rules="fieldRules" ref="formRef" label-width="100px">
         <el-form-item label="字段编码" prop="fieldCode" v-if="!form.id">
-          <el-input v-model="form.fieldCode" placeholder="如：FIELD_001（只能包含字母、数字和下划线）"/>
+          <el-input
+            v-model="form.fieldCode"
+            placeholder="如：FIELD_001（只能包含字母、数字和下划线）"
+            @blur="applyIdentifierBlur(form, 'fieldCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="字段名称" prop="fieldName">
           <el-input
             v-model="form.fieldName"
             :disabled="isEditingPrimaryKey"
             :placeholder="isEditingPrimaryKey ? '物理列名已随建表固定，不可在此修改' : '请输入字段名称（对应业务库列名）'"
+            @blur="applyIdentifierBlur(form, 'fieldName', 'column')"
           />
         </el-form-item>
         <el-alert
@@ -256,6 +283,18 @@
             <el-option label="数字输入框" value="number"/>
             <el-option label="文本域" value="textarea"/>
           </el-select>
+          <div
+            v-if="isDiscreteStatusFieldName(form.fieldName) && form.formComponent === 'number'"
+            style="margin-top: 6px; font-size: 12px; color: #e6a23c;"
+          >
+            状态类字段建议用「下拉框」，并在校验规则中配置 options 与 IN（勿仅用数字框填 0/1/2）。
+          </div>
+          <div
+            v-else-if="isDiscreteStatusFieldName(form.fieldName) && form.formComponent === 'select'"
+            style="margin-top: 6px; font-size: 12px; color: #909399;"
+          >
+            库类型可为 TINYINT；展示文案请在校验规则的 options 中按业务自行配置。
+          </div>
         </el-form-item>
         <el-form-item label="业务系统" prop="businessCode">
           <el-select v-model="form.businessCode" placeholder="请选择业务系统" style="width: 100%">
@@ -268,6 +307,12 @@
           </el-select>
         </el-form-item>
         <el-form-item label="校验规则" prop="validateRule">
+          <div
+            v-if="isDiscreteStatusFieldName(form.fieldName)"
+            style="margin-bottom: 8px;"
+          >
+            <span style="font-size: 12px; color: #909399;">状态文案在 JSON 的 options 中配置；点编辑器上方「查看示例」→「状态字段（含 options）」。</span>
+          </div>
           <div style="display: flex; gap: 10px; margin-bottom: 5px;" v-if="form.baseFieldType === 'ENUM'">
             <el-button size="small" type="primary" @click="syncValidateRuleToEnum">刷新到枚举值</el-button>
             <div style="font-size: 12px; color: #909399; line-height: 32px;">
@@ -289,7 +334,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -397,6 +442,13 @@ import {
   buildPresetFieldCode,
   toAddFieldPayload
 } from '../constants/commonFieldPresets'
+import {
+  applyIdentifierBlur,
+  metadataCodeRules,
+  normalizeFormCodes,
+  physicalColumnRules
+} from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'FieldManage',
@@ -479,9 +531,17 @@ export default {
         // 时间字段自动设置为DATETIME类型和datetime表单组件
         form.baseFieldType = 'DATETIME'
         form.fieldType = 'DATETIME'
-        form.formComponent = 'datetime'
+        form.formComponent = 'datepicker'
         // 时间字段由数据库自动生成，不需要用户输入
         form.isRequired = 0
+      } else if (isDiscreteStatusFieldName(newValue)) {
+        if (form.formComponent !== 'primary_key') {
+          form.formComponent = 'select'
+        }
+        if (!form.baseFieldType || form.baseFieldType === 'VARCHAR') {
+          form.baseFieldType = 'TINYINT'
+        }
+        // 校验规则文案由业务自行配置，不自动写入默认 options
       }
     })
     // 基础字段类型列表
@@ -525,15 +585,25 @@ export default {
       'DEFAULT': 'input'
     }
 
-    // 根据字段类型获取合适的表单组件
-    const getRecommendedFormComponent = (fieldType) => {
-      // 首先尝试精确匹配
-      if (fieldTypeToFormComponentMap[fieldType]) {
-        return fieldTypeToFormComponentMap[fieldType]
-      }
+    /** 离散状态类字段名：应用 select，不用 number（即使用 TINYINT 存 0/1/2） */
+    const isDiscreteStatusFieldName = (fieldName) => {
+      if (!fieldName) return false
+      const n = String(fieldName).toLowerCase()
+      if (n === 'status' || n === 'state' || n.endsWith('_status') || n.endsWith('_state')) return true
+      if (n === 'enabled' || n === 'is_enabled' || n === 'is_enable') return true
+      return false
+    }
 
-      // 然后尝试匹配类型前缀（如VARCHAR匹配不到，使用DEFAULT）
-      return fieldTypeToFormComponentMap['DEFAULT']
+    // 根据字段类型（及字段名）获取合适的表单组件
+    const getRecommendedFormComponent = (fieldType, fieldName = form.fieldName) => {
+      const base = fieldTypeToFormComponentMap[fieldType] || fieldTypeToFormComponentMap['DEFAULT']
+      if (
+        isDiscreteStatusFieldName(fieldName) &&
+        (fieldType === 'TINYINT' || fieldType === 'INT' || fieldType === 'SMALLINT')
+      ) {
+        return 'select'
+      }
+      return base
     }
 
     // 需要参数的字段类型
@@ -653,7 +723,7 @@ export default {
 
         // 如果不是主键字段，根据字段类型自动更新表单组件
         if (form.formComponent !== 'primary_key' && form.fieldName !== 'id' && form.fieldName !== 'uuid') {
-          form.formComponent = getRecommendedFormComponent(baseType)
+          form.formComponent = getRecommendedFormComponent(baseType, form.fieldName)
         }
       }
     })
@@ -663,7 +733,7 @@ export default {
       if (newValue) {
         // 如果不是主键字段，根据字段类型自动更新表单组件
         if (form.formComponent !== 'primary_key' && form.fieldName !== 'id' && form.fieldName !== 'uuid') {
-          form.formComponent = getRecommendedFormComponent(newValue)
+          form.formComponent = getRecommendedFormComponent(newValue, form.fieldName)
         }
 
         // 当字段类型切换时，清空校验规则
@@ -697,7 +767,7 @@ export default {
       if (v === 0) {
         form.formComponent = 'none'
       } else if (v === 1 && form.formComponent === 'none') {
-        form.formComponent = getRecommendedFormComponent(form.baseFieldType || 'VARCHAR')
+        form.formComponent = getRecommendedFormComponent(form.baseFieldType || 'VARCHAR', form.fieldName)
       }
     })
 
@@ -706,15 +776,13 @@ export default {
       loadTables()
     })
 
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
+
     const fieldRules = computed(() => ({
-      fieldCode: [
-        {required: true, message: '请输入字段编码', trigger: 'blur'},
-        {pattern: /^[A-Za-z0-9_]{1,50}$/, message: '字段编码只能包含字母、数字和下划线，长度1-50', trigger: 'blur'}
-      ],
-      fieldName: [
-        {required: true, message: '请输入字段名称', trigger: 'blur'},
-        {pattern: /^[A-Za-z0-9_]{1,50}$/, message: '字段名称只能包含字母、数字和下划线，长度1-50', trigger: 'blur'}
-      ],
+      fieldCode: metadataCodeRules('字段编码'),
+      fieldName: physicalColumnRules(),
       baseFieldType: [{required: true, message: '请选择基础字段类型', trigger: 'change'}],
       fieldType: [{required: true, message: '请选择字段类型', trigger: 'change'}],
       label: [{required: true, message: '请输入显示名', trigger: 'blur'}],
@@ -1318,6 +1386,10 @@ export default {
     }
 
     const handleSubmit = async () => {
+      normalizeFormCodes(form, [
+        { key: 'fieldCode', mode: 'code' },
+        { key: 'fieldName', mode: 'column' }
+      ])
       // 检查是否设置了主键字段（仅基于formComponent判断）
       const isSettingPrimaryKey = form.formComponent === 'primary_key'
 
@@ -1514,7 +1586,10 @@ export default {
         if (submitForm.inForm === 0) {
           submitForm.formComponent = 'none'
         } else if (submitForm.inForm === 1 && submitForm.formComponent === 'none' && submitForm.fieldName !== 'id' && submitForm.fieldName !== 'uuid') {
-          submitForm.formComponent = getRecommendedFormComponent(submitForm.baseFieldType || 'VARCHAR')
+          submitForm.formComponent = getRecommendedFormComponent(
+            submitForm.baseFieldType || 'VARCHAR',
+            submitForm.fieldName
+          )
         }
 
         if (form.id) {
@@ -1523,6 +1598,7 @@ export default {
           await addField(submitForm)
         }
         ElMessage.success('操作成功')
+        formGuard.markClean()
         dialogVisible.value = false
         loadFields()
       } catch (error) {
@@ -1778,6 +1854,50 @@ export default {
       loadBusinessSystems()
     })
 
+    const normalizeOptionItem = (o) => {
+      if (o == null) return null
+      if (typeof o === 'object' && !Array.isArray(o)) {
+        const value = o.value ?? o.label
+        const label = o.label ?? o.value
+        if (value == null && label == null) return null
+        return { value, label: label ?? value }
+      }
+      return { value: o, label: o }
+    }
+
+    /** 列表展示：从 validateRule 解析为 { value, label }[] */
+    const parseFieldOptionItems = (row) => {
+      const raw = row?.validateRule
+      if (!raw || String(raw).trim() === '' || String(raw).trim() === '{}') {
+        return []
+      }
+      try {
+        const obj = JSON.parse(String(raw).trim())
+        let list = []
+        if (Array.isArray(obj.options) && obj.options.length) {
+          list = obj.options
+        } else if (obj.operator === 'IN' && Array.isArray(obj.values) && obj.values.length) {
+          list = obj.values
+        }
+        return list.map(normalizeOptionItem).filter(Boolean)
+      } catch {
+        return []
+      }
+    }
+
+    const showOptionCode = (opt) =>
+      opt.value != null && String(opt.label) !== String(opt.value)
+
+    const optionTagType = (opt, index) => {
+      const text = `${opt.label ?? ''} ${opt.value ?? ''}`.toLowerCase()
+      if (/草稿|draft|待审|pending/.test(text)) return 'info'
+      if (/生效|确认|confirm|启用|enable|通过|success|正常/.test(text)) return 'success'
+      if (/作废|取消|cancel|关闭|禁用|disable|驳回|reject|删除/.test(text)) return 'danger'
+      if (/警告|warning|暂停|pause/.test(text)) return 'warning'
+      const cycle = ['', 'success', 'warning', 'danger', 'info']
+      return cycle[index % cycle.length]
+    }
+
     // 页面激活时重新加载表列表，确保获取最新的表名
     onActivated(() => {
       loadTables()
@@ -1801,6 +1921,8 @@ export default {
       form,
       isEditingPrimaryKey,
       fieldRules,
+      formGuard,
+      applyIdentifierBlur,
       baseFieldTypes,
       typeParams,
       // 约束相关
@@ -1845,7 +1967,11 @@ export default {
       handleCommonFieldDialogClosed,
       handleCommonFieldSubmit,
       syncMissingFieldsSubmitting,
-      handleSyncMissingFieldsFromPhysical
+      handleSyncMissingFieldsFromPhysical,
+      parseFieldOptionItems,
+      showOptionCode,
+      optionTagType,
+      isDiscreteStatusFieldName
     }
   }
 }
@@ -1906,5 +2032,47 @@ export default {
 
 .common-field-toolbar {
   margin-bottom: 8px;
+}
+
+.field-options-empty {
+  color: #c0c4cc;
+}
+
+.field-options-cell {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  line-height: 1.4;
+  padding: 2px 0;
+}
+
+.field-opt-tag {
+  border-radius: 4px;
+  max-width: 100%;
+}
+
+.field-opt-tag :deep(.el-tag__content) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.field-opt-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.field-opt-label {
+  font-size: 12px;
 }
 </style>

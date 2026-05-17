@@ -82,6 +82,11 @@ public class MetadataTableRelationServiceImpl implements MetadataTableRelationSe
     @Override
     @Transactional
     public void add(MetadataTableRelation relation) {
+        relation.setRelationCode(CodeValidator.normalizeCode(relation.getRelationCode()));
+        relation.setMainTableCode(CodeValidator.normalizeCode(relation.getMainTableCode()));
+        relation.setSlaveTableCode(CodeValidator.normalizeCode(relation.getSlaveTableCode()));
+        relation.setMainFieldCode(CodeValidator.normalizeCode(relation.getMainFieldCode()));
+        relation.setSlaveFieldCode(CodeValidator.normalizeCode(relation.getSlaveFieldCode()));
         if (!CodeValidator.isValidCodes(relation.getRelationCode(), relation.getMainTableCode(),
                 relation.getSlaveTableCode(), relation.getMainFieldCode(), relation.getSlaveFieldCode())) {
             throw BizException.of(AppErrorCodes.RELATION_CODE_INVALID, "编码格式不正确");

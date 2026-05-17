@@ -230,6 +230,7 @@ public class CodeGenUtils {
             // 解析校验规则
             Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
             fieldMap.put("validationRules", validationRules);
+            enrichFieldDisplayMeta(fieldMap, validationRules, field);
 
             fieldList.add(fieldMap);
         }
@@ -351,12 +352,126 @@ public class CodeGenUtils {
             fillNumericRangeRules(jsonObject, rules);
             fillOperatorRules(jsonObject, rules);
             fillCrossFieldRules(jsonObject, rules);
+            enrichSelectOptionsFromIn(rules);
         } catch (Exception e) {
             log.warn("validateRule 解析后处理失败，已忽略: {}", abbreviateForLog(validateRule), e);
             return newValidationRuleDefaults();
         }
 
         return rules;
+    }
+
+    /**
+     * 当仅有 IN.values 而无 options 时，为 select 模板与预览推导 options（label 默认取 value 字符串）。
+     */
+    private static void enrichFieldDisplayMeta(Map<String, Object> fieldMap, Map<String, Object> validationRules,
+                                                MetadataField field) {
+        fieldMap.put("useSwitchDisplay", Boolean.FALSE);
+        fieldMap.put("useTagDisplay", Boolean.FALSE);
+        JSONArray opts = collectOptionsFromValidationRules(validationRules);
+        String formComponent = field.getFormComponent() != null ? field.getFormComponent() : "";
+        String fieldName = field.getFieldName() != null ? field.getFieldName() : "";
+        boolean binaryName = isBinarySwitchFieldName(fieldName);
+
+        if (opts != null && opts.size() == 2
+                && ("select".equalsIgnoreCase(formComponent) || binaryName || "number".equalsIgnoreCase(formComponent))) {
+            fieldMap.put("useSwitchDisplay", Boolean.TRUE);
+            assignSwitchValues(fieldMap, opts);
+        } else if (binaryName
+                && ("select".equalsIgnoreCase(formComponent) || "number".equalsIgnoreCase(formComponent))) {
+            fieldMap.put("useSwitchDisplay", Boolean.TRUE);
+            fieldMap.put("switchInactiveValue", 0);
+            fieldMap.put("switchActiveValue", 1);
+        } else if (opts != null && opts.size() >= 2 && "select".equalsIgnoreCase(formComponent)) {
+            fieldMap.put("useTagDisplay", Boolean.TRUE);
+        }
+    }
+
+    private static boolean isBinarySwitchFieldName(String fieldName) {
+        if (fieldName == null || fieldName.isEmpty()) {
+            return false;
+        }
+        String n = fieldName.toLowerCase();
+        return "enabled".equals(n) || "is_enabled".equals(n) || "is_enable".equals(n) || "is_deleted".equals(n);
+    }
+
+    private static JSONArray collectOptionsFromValidationRules(Map<String, Object> validationRules) {
+        if (validationRules == null) {
+            return null;
+        }
+        Object options = validationRules.get("options");
+        if (options instanceof JSONArray && !((JSONArray) options).isEmpty()) {
+            return (JSONArray) options;
+        }
+        if (Boolean.TRUE.equals(validationRules.get("hasOperator"))
+                && "IN".equalsIgnoreCase(String.valueOf(validationRules.get("operator")))) {
+            Object values = validationRules.get("values");
+            if (values instanceof JSONArray && !((JSONArray) values).isEmpty()) {
+                return (JSONArray) values;
+            }
+        }
+        return null;
+    }
+
+    private static void assignSwitchValues(Map<String, Object> fieldMap, JSONArray opts) {
+        Object v0 = opts.get(0);
+        Object v1 = opts.get(1);
+        if (v0 instanceof JSONObject) {
+            v0 = ((JSONObject) v0).get("value");
+        }
+        if (v1 instanceof JSONObject) {
+            v1 = ((JSONObject) v1).get("value");
+        }
+        Number n0 = convertToNumber(v0);
+        Number n1 = convertToNumber(v1);
+        if (n0 != null && n1 != null && n0.doubleValue() <= n1.doubleValue()) {
+            fieldMap.put("switchInactiveValue", n0);
+            fieldMap.put("switchActiveValue", n1);
+        } else {
+            fieldMap.put("switchInactiveValue", v0);
+            fieldMap.put("switchActiveValue", v1);
+        }
+    }
+
+    private static void enrichSelectOptionsFromIn(Map<String, Object> rules) {
+        if (Boolean.TRUE.equals(rules.get("hasOptions"))) {
+            Object existing = rules.get("options");
+            if (existing instanceof JSONArray && !((JSONArray) existing).isEmpty()) {
+                return;
+            }
+        }
+        if (!Boolean.TRUE.equals(rules.get("hasOperator"))) {
+            return;
+        }
+        if (!"IN".equalsIgnoreCase(String.valueOf(rules.get("operator")))) {
+            return;
+        }
+        Object valuesObj = rules.get("values");
+        if (!(valuesObj instanceof JSONArray)) {
+            return;
+        }
+        JSONArray valuesArray = (JSONArray) valuesObj;
+        if (valuesArray.isEmpty()) {
+            return;
+        }
+        JSONArray optionsArray = new JSONArray();
+        for (int i = 0; i < valuesArray.size(); i++) {
+            Object v = valuesArray.get(i);
+            JSONObject opt = new JSONObject();
+            if (v instanceof JSONObject) {
+                JSONObject jo = (JSONObject) v;
+                Object value = jo.containsKey("value") ? jo.get("value") : jo.get("label");
+                String label = jo.containsKey("label") ? jo.getString("label") : String.valueOf(value);
+                opt.put("label", label);
+                opt.put("value", value);
+            } else {
+                opt.put("label", String.valueOf(v));
+                opt.put("value", v);
+            }
+            optionsArray.add(opt);
+        }
+        rules.put("hasOptions", true);
+        rules.put("options", optionsArray);
     }
 
     private static Map<String, Object> newValidationRuleDefaults() {
@@ -826,32 +941,9 @@ public class CodeGenUtils {
             }
         }
 
-        // 处理枚举值
-        if (validationRules.containsKey("hasOptions") && (Boolean) validationRules.get("hasOptions")) {
-            Object options = validationRules.get("options");
-            if (options instanceof JSONArray) {
-                JSONArray optionsArray = (JSONArray) options;
-                if (!optionsArray.isEmpty()) {
-                    StringBuilder inClause = new StringBuilder();
-                    inClause.append("`").append(field.getFieldName()).append("` IN (");
-                    for (int i = 0; i < optionsArray.size(); i++) {
-                        if (i > 0) {
-                            inClause.append(", ");
-                        }
-                        Object option = optionsArray.get(i);
-                        if (option instanceof String) {
-                            inClause.append("'").append(option).append("'");
-                        } else {
-                            inClause.append(option);
-                        }
-                    }
-                    inClause.append(")");
-                    conditions.add(inClause.toString());
-                }
-            }
-        }
+        boolean inConstraintAdded = false;
 
-        // 处理操作符（IN、BETWEEN等）
+        // 处理操作符（IN、BETWEEN等）— 优先用 values，避免 options 中 {label,value} 误拼进 SQL
         if (validationRules.containsKey("hasOperator") && (Boolean) validationRules.get("hasOperator")) {
             String operator = (String) validationRules.get("operator");
 
@@ -860,22 +952,10 @@ public class CodeGenUtils {
                 Object values = validationRules.get("values");
                 if (values instanceof JSONArray) {
                     JSONArray valuesArray = (JSONArray) values;
-                    if (!valuesArray.isEmpty()) {
-                        StringBuilder inClause = new StringBuilder();
-                        inClause.append("`").append(field.getFieldName()).append("` IN (");
-                        for (int i = 0; i < valuesArray.size(); i++) {
-                            if (i > 0) {
-                                inClause.append(", ");
-                            }
-                            Object value = valuesArray.get(i);
-                            if (value instanceof String) {
-                                inClause.append("'").append(value).append("'");
-                            } else {
-                                inClause.append(value);
-                            }
-                        }
-                        inClause.append(")");
-                        conditions.add(inClause.toString());
+                    String inSql = buildColumnInClause(field.getFieldName(), valuesArray);
+                    if (inSql != null) {
+                        conditions.add(inSql);
+                        inConstraintAdded = true;
                     }
                 }
             }
@@ -890,12 +970,80 @@ public class CodeGenUtils {
             }
         }
 
+        // 仅有 options、无 IN.values 时再从 options 生成 CHECK（取 value 列，忽略 label）
+        if (!inConstraintAdded
+                && validationRules.containsKey("hasOptions")
+                && Boolean.TRUE.equals(validationRules.get("hasOptions"))) {
+            Object options = validationRules.get("options");
+            if (options instanceof JSONArray) {
+                String inSql = buildColumnInClause(field.getFieldName(), (JSONArray) options);
+                if (inSql != null) {
+                    conditions.add(inSql);
+                }
+            }
+        }
+
         // 如果有条件，生成单个CHECK约束
         if (!conditions.isEmpty()) {
             return "CHECK (" + String.join(" AND ", conditions) + ")";
         }
 
         return null;
+    }
+
+    /**
+     * 从校验规则 IN / options 的一项解析出用于 SQL 的字面量（支持 {label,value} 对象）
+     */
+    static Object resolveValidateRuleInScalar(Object item) {
+        if (item == null) {
+            return null;
+        }
+        if (item instanceof JSONObject) {
+            JSONObject obj = (JSONObject) item;
+            if (obj.containsKey("value")) {
+                return obj.get("value");
+            }
+            if (obj.containsKey("label")) {
+                return obj.get("label");
+            }
+            return null;
+        }
+        return item;
+    }
+
+    private static String buildColumnInClause(String columnName, JSONArray items) {
+        if (columnName == null || columnName.isEmpty() || items == null || items.isEmpty()) {
+            return null;
+        }
+        StringBuilder inClause = new StringBuilder();
+        inClause.append("`").append(columnName).append("` IN (");
+        boolean first = true;
+        for (int i = 0; i < items.size(); i++) {
+            Object scalar = resolveValidateRuleInScalar(items.get(i));
+            if (scalar == null) {
+                continue;
+            }
+            if (!first) {
+                inClause.append(", ");
+            }
+            appendSqlLiteral(inClause, scalar);
+            first = false;
+        }
+        inClause.append(")");
+        if (first) {
+            return null;
+        }
+        return inClause.toString();
+    }
+
+    private static void appendSqlLiteral(StringBuilder sb, Object scalar) {
+        if (scalar instanceof String) {
+            sb.append("'").append(((String) scalar).replace("'", "''")).append("'");
+        } else if (scalar instanceof Number || scalar instanceof Boolean) {
+            sb.append(scalar);
+        } else {
+            sb.append("'").append(String.valueOf(scalar).replace("'", "''")).append("'");
+        }
     }
 
     /**
@@ -1049,6 +1197,7 @@ public class CodeGenUtils {
             // 解析校验规则
             Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
             fieldMap.put("validationRules", validationRules);
+            enrichFieldDisplayMeta(fieldMap, validationRules, field);
 
             // 处理关联关系
             if (relations != null && !relations.isEmpty()) {

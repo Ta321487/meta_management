@@ -1,10 +1,10 @@
 package com.metadata.controller;
 
-import com.alibaba.fastjson2.JSON;
+import com.metadata.common.CodeTestApiTestItem;
+import com.metadata.common.CodeTestItemResult;
 import com.metadata.common.CodeTestReport;
 import com.metadata.common.GeneratedCodeBundleMapper;
 import com.metadata.common.Result;
-import com.metadata.common.TableGeneratedCodeBundle;
 import com.metadata.service.CodeGeneratorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -42,9 +42,7 @@ public class CodeTestController {
         // 生成所有代码（与代码生成页开关一致，便于测试验证码扩展包）
         Map<String, String> codeMap = codeGeneratorService.generateAll(tableCode, packageName, businessCode, useInterface, captchaEnabled);
 
-        // 构造测试结果
-        Map<String, Object> result = new HashMap<>();
-        List<Map<String, Object>> testResults = new ArrayList<>();
+        List<CodeTestItemResult> testResults = new ArrayList<>();
 
         // 定义测试项配置
         Map<String, Map<String, String>> testConfigMap = new HashMap<>();
@@ -74,14 +72,11 @@ public class CodeTestController {
             String codeType = entry.getKey();
             String code = entry.getValue();
 
-            Map<String, Object> testResult = new HashMap<>();
             Map<String, String> testConfig = testConfigMap.getOrDefault(codeType, Map.of("name", codeType, "type", "未知类型"));
+            CodeTestItemResult item = new CodeTestItemResult();
+            item.setName(testConfig.get("name"));
+            item.setType(testConfig.get("type"));
 
-            // 基本信息
-            testResult.put("name", testConfig.get("name"));
-            testResult.put("type", testConfig.get("type"));
-
-            // 验证代码是否生成成功
             boolean isSuccess = code != null && !code.trim().isEmpty();
             String status = isSuccess ? "success" : "danger";
             String message = isSuccess ? "生成成功" : "生成失败：代码为空";
@@ -92,144 +87,75 @@ public class CodeTestController {
             if (!isSuccess) {
                 errors.add("代码内容为空");
             } else {
-                // 验证模板之间的逻辑关系
                 try {
                     validateTemplateLogic(codeType, code, codeMap);
                 } catch (Exception e) {
                     warnings.add(e.getMessage());
-                    if (status.equals("success")) {
+                    if ("success".equals(status)) {
                         status = "warning";
                     }
                 }
             }
 
-            testResult.put("status", status);
-            testResult.put("message", message);
-            testResult.put("errors", errors);
-            testResult.put("warnings", warnings);
-            
-            // 处理API测试信息
-            List<Map<String, String>> apiTests = new ArrayList<>();
-            if (isSuccess) {
-                apiTests = processApiTests(codeType, code, codeMap);
-            }
-            testResult.put("apiTests", apiTests);
-
-            testResults.add(testResult);
+            item.setStatus(status);
+            item.setMessage(message);
+            item.setErrors(errors);
+            item.setWarnings(warnings);
+            item.setApiTests(isSuccess ? processApiTests(codeType, code, codeMap) : List.of());
+            testResults.add(item);
         }
 
-        // 计算测试统计
         int total = testResults.size();
-        int successCount = (int) testResults.stream().filter(r -> "success".equals(r.get("status"))).count();
-        int failCount = (int) testResults.stream().filter(r -> "danger".equals(r.get("status"))).count();
+        long successCount = testResults.stream().filter(r -> "success".equals(r.getStatus())).count();
+        long failCount = testResults.stream().filter(r -> "danger".equals(r.getStatus())).count();
         boolean allSuccess = successCount == total;
 
-        result.put("testResults", testResults);
-        result.put("success", allSuccess);
-        result.put("message", allSuccess ? "所有代码生成测试通过！" : "部分代码生成测试失败，请检查");
-        result.put("total", total);
-        result.put("successCount", successCount);
-        result.put("failCount", failCount);
-        TableGeneratedCodeBundle bundle = GeneratedCodeBundleMapper.fromMap(codeMap);
-        result.put("generatedCode", bundle);
-
-        return Result.success(JSON.parseObject(JSON.toJSONString(result), CodeTestReport.class));
-
+        CodeTestReport report = new CodeTestReport();
+        report.setTestResults(testResults);
+        report.setSuccess(allSuccess);
+        report.setMessage(allSuccess ? "所有代码生成测试通过！" : "部分代码生成测试失败，请检查");
+        report.setTotal(total);
+        report.setSuccessCount((int) successCount);
+        report.setFailCount((int) failCount);
+        report.setGeneratedCode(GeneratedCodeBundleMapper.fromMap(codeMap));
+        return Result.success(report);
     }
 
     /**
      * 处理API测试信息
      */
-    private List<Map<String, String>> processApiTests(String codeType, String code, Map<String, String> codeMap) {
-        List<Map<String, String>> apiTests = new ArrayList<>();
-        
-        // 根据不同的代码类型处理API测试信息
-        switch (codeType) {
-            case "Controller.java":
-                // 从Controller代码中提取API接口信息
-                apiTests = extractControllerApiInfo(code);
-                break;
-            case "Service.java":
-                // Service被Controller调用
-                Map<String, String> serviceApi = new HashMap<>();
-                serviceApi.put("method", "CALL");
-                serviceApi.put("path", "被Controller调用");
-                serviceApi.put("name", "服务调用关系");
-                serviceApi.put("status", "success");
-                apiTests.add(serviceApi);
-                break;
-            case "Mapper.java":
-                // Mapper被Service调用
-                Map<String, String> mapperApi = new HashMap<>();
-                mapperApi.put("method", "CALL");
-                mapperApi.put("path", "被Service调用");
-                mapperApi.put("name", "数据访问调用关系");
-                mapperApi.put("status", "success");
-                apiTests.add(mapperApi);
-                break;
-            case "Mapper.xml":
-                // Mapper.xml被Mapper.java调用
-                Map<String, String> mapperXmlApi = new HashMap<>();
-                mapperXmlApi.put("method", "CALL");
-                mapperXmlApi.put("path", "被Mapper.java调用");
-                mapperXmlApi.put("name", "映射文件调用关系");
-                mapperXmlApi.put("status", "success");
-                apiTests.add(mapperXmlApi);
-                break;
-            case "List.vue":
-                // Vue列表页可能调用的API
-                Map<String, String> listVueApi = new HashMap<>();
-                listVueApi.put("method", "GET");
-                listVueApi.put("path", "/api/[businessCode]/[entityName]/list");
-                listVueApi.put("name", "获取列表数据");
-                listVueApi.put("status", "success");
-                apiTests.add(listVueApi);
-                break;
-            case "Form.vue":
-                // Vue表单页可能调用的API
-                Map<String, String> formVueApi1 = new HashMap<>();
-                formVueApi1.put("method", "POST");
-                formVueApi1.put("path", "/api/[businessCode]/[entityName]/add");
-                formVueApi1.put("name", "新增数据");
-                formVueApi1.put("status", "success");
-                apiTests.add(formVueApi1);
-                
-                Map<String, String> formVueApi2 = new HashMap<>();
-                formVueApi2.put("method", "POST");
-                formVueApi2.put("path", "/api/[businessCode]/[entityName]/update");
-                formVueApi2.put("name", "更新数据");
-                formVueApi2.put("status", "success");
-                apiTests.add(formVueApi2);
-                break;
-            case "routes.js":
-                // 路由配置定义的前端路由
-                Map<String, String> routeApi = new HashMap<>();
-                routeApi.put("method", "ROUTE");
-                routeApi.put("path", "/[entityName]/list");
-                routeApi.put("name", "列表页路由");
-                routeApi.put("status", "success");
-                apiTests.add(routeApi);
-                
-                Map<String, String> routeApi2 = new HashMap<>();
-                routeApi2.put("method", "ROUTE");
-                routeApi2.put("path", "/[entityName]/form");
-                routeApi2.put("name", "表单页路由");
-                routeApi2.put("status", "success");
-                apiTests.add(routeApi2);
-                break;
-            default:
-                // 其他类型可以不显示API测试信息或显示相关信息
-                break;
-        }
-        
-        return apiTests;
+    private List<CodeTestApiTestItem> processApiTests(String codeType, String code, Map<String, String> codeMap) {
+        return switch (codeType) {
+            case "Controller.java" -> extractControllerApiInfo(code);
+            case "Service.java" -> List.of(apiItem("CALL", "被Controller调用", "服务调用关系", "success"));
+            case "Mapper.java" -> List.of(apiItem("CALL", "被Service调用", "数据访问调用关系", "success"));
+            case "Mapper.xml" -> List.of(apiItem("CALL", "被Mapper.java调用", "映射文件调用关系", "success"));
+            case "List.vue" -> List.of(
+                    apiItem("GET", "/api/[businessCode]/[entityName]/list", "获取列表数据", "success"));
+            case "Form.vue" -> List.of(
+                    apiItem("POST", "/api/[businessCode]/[entityName]/add", "新增数据", "success"),
+                    apiItem("POST", "/api/[businessCode]/[entityName]/update", "更新数据", "success"));
+            case "routes.js" -> List.of(
+                    apiItem("ROUTE", "/[entityName]/list", "列表页路由", "success"),
+                    apiItem("ROUTE", "/[entityName]/form", "表单页路由", "success"));
+            default -> List.of();
+        };
+    }
+
+    private static CodeTestApiTestItem apiItem(String method, String path, String name, String status) {
+        CodeTestApiTestItem item = new CodeTestApiTestItem();
+        item.setMethod(method);
+        item.setPath(path);
+        item.setName(name);
+        item.setStatus(status);
+        return item;
     }
     
     /**
      * 从Controller代码中提取API接口信息
      */
-    private List<Map<String, String>> extractControllerApiInfo(String controllerCode) {
-        List<Map<String, String>> apiTests = new ArrayList<>();
+    private List<CodeTestApiTestItem> extractControllerApiInfo(String controllerCode) {
+        List<CodeTestApiTestItem> apiTests = new ArrayList<>();
         
         // 提取类上的@RequestMapping注解，获取基础路径
         String basePath = "";
@@ -349,16 +275,14 @@ public class CodeTestController {
                 // 组合完整路径
                 String fullPath = basePath + currentPath;
                 
-                // 添加到API测试列表
-                Map<String, String> apiInfo = new HashMap<>();
-                apiInfo.put("method", currentMethod);
-                apiInfo.put("path", fullPath);
-                apiInfo.put("name", currentName.isEmpty() ? "未命名接口" : currentName);
-                apiInfo.put("status", "success");
-                apiTests.add(apiInfo);
+                apiTests.add(apiItem(
+                        currentMethod,
+                        fullPath,
+                        currentName.isEmpty() ? "未命名接口" : currentName,
+                        "success"));
             }
         }
-        
+
         return apiTests;
     }
     

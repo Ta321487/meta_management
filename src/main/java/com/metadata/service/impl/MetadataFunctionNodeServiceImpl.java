@@ -38,6 +38,7 @@ public class MetadataFunctionNodeServiceImpl implements MetadataFunctionNodeServ
     @Override
     @Transactional
     public void add(MetadataFunctionNode node) {
+        node.setNodeCode(CodeValidator.normalizeCode(node.getNodeCode()));
         if (!CodeValidator.isValidCode(node.getNodeCode())) {
             throw BizException.of(AppErrorCodes.FUNCTION_NODE_CODE_INVALID, "节点编码格式不正确");
         }

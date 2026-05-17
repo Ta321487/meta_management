@@ -3,7 +3,7 @@
     <div class="page-header">
       <div class="page-header-left">
         <h2 class="page-title">{{ formModel.menuTitle || formModel.tableName }}</h2>
-        <span class="page-desc">流程审批 · 预览</span>
+        <span class="page-desc">ćľç¨ĺŽĄćš Âˇ é˘č§</span>
       </div>
     </div>
 
@@ -17,11 +17,11 @@
           min-width="120"
           show-overflow-tooltip
         />
-        <el-table-column v-if="statusField" :prop="statusProp" label="流程状�? width="110" />
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column v-if="statusField" :prop="statusProp" label="ćľç¨çść" width="110" />
+        <el-table-column label="ćä˝" width="160" fixed="right">
           <template #default="{ row }">
-            <el-button type="success" link size="small" @click="approve(row)">通过</el-button>
-            <el-button type="danger" link size="small" @click="reject(row)">驳回</el-button>
+            <el-button type="success" link size="small" @click="approve(row)">éčż</el-button>
+            <el-button type="danger" link size="small" @click="reject(row)">éŠłĺ</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -60,7 +60,6 @@ const api = computed(() =>
   createPreviewMockApi(props.mockApiBase, props.formModel.primaryKeyCamelCase)
 )
 
-const pk = computed(() => props.formModel.primaryKeyCamelCase || 'id')
 const statusField = computed(() => findStatusField(props.formModel.fields))
 const statusProp = computed(() => (statusField.value ? resolveListFieldProp(statusField.value) : ''))
 
@@ -88,19 +87,19 @@ async function updateFlow(row, nextStatus) {
   const payload = { ...row }
   if (statusProp.value) payload[statusProp.value] = nextStatus
   await api.value.update(payload)
-  ElMessage.success('�? + nextStatus)
+  ElMessage.success('ĺˇ˛' + nextStatus)
   load()
 }
 
 function approve(row) {
-  ElMessageBox.confirm('确认通过�?, '审批', { type: 'info' })
-    .then(() => updateFlow(row, '已通过'))
+  ElMessageBox.confirm('çĄŽčŽ¤éčżďź', 'ĺŽĄćš', { type: 'info' })
+    .then(() => updateFlow(row, 'ĺˇ˛éčż'))
     .catch(() => {})
 }
 
 function reject(row) {
-  ElMessageBox.confirm('确认驳回�?, '审批', { type: 'warning' })
-    .then(() => updateFlow(row, '已驳�?))
+  ElMessageBox.confirm('çĄŽčŽ¤éŠłĺďź', 'ĺŽĄćš', { type: 'warning' })
+    .then(() => updateFlow(row, 'ĺˇ˛éŠłĺ'))
     .catch(() => {})
 }
 
@@ -112,4 +111,3 @@ defineExpose({ load })
 .table-card { margin-top: 8px; }
 .table-footer { margin-top: 16px; display: flex; justify-content: flex-end; }
 </style>
-

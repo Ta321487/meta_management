@@ -38,6 +38,12 @@
           </el-select>
           <#elseif field.field.formComponent == "input">
           <el-input v-model="form.${field.camelCaseName}" placeholder="请输入${field.field.label}" />
+          <#elseif field.useSwitchDisplay!false>
+          <el-switch
+            v-model="form.${field.camelCaseName}"
+            :active-value="${field.switchActiveValue}"
+            :inactive-value="${field.switchInactiveValue}"
+          />
           <#elseif field.field.formComponent == "select">
           <el-select v-model="form.${field.camelCaseName}" placeholder="请选择" style="width: 100%">
             <#if (field.validationRules?? && field.validationRules.hasOptions!false)>

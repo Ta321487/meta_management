@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="rule-manage">
     <el-card>
       <template #header>
@@ -63,11 +63,16 @@
       v-model="dialogVisible"
       :title="dialogTitle"
       width="700px"
+      :before-close="formGuard.handleBeforeClose"
       @close="handleDialogClose"
     >
       <el-form :model="form" :rules="rules" ref="formRef" label-width="100px">
         <el-form-item label="规则编码" prop="ruleCode" v-if="!form.id">
-          <el-input v-model="form.ruleCode" placeholder="如：RULE_001" />
+          <el-input
+            v-model="form.ruleCode"
+            placeholder="如：RULE_001"
+            @blur="applyIdentifierBlur(form, 'ruleCode', 'code')"
+          />
         </el-form-item>
         <el-form-item label="规则类型" prop="ruleType">
           <el-select v-model="form.ruleType" placeholder="请选择" style="width: 100%" @change="handleRuleTypeChange">
@@ -97,7 +102,7 @@
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialogVisible = false">取消</el-button>
+        <el-button @click="formGuard.requestCloseDialog">取消</el-button>
         <el-button type="primary" @click="handleSubmit">确定</el-button>
       </template>
     </el-dialog>
@@ -114,6 +119,8 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getModuleList, getRuleList, addRule, updateRule, deleteRule, getBusinessSystemList } from '../api'
 import JsonEditor from '../components/JsonEditor'
+import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
+import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
 
 export default {
   name: 'RuleManage',
@@ -147,10 +154,14 @@ export default {
       businessCode: ''
     })
     const rules = {
-      ruleCode: [{ required: true, message: '请输入规则编码', trigger: 'blur' }],
+      ruleCode: metadataCodeRules('规则编码'),
       ruleType: [{ required: true, message: '请选择规则类型', trigger: 'change' }],
       ruleContent: [{ required: true, message: '请输入规则内容', trigger: 'blur' }]
     }
+
+    const formGuard = useDialogFormGuard(form, dialogVisible, {
+      onReset: () => formRef.value?.resetFields()
+    })
 
     const loadBusinessSystems = async () => {
       try {
@@ -261,6 +272,9 @@ export default {
     }
 
     const handleSubmit = async () => {
+      if (!form.id) {
+        normalizeFormCodes(form, [{ key: 'ruleCode', mode: 'code' }])
+      }
       await formRef.value.validate(async (valid) => {
         if (valid) {
           try {
@@ -276,6 +290,7 @@ export default {
               await addRule(submitForm)
             }
             ElMessage.success('操作成功')
+            formGuard.markClean()
             dialogVisible.value = false
             loadRules()
           } catch (error) {
@@ -341,6 +356,8 @@ export default {
       pagination,
       form,
       rules,
+      formGuard,
+      applyIdentifierBlur,
       loadRules,
       handleSizeChange,
       handleCurrentChange,
