@@ -1,5 +1,6 @@
 package com.metadata.service;
 
+import com.metadata.common.FieldMigrateBatchRequest;
 import com.metadata.common.FieldMigrateRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
@@ -107,4 +108,9 @@ public interface MetadataFieldService {
      * 将字段从当前表迁移到另一张表：目标表补元数据与 ADD COLUMN（若缺列），可选拷贝数据、删除源表字段。
      */
     Map<String, Object> migrateField(FieldMigrateRequest request);
+
+    /**
+     * 批量将字段迁移到同一目标表：逐条调用单字段迁移，每条独立事务，部分失败不回滚已成功项。
+     */
+    Map<String, Object> migrateFieldBatch(FieldMigrateBatchRequest request);
 }

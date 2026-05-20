@@ -39,6 +39,11 @@ public interface MetadataFieldMapper {
     }
     
     int countByCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode, @Param("businessCode") String businessCode);
+
+    /**
+     * 按表+字段编码统计（与 uk_table_field 一致，不按 business_code 过滤）。
+     */
+    int countByTableAndFieldCode(@Param("tableCode") String tableCode, @Param("fieldCode") String fieldCode);
     
     /**
      * 根据表编码和字段编码统计字段数量（默认业务系统）

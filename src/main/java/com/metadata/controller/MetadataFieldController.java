@@ -2,6 +2,7 @@ package com.metadata.controller;
 
 import com.metadata.common.BatchDeleteRequest;
 import com.metadata.common.DeleteConstraintRequest;
+import com.metadata.common.FieldMigrateBatchRequest;
 import com.metadata.common.FieldMigrateRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
@@ -123,6 +124,12 @@ public class MetadataFieldController {
     @Operation(summary = "迁移字段到其他表", description = "目标表登记元数据并 ADD COLUMN（若缺列）；可选拷贝数据、删除源表字段")
     public Result<Map<String, Object>> migrateField(@RequestBody FieldMigrateRequest request) {
         return Result.success(fieldService.migrateField(request));
+    }
+
+    @PostMapping("/migrate/batch")
+    @Operation(summary = "批量迁移字段到其他表", description = "共用目标表与迁移选项，按字段 ID 逐条迁移；每条独立事务，部分失败不回滚已成功项")
+    public Result<Map<String, Object>> migrateFieldBatch(@RequestBody FieldMigrateBatchRequest request) {
+        return Result.success(fieldService.migrateFieldBatch(request));
     }
 
     /**

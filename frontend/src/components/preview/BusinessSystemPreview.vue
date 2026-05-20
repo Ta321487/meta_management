@@ -109,6 +109,7 @@ import { ref, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request from '../../utils/request'
 import { seedBusinessMock } from '../../utils/previewMockSeed'
+import { clearPreviewFkOptionsCache } from '../../utils/previewFkOptions'
 import GeneratedListPreview from './GeneratedListPreview.vue'
 import GeneratedFormPreview from './GeneratedFormPreview.vue'
 import GeneratedDetailPreview from './GeneratedDetailPreview.vue'
@@ -318,6 +319,7 @@ async function fillSampleData(clearFirst) {
   }
   seeding.value = true
   try {
+    clearPreviewFkOptionsCache()
     const { total, details } = await seedBusinessMock(spec.value, {
       rowsPerTable: ROWS_PER_TABLE,
       clearFirst,
@@ -340,6 +342,7 @@ async function fillSampleData(clearFirst) {
 
 async function resetMock() {
   await request.post(`/codegen/preview/business/${encodeURIComponent(props.businessCode)}/mock/reset`)
+  clearPreviewFkOptionsCache()
   ElMessage.success('已清空 Mock 数据')
   refreshActiveView()
 }

@@ -32,6 +32,7 @@ public class TemplateLoadingTest {
         table.put("pkStrategy", "AUTO");
         
         dataModel.put("table", table);
+        dataModel.put("tableName", table.get("tableName"));
         
         // 创建字段列表
         List<Map<String, Object>> fields = new ArrayList<>();
@@ -40,6 +41,7 @@ public class TemplateLoadingTest {
         field.put("fieldType", "BIGINT");
         field.put("isRequired", 1);
         field.put("label", "主键");
+        field.put("formComponent", "primary_key");
         field.put("field_has_next", false); // 标记是否有下一个字段
         
         fields.add(field);

@@ -1,6 +1,9 @@
 package com.metadata.service.impl;
 
 import org.junit.jupiter.api.Test;
+
+import java.util.Map;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -42,6 +45,23 @@ public class CodeGenUtilsTest {
         // 预期结果应该是studentName，不需要添加前缀
         assertEquals("studentName", result);
         System.out.println("测试convertToCamelCaseWithNonKeyword通过：student_name -> " + result);
+    }
+
+    @Test
+    public void testParseValidationRulePatternKind() {
+        Map<String, Object> lineNo = CodeGenUtils.parseValidationRule(
+                "{\"type\":\"number\",\"integer\":true,\"min\":1,\"message\":\"行号>=1\",\"trigger\":\"blur\"}");
+        assertEquals("integer", lineNo.get("patternKind"));
+        assertTrue((Boolean) lineNo.get("hasRange"));
+
+        Map<String, Object> qty = CodeGenUtils.parseValidationRule(
+                "{\"type\":\"number\",\"min\":0.0001,\"message\":\"数量>0\",\"trigger\":\"blur\"}");
+        assertEquals("builtinNumber", qty.get("patternKind"));
+        assertTrue((Boolean) qty.get("hasRange"));
+
+        Map<String, Object> phone = CodeGenUtils.parseValidationRule(
+                "{\"pattern\":\"^1[3-9]\\\\d{9}$\",\"message\":\"手机号格式不正确\"}");
+        assertEquals("custom", phone.get("patternKind"));
     }
 
     @Test

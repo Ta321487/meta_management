@@ -27,18 +27,19 @@
                        :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode">批量删除
             </el-button>
             <el-button
-                :type="selectedRows.every(row => row.isEnabled === 1) ? 'warning' : 'success'"
-                @click="handleBatchToggleEnable(0)"
-                :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode || selectedRows.every(row => row.isEnabled === 0)"
+                :type="batchEnableToggle.type"
+                @click="handleBatchToggleEnable(batchEnableToggle.targetStatus)"
+                :disabled="!selectedTableCode || batchEnableToggle.disabled"
             >
-              批量禁用
+              {{ batchEnableToggle.label }}
             </el-button>
             <el-button
-                type="success"
-                @click="handleBatchToggleEnable(1)"
-                :disabled="!selectedRows || selectedRows.length === 0 || !selectedTableCode || selectedRows.every(row => row.isEnabled === 1)"
+                type="warning"
+                plain
+                @click="openBatchMigrateDialog"
+                :disabled="!selectedTableCode || batchMigratableCount === 0"
             >
-              批量启用
+              批量迁移
             </el-button>
             <el-button type="primary" @click="handleAdd" :disabled="!selectedTableCode">新增字段</el-button>
             <el-button type="success" @click="openCommonFieldDialog" :disabled="!selectedTableCode">常用字段</el-button>
@@ -241,6 +242,21 @@
           </div>
         </el-form-item>
 
+        <!-- 状态值（TINYINT/INT 状态列，同步到校验规则 IN + options） -->
+        <el-form-item v-if="isStatusFieldContext" label="状态值">
+          <div style="display: flex; gap: 10px; width: 100%;">
+            <el-input
+                v-model="typeParams.statusValues"
+                style="flex: 1"
+                placeholder="格式：0:草稿,1:生效,2:作废（仅数字可写 0,1,2；支持中文逗号）"
+            />
+            <el-button type="primary" @click="syncStatusToValidateRule">刷新</el-button>
+          </div>
+          <div style="margin-top: 5px; font-size: 12px; color: #909399;">
+            填写存库值与展示名，点「刷新」写入下方校验规则；改 JSON 后可点校验区「刷新到状态值」
+          </div>
+        </el-form-item>
+
         <!-- 枚举值输入框（用于ENUM类型） -->
         <el-form-item
             v-if="form.baseFieldType === 'ENUM'"
@@ -302,7 +318,7 @@
             v-else-if="isDiscreteStatusFieldName(form.fieldName) && form.formComponent === 'select'"
             style="margin-top: 6px; font-size: 12px; color: #909399;"
           >
-            库类型可为 TINYINT；展示文案请在校验规则的 options 中按业务自行配置。
+            库类型建议 TINYINT；展示文案在上方「状态值」填写（如 0:草稿,1:生效）。
           </div>
         </el-form-item>
         <el-form-item label="业务系统" prop="businessCode">
@@ -317,10 +333,13 @@
         </el-form-item>
         <el-form-item label="校验规则" prop="validateRule">
           <div
-            v-if="isDiscreteStatusFieldName(form.fieldName)"
-            style="margin-bottom: 8px;"
+            v-if="isStatusFieldContext"
+            style="display: flex; gap: 10px; margin-bottom: 5px;"
           >
-            <span style="font-size: 12px; color: #909399;">状态文案在 JSON 的 options 中配置；点编辑器上方「查看示例」→「状态字段（含 options）」。</span>
+            <el-button size="small" type="primary" @click="syncValidateRuleToStatus">刷新到状态值</el-button>
+            <div style="font-size: 12px; color: #909399; line-height: 32px;">
+              修改 JSON 后点此同步到上方「状态值」；也可在编辑器「查看示例」选状态模板
+            </div>
           </div>
           <div style="display: flex; gap: 10px; margin-bottom: 5px;" v-if="form.baseFieldType === 'ENUM'">
             <el-button size="small" type="primary" @click="syncValidateRuleToEnum">刷新到枚举值</el-button>
@@ -336,6 +355,7 @@
               maxLines: 15,
               minLines: 5
             }"
+              @example-applied="onValidateRuleExampleApplied"
           />
         </el-form-item>
         <el-form-item label="排序号" prop="sort">
@@ -401,13 +421,14 @@
     <!-- 迁移到其他表 -->
     <el-dialog
         v-model="migrateDialogVisible"
-        title="迁移字段到其他表"
+        :title="migrateBatchMode ? '批量迁移字段到其他表' : '迁移字段到其他表'"
         width="620px"
         :close-on-click-modal="false"
         destroy-on-close
+        @closed="onMigrateDialogClosed"
     >
       <el-alert
-        v-if="migrateSourceRow"
+        v-if="!migrateBatchMode && migrateSourceRow"
         type="info"
         :closable="false"
         show-icon
@@ -415,6 +436,27 @@
       >
         将「{{ migrateSourceRow.label || migrateSourceRow.fieldName }}」（{{ migrateSourceRow.fieldCode }} /
         {{ migrateSourceRow.fieldName }}）从表「{{ selectedTableCode }}」迁到目标表：登记元数据，缺列时 ADD COLUMN。
+      </el-alert>
+      <el-alert
+        v-else-if="migrateBatchMode && migrateSourceRows.length"
+        type="info"
+        :closable="false"
+        show-icon
+        style="margin-bottom: 12px"
+      >
+        <div>将以下 <strong>{{ migrateSourceRows.length }}</strong> 个字段从表「{{ selectedTableCode }}」迁到同一目标表（已跳过主键）：</div>
+        <div class="migrate-batch-tags">
+          <el-tag
+            v-for="row in migrateSourceRows"
+            :key="row.id"
+            size="small"
+            type="info"
+            effect="light"
+            class="migrate-batch-tag"
+          >
+            {{ row.label || row.fieldName }}（{{ row.fieldCode }}）
+          </el-tag>
+        </div>
       </el-alert>
       <el-alert type="warning" :closable="false" show-icon style="margin-bottom: 16px">
         <div class="migrate-hints-title">操作前请知悉</div>
@@ -425,7 +467,8 @@
           <li>关闭「迁移数据」时，目标表新列仅为空或默认值，不会从源表拷贝。</li>
           <li>关闭「删除源表字段」时，源表仍保留元数据与物理列，需自行再删。</li>
           <li>迁移后请检查<strong>表关联</strong>、<strong>业务规则</strong>是否仍指向源表字段；预览/ZIP 请在对表重新生成。</li>
-          <li>任一步失败将整体回滚，不会只改一半。</li>
+          <li v-if="!migrateBatchMode">单字段迁移：任一步失败将整体回滚，不会只改一半。</li>
+          <li v-else>批量迁移：按字段逐条执行；已成功的不回滚，失败项仍留在源表。</li>
         </ul>
       </el-alert>
       <el-form label-width="120px">
@@ -454,13 +497,16 @@
             不拷贝数据，仅元数据 + ADD COLUMN
           </span>
         </el-form-item>
-        <template v-if="migrateForm.migrateData && migrateSourceRow">
+        <template v-if="migrateForm.migrateData && !migrateBatchMode && migrateSourceRow">
           <div class="migrate-join-hint">
             被迁移列：<strong>{{ migrateSourceRow.fieldName }}</strong>（{{ migrateSourceRow.label }}）。
             下方填写的是<strong>主键对齐键</strong>，用于 JOIN 找「同一行」，不是要迁移的列。
           </div>
           <p v-if="migrateJoinExample" class="migrate-join-sql">{{ migrateJoinExample }}</p>
         </template>
+        <div v-else-if="migrateForm.migrateData && migrateBatchMode" class="migrate-join-hint">
+          批量模式下各字段分别按列名拷贝；下方为主键对齐键（JOIN 用），不是要迁移的列。
+        </div>
         <el-form-item v-if="migrateForm.migrateData" label="源表行对齐键">
           <el-input :model-value="migrateForm.joinSourceField" readonly>
             <template #append>主键</template>
@@ -497,7 +543,9 @@
       </el-form>
       <template #footer>
         <el-button @click="migrateDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="migrateSubmitting" @click="handleMigrateSubmit">开始迁移</el-button>
+        <el-button type="primary" :loading="migrateSubmitting" @click="handleMigrateSubmit">
+          {{ migrateBatchMode ? '开始批量迁移' : '开始迁移' }}
+        </el-button>
       </template>
     </el-dialog>
 
@@ -545,6 +593,7 @@ import {
   getFieldList,
   getPhysicalColumnNames,
   getTableList,
+  migrateFieldBatchToTable,
   migrateFieldToTable,
   syncMissingFieldsFromPhysical,
   updateField
@@ -562,7 +611,15 @@ import {
   physicalColumnRules
 } from '../utils/identifierInput'
 import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
-import { mergeOptionsWithValues, resolveFieldOptionItems } from '../utils/fieldOptionUtils'
+import {
+  formatStatusEntriesFromValidateRule,
+  isStatusIntegerFieldType,
+  isStatusStyleValidateRule,
+  mergeOptionsWithValues,
+  parseStatusEntriesString,
+  resolveFieldOptionItems
+} from '../utils/fieldOptionUtils'
+import { resolveBatchEnableToggle } from '../utils/batchEnableToggle'
 
 export default {
   name: 'FieldManage',
@@ -582,6 +639,7 @@ export default {
     const formRef = ref(null)
     const tableRef = ref(null)
     const selectedRows = ref([])
+    const batchEnableToggle = computed(() => resolveBatchEnableToggle(selectedRows.value, 'isEnabled'))
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -599,7 +657,9 @@ export default {
     const syncMissingFieldsSubmitting = ref(false)
     const migrateDialogVisible = ref(false)
     const migrateSubmitting = ref(false)
+    const migrateBatchMode = ref(false)
     const migrateSourceRow = ref(null)
+    const migrateSourceRows = ref([])
     const migrateForm = reactive({
       targetTableCode: '',
       migrateData: true,
@@ -615,6 +675,12 @@ export default {
     const migrateTargetTableOptions = computed(() =>
       tables.value.filter((t) => t.tableCode && t.tableCode !== selectedTableCode.value)
     )
+
+    const batchMigratableRows = computed(() =>
+      (selectedRows.value || []).filter((row) => !isPrimaryKey(row))
+    )
+
+    const batchMigratableCount = computed(() => batchMigratableRows.value.length)
 
     const resolveTablePrimaryKeyFieldName = (fields) => {
       const pk = (fields || []).find(
@@ -729,6 +795,17 @@ export default {
       return form.formComponent === 'primary_key' || form.fieldName === 'id' || form.fieldName === 'uuid'
     })
 
+    const isStatusFieldContext = computed(() => {
+      if (!isStatusIntegerFieldType(form.baseFieldType)) {
+        return false
+      }
+      return (
+        isDiscreteStatusFieldName(form.fieldName) ||
+        form.formComponent === 'select' ||
+        isStatusStyleValidateRule(form.validateRule)
+      )
+    })
+
     // 监听字段名称变化，当字段名为'id'或'uuid'时自动设置排序号为0和表单组件为primary_key
     // 当字段名为create_time或update_time时自动设置合适的属性
     watch(() => form.fieldName, (newValue) => {
@@ -746,12 +823,94 @@ export default {
         if (form.formComponent !== 'primary_key') {
           form.formComponent = 'select'
         }
-        if (!form.baseFieldType || form.baseFieldType === 'VARCHAR') {
-          form.baseFieldType = 'TINYINT'
+        if (!form.baseFieldType || form.baseFieldType === 'VARCHAR' || form.baseFieldType === 'ENUM') {
+          applyStatusFieldTypePreset(false)
         }
         // 校验规则文案由业务自行配置，不自动写入默认 options
       }
     })
+
+    /** 状态列：TINYINT/INT + IN/options，不用 MySQL ENUM */
+    const applyStatusFieldTypePreset = (showMessage = true) => {
+      const wasEnum = form.baseFieldType === 'ENUM'
+      if (wasEnum || !form.baseFieldType || form.baseFieldType === 'VARCHAR') {
+        form.baseFieldType = 'TINYINT'
+        typeParams.enumValues = ''
+        if (!typeParams.statusValues) {
+          typeParams.statusValues = '0:草稿,1:生效,2:作废'
+        }
+      }
+      if (form.formComponent !== 'primary_key') {
+        form.formComponent = 'select'
+      }
+      if (showMessage && wasEnum) {
+        ElMessage.info('状态列已切换为 TINYINT：请用校验规则 IN/options，勿使用 MySQL ENUM 类型')
+      }
+    }
+
+    const onValidateRuleExampleApplied = ({ key }) => {
+      if (key === 'status_with_options') {
+        applyStatusFieldTypePreset(true)
+        typeParams.statusValues = '0:选项一,1:选项二,2:选项三'
+        syncStatusToValidateRule(false)
+      }
+    }
+
+    const buildValidateRuleFromStatusEntries = (statusStr, prevRuleStr) => {
+      const { values, options } = parseStatusEntriesString(statusStr)
+      if (!values.length) {
+        return null
+      }
+      let prevRule = {}
+      try {
+        if (prevRuleStr?.trim() && prevRuleStr !== '{}') {
+          prevRule = JSON.parse(prevRuleStr) || {}
+        }
+      } catch {
+        prevRule = {}
+      }
+      const validateRuleObj = {
+        operator: 'IN',
+        values,
+        options: mergeOptionsWithValues(values, options.length ? options : prevRule.options || []),
+        message: prevRule.message || '请选择有效值',
+        trigger: prevRule.trigger || 'change'
+      }
+      if ('value' in validateRuleObj) {
+        delete validateRuleObj.value
+      }
+      return JSON.stringify(validateRuleObj, null, 2)
+    }
+
+    const syncStatusToValidateRule = (showMessage = true) => {
+      if (!isStatusIntegerFieldType(form.baseFieldType)) {
+        ElMessage.warning('状态值仅用于 TINYINT/INT/SMALLINT 类型字段')
+        return
+      }
+      const next = buildValidateRuleFromStatusEntries(typeParams.statusValues, form.validateRule)
+      if (!next) {
+        ElMessage.warning('请先填写状态值，例如：0:草稿,1:生效,2:作废')
+        return
+      }
+      form.validateRule = next
+      if (showMessage) {
+        ElMessage.success('状态值已同步到校验规则')
+      }
+    }
+
+    const syncValidateRuleToStatus = () => {
+      if (!isStatusIntegerFieldType(form.baseFieldType)) {
+        ElMessage.warning('当前字段类型不支持状态值同步')
+        return
+      }
+      const text = formatStatusEntriesFromValidateRule(form.validateRule)
+      if (!text) {
+        ElMessage.warning('校验规则中未找到 IN/values 或 options')
+        return
+      }
+      typeParams.statusValues = text
+      ElMessage.success('校验规则已同步到状态值')
+    }
     // 基础字段类型列表
     const baseFieldTypes = ref([
       {label: 'INT', value: 'INT'},
@@ -822,7 +981,8 @@ export default {
       length: 50, // 用于VARCHAR, CHAR等
       precision: 10, // 用于DECIMAL, NUMERIC等
       scale: 2, // 用于DECIMAL, NUMERIC等
-      enumValues: '' // 用于ENUM类型，默认空字符串
+      enumValues: '', // 用于ENUM类型，默认空字符串
+      statusValues: '' // 状态列：0:草稿,1:生效
     })
 
     // 解析字段类型，提取基础类型和参数
@@ -1315,23 +1475,70 @@ export default {
       }
     }
 
+    const resetMigrateForm = () => {
+      migrateForm.targetTableCode = ''
+      migrateForm.migrateData = true
+      migrateForm.removeFromSource = true
+      migrateForm.joinSourceField = resolveTablePrimaryKeyFieldName(fieldData.value)
+      migrateForm.joinTargetField = ''
+      migrateTargetFields.value = []
+    }
+
+    const onMigrateDialogClosed = () => {
+      migrateBatchMode.value = false
+      migrateSourceRow.value = null
+      migrateSourceRows.value = []
+    }
+
     const openMigrateDialog = (row) => {
       if (isPrimaryKey(row)) {
         ElMessage.warning('主键字段不能迁移')
         return
       }
+      migrateBatchMode.value = false
+      migrateSourceRows.value = []
       migrateSourceRow.value = row
-      migrateForm.targetTableCode = ''
-      migrateForm.migrateData = true
-      migrateForm.removeFromSource = true
-      const pkName = resolveTablePrimaryKeyFieldName(fieldData.value)
-      migrateForm.joinSourceField = pkName
-      migrateForm.joinTargetField = ''
-      migrateTargetFields.value = []
+      resetMigrateForm()
       migrateDialogVisible.value = true
     }
 
+    const openBatchMigrateDialog = () => {
+      const rows = batchMigratableRows.value
+      if (!rows.length) {
+        const pkCount = (selectedRows.value || []).filter((row) => isPrimaryKey(row)).length
+        if (pkCount > 0) {
+          ElMessage.warning('所选字段均为主键，无法迁移')
+        } else {
+          ElMessage.warning('请先勾选要迁移的字段')
+        }
+        return
+      }
+      const pkSkipped = (selectedRows.value || []).length - rows.length
+      if (pkSkipped > 0) {
+        ElMessage.info(`已跳过 ${pkSkipped} 个主键字段`)
+      }
+      migrateBatchMode.value = true
+      migrateSourceRow.value = null
+      migrateSourceRows.value = [...rows]
+      resetMigrateForm()
+      migrateDialogVisible.value = true
+    }
+
+    const buildMigratePayload = (fieldId) => ({
+      fieldId,
+      targetTableCode: migrateForm.targetTableCode,
+      businessCode: currentTableBusinessCode.value || undefined,
+      migrateData: migrateForm.migrateData,
+      removeFromSource: migrateForm.removeFromSource,
+      joinSourceField: migrateForm.joinSourceField || 'id',
+      joinTargetField: migrateForm.joinTargetField || undefined
+    })
+
     const handleMigrateSubmit = async () => {
+      if (migrateBatchMode.value) {
+        await handleBatchMigrateSubmit()
+        return
+      }
       if (!migrateSourceRow.value?.id) {
         return
       }
@@ -1369,16 +1576,7 @@ export default {
       }
       migrateSubmitting.value = true
       try {
-        const payload = {
-          fieldId: src.id,
-          targetTableCode: migrateForm.targetTableCode,
-          businessCode: currentTableBusinessCode.value || undefined,
-          migrateData: migrateForm.migrateData,
-          removeFromSource: migrateForm.removeFromSource,
-          joinSourceField: migrateForm.joinSourceField || 'id',
-          joinTargetField: migrateForm.joinTargetField || undefined
-        }
-        const res = await migrateFieldToTable(payload)
+        const res = await migrateFieldToTable(buildMigratePayload(src.id))
         if (res.code === 200) {
           const d = res.data || {}
           let msg = `已迁移到 ${d.targetTableCode}`
@@ -1397,6 +1595,90 @@ export default {
         }
       } catch (e) {
         ElMessage.error(e.response?.data?.message || e.message || '迁移失败')
+      } finally {
+        migrateSubmitting.value = false
+      }
+    }
+
+    const handleBatchMigrateSubmit = async () => {
+      if (!migrateSourceRows.value.length) {
+        return
+      }
+      if (!migrateForm.targetTableCode) {
+        ElMessage.warning('请选择目标表')
+        return
+      }
+      if (migrateForm.migrateData && !migrateForm.joinTargetField) {
+        ElMessage.warning('请选择目标表行对齐键')
+        return
+      }
+      const targetLabel =
+        migrateTargetTableOptions.value.find((t) => t.tableCode === migrateForm.targetTableCode)?.tableName
+        || migrateForm.targetTableCode
+      const names = migrateSourceRows.value
+        .map((r) => r.label || r.fieldName || r.fieldCode)
+        .join('、')
+      let confirmMsg = `将 ${migrateSourceRows.value.length} 个字段迁移到表「${targetLabel}」？\n字段：${names}\n`
+      if (migrateForm.migrateData) {
+        confirmMsg += '· 各字段在目标表 ADD COLUMN（若缺列），并按关联列拷贝数据\n'
+      } else {
+        confirmMsg += '· 不拷贝物理数据\n'
+      }
+      confirmMsg += migrateForm.removeFromSource
+        ? '· 成功后从当前表删除已迁字段'
+        : '· 保留当前表字段'
+      try {
+        await ElMessageBox.confirm(confirmMsg, '确认批量迁移', {
+          type: 'warning',
+          confirmButtonText: '开始批量迁移',
+          cancelButtonText: '取消'
+        })
+      } catch {
+        return
+      }
+      migrateSubmitting.value = true
+      try {
+        const res = await migrateFieldBatchToTable({
+          fieldIds: migrateSourceRows.value.map((r) => r.id),
+          targetTableCode: migrateForm.targetTableCode,
+          businessCode: currentTableBusinessCode.value || undefined,
+          migrateData: migrateForm.migrateData,
+          removeFromSource: migrateForm.removeFromSource,
+          joinSourceField: migrateForm.joinSourceField || 'id',
+          joinTargetField: migrateForm.joinTargetField || undefined
+        })
+        if (res.code !== 200 || !res.data) {
+          ElMessage.error(res.message || '批量迁移失败')
+          return
+        }
+        const d = res.data
+        const successCount = d.successCount ?? 0
+        const failCount = d.failCount ?? 0
+        const failedItems = (d.items || []).filter((it) => !it.success)
+        if (failCount === 0) {
+          ElMessage.success(`已成功迁移 ${successCount} 个字段`)
+          migrateDialogVisible.value = false
+        } else if (successCount === 0) {
+          const detail = failedItems
+            .map((it) => `${it.fieldCode || it.fieldName || it.fieldId}：${it.message || '迁移失败'}`)
+            .join('\n')
+          await ElMessageBox.alert(detail, '批量迁移失败', { type: 'error' })
+        } else {
+          const detail = failedItems
+            .map((it) => `${it.fieldCode || it.fieldName || it.fieldId}：${it.message || '迁移失败'}`)
+            .join('\n')
+          await ElMessageBox.alert(
+            `成功 ${successCount} 个，失败 ${failCount} 个：\n${detail}`,
+            '批量迁移部分完成',
+            { type: 'warning' }
+          )
+          migrateDialogVisible.value = false
+        }
+        selectedRows.value = []
+        tableRef.value?.clearSelection?.()
+        await loadFields()
+      } catch (e) {
+        ElMessage.error(e.response?.data?.message || e.message || '批量迁移失败')
       } finally {
         migrateSubmitting.value = false
       }
@@ -1478,7 +1760,8 @@ export default {
         length: 50,
         precision: 10,
         scale: 2,
-        enumValues: ''
+        enumValues: '',
+        statusValues: ''
       })
 
       dialogVisible.value = true
@@ -1518,7 +1801,8 @@ export default {
         length: 50,
         precision: 10,
         scale: 2,
-        enumValues: '' // 重置枚举值为空字符串
+        enumValues: '',
+        statusValues: ''
       })
 
       // 解析字段类型，自动填充baseFieldType和typeParams
@@ -1549,6 +1833,15 @@ export default {
 
         // 最后设置 baseFieldType，这会触发 watch，但由于我们已经处理了校验规则，不会影响枚举值
         form.baseFieldType = baseType
+
+        // 已按「状态字段（含 options）」保存但误选 ENUM 时，编辑页自动纠正为 TINYINT
+        if (baseType === 'ENUM' && isStatusStyleValidateRule(savedValidateRule)) {
+          applyStatusFieldTypePreset(true)
+        }
+
+        if (isStatusIntegerFieldType(form.baseFieldType)) {
+          typeParams.statusValues = formatStatusEntriesFromValidateRule(savedValidateRule) || ''
+        }
       }
 
       // 对于主键字段（字段名为id或uuid），确保设置为必填且设置默认表单组件
@@ -1769,6 +2062,18 @@ export default {
 
       if (!valid) {
         return
+      }
+
+      // 状态模板 + ENUM 组合会在库中生成 ENUM(...)，与「状态字段（含 options）」设计不符
+      if (
+        form.baseFieldType === 'ENUM' &&
+        isStatusStyleValidateRule(form.validateRule)
+      ) {
+        applyStatusFieldTypePreset(true)
+      }
+
+      if (isStatusFieldContext.value && typeParams.statusValues?.trim()) {
+        syncStatusToValidateRule(false)
       }
 
       // 统一保存逻辑
@@ -2201,6 +2506,7 @@ export default {
       formRef,
       tableRef,
       selectedRows,
+      batchEnableToggle,
       pagination,
       form,
       isEditingPrimaryKey,
@@ -2234,6 +2540,11 @@ export default {
       // ENUM相关方法
       syncEnumToValidateRule,
       syncValidateRuleToEnum,
+      syncStatusToValidateRule,
+      syncValidateRuleToStatus,
+      isStatusFieldContext,
+      onValidateRuleExampleApplied,
+      applyStatusFieldTypePreset,
       // 辅助函数
       isPrimaryKey,
       commonFieldDialogVisible,
@@ -2253,14 +2564,19 @@ export default {
       syncMissingFieldsSubmitting,
       migrateDialogVisible,
       migrateSubmitting,
+      migrateBatchMode,
       migrateSourceRow,
+      migrateSourceRows,
       migrateForm,
       migrateTargetTableOptions,
       migrateJoinExample,
       migrateTargetJoinOptions,
       migrateTargetFieldsLoading,
       loadMigrateTargetJoinFields,
+      batchMigratableCount,
       openMigrateDialog,
+      openBatchMigrateDialog,
+      onMigrateDialogClosed,
       handleMigrateSubmit,
       handleSyncMissingFieldsFromPhysical,
       parseFieldOptionItems,
@@ -2351,6 +2667,17 @@ export default {
   padding: 0 3px;
   background: rgba(0, 0, 0, 0.06);
   border-radius: 2px;
+}
+
+.migrate-batch-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.migrate-batch-tag {
+  max-width: 100%;
 }
 
 .migrate-join-hint {

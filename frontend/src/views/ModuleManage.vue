@@ -6,19 +6,12 @@
           <span>模块管理</span>
           <div>
             <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0">批量删除</el-button>
-            <el-button 
-              :type="selectedRows.every(row => row.status === 1) ? 'warning' : 'success'" 
-              @click="handleBatchToggleStatus(0)" 
-              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.status === 0)"
+            <el-button
+              :type="batchEnableToggle.type"
+              :disabled="batchEnableToggle.disabled"
+              @click="handleBatchToggleStatus(batchEnableToggle.targetStatus)"
             >
-              批量禁用
-            </el-button>
-            <el-button 
-              type="success" 
-              @click="handleBatchToggleStatus(1)" 
-              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.status === 1)"
-            >
-              批量启用
+              {{ batchEnableToggle.label }}
             </el-button>
             <el-button type="primary" @click="handleAdd">新增模块</el-button>
           </div>
@@ -216,7 +209,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   getModuleList,
@@ -235,6 +228,7 @@ import {
 import IconSelector from '../components/IconSelector.vue'
 import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
 import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
+import { resolveBatchEnableToggle } from '../utils/batchEnableToggle'
 
 export default {
   name: 'ModuleManage',
@@ -248,6 +242,7 @@ export default {
     const formRef = ref(null)
     const tableRef = ref(null)
     const selectedRows = ref([])
+    const batchEnableToggle = computed(() => resolveBatchEnableToggle(selectedRows.value, 'status'))
     const pagination = reactive({
       current: 1,
       size: 10,
@@ -602,6 +597,7 @@ export default {
       formRef,
       tableRef,
       selectedRows,
+      batchEnableToggle,
       searchForm,
       form,
       rules,

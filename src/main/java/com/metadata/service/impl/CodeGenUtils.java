@@ -11,6 +11,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 代码生成工具类，包含公共方法和工具函数
@@ -231,6 +233,7 @@ public class CodeGenUtils {
             Map<String, Object> validationRules = parseValidationRule(field.getValidateRule());
             fieldMap.put("validationRules", validationRules);
             enrichFieldDisplayMeta(fieldMap, validationRules, field);
+            enrichNumericFormMeta(fieldMap, validationRules, field);
 
             fieldList.add(fieldMap);
         }
@@ -477,6 +480,7 @@ public class CodeGenUtils {
     private static Map<String, Object> newValidationRuleDefaults() {
         Map<String, Object> rules = new HashMap<>();
         rules.put("hasPattern", false);
+        rules.put("patternKind", "none");
         rules.put("hasOptions", false);
         rules.put("hasLength", false);
         rules.put("hasRange", false);
@@ -516,9 +520,12 @@ public class CodeGenUtils {
     }
 
     private static void fillPatternRules(JSONObject jsonObject, Map<String, Object> rules) {
+        rules.put("patternKind", "none");
         String pattern = null;
         if (jsonObject.containsKey("pattern")) {
             pattern = jsonObject.getString("pattern");
+        } else if (Boolean.TRUE.equals(jsonObject.getBoolean("integer"))) {
+            pattern = BUILT_IN_REGEX_MAP.get("integer");
         } else {
             String type = jsonObject.getString("type");
             if (type != null && !"crossField".equalsIgnoreCase(type) && BUILT_IN_REGEX_MAP.containsKey(type)) {
@@ -531,9 +538,73 @@ public class CodeGenUtils {
             rules.put("hasPattern", true);
             rules.put("pattern", pattern);
             rules.put("patternMessage", message != null ? message : "格式不正确");
+            if (Boolean.TRUE.equals(jsonObject.getBoolean("integer"))
+                    || BUILT_IN_REGEX_MAP.get("integer").equals(pattern)) {
+                rules.put("patternKind", "integer");
+            } else if (BUILT_IN_REGEX_MAP.get("number").equals(pattern)) {
+                rules.put("patternKind", "builtinNumber");
+            } else {
+                rules.put("patternKind", "custom");
+            }
         } else {
             rules.put("hasPattern", false);
         }
+    }
+
+    /**
+     * 数值表单组件：供 Vue 模板生成 precision 与校验分支（与预览 generatedPreviewRules 语义一致）。
+     */
+    private static void enrichNumericFormMeta(Map<String, Object> fieldMap, Map<String, Object> validationRules,
+                                              MetadataField field) {
+        String formComponent = field.getFormComponent() != null ? field.getFormComponent() : "";
+        String fieldType = field.getFieldType() != null ? field.getFieldType() : "";
+        boolean numeric = "number".equalsIgnoreCase(formComponent) || isNumericSqlType(fieldType);
+        fieldMap.put("numericFormField", numeric);
+        if (!numeric) {
+            fieldMap.put("numberInteger", false);
+            return;
+        }
+        String patternKind = String.valueOf(validationRules.getOrDefault("patternKind", "none"));
+        boolean integerField = "integer".equals(patternKind) || isIntegerSqlType(fieldType);
+        fieldMap.put("numberInteger", integerField);
+        if (integerField) {
+            fieldMap.put("numberPrecision", 0);
+        } else {
+            Integer scale = extractDecimalScale(fieldType);
+            fieldMap.put("numberPrecision", scale != null ? scale : 4);
+        }
+    }
+
+    private static boolean isNumericSqlType(String fieldType) {
+        if (fieldType == null || fieldType.isEmpty()) {
+            return false;
+        }
+        String t = fieldType.toLowerCase().replace(" ", "");
+        return t.contains("int") || t.contains("decimal") || t.contains("numeric")
+                || t.contains("float") || t.contains("double");
+    }
+
+    private static boolean isIntegerSqlType(String fieldType) {
+        if (fieldType == null || fieldType.isEmpty()) {
+            return false;
+        }
+        String t = fieldType.toLowerCase().replace(" ", "");
+        if (t.contains("decimal") || t.contains("numeric") || t.contains("float") || t.contains("double")) {
+            return false;
+        }
+        return t.contains("int");
+    }
+
+    private static Integer extractDecimalScale(String fieldType) {
+        if (fieldType == null) {
+            return null;
+        }
+        Matcher m = Pattern.compile("(?:decimal|numeric)\\s*\\(\\s*\\d+\\s*,\\s*(\\d+)\\s*\\)",
+                Pattern.CASE_INSENSITIVE).matcher(fieldType);
+        if (m.find()) {
+            return Integer.parseInt(m.group(1));
+        }
+        return null;
     }
 
     private static void fillOptionsRules(JSONObject jsonObject, Map<String, Object> rules) {
@@ -1211,6 +1282,7 @@ public class CodeGenUtils {
                     fieldMap.put("relatedTableFieldName", getRelatedTableFieldName(relation));
                     fieldMap.put("relatedTableClassName", convertToClassName(getRelatedTableName(relation)));
                     fieldMap.put("relatedTableCamelCaseName", convertToCamelCase(getRelatedTableName(relation), false));
+                    fieldMap.put("relatedEntityName", convertToEntityName(getRelatedTableName(relation)));
                 }
             } else {
                 fieldMap.put("isForeignKey", false);

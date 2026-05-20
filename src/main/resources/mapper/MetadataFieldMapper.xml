@@ -109,6 +109,11 @@
         </if>
     </select>
 
+    <select id="countByTableAndFieldCode" resultType="int">
+        SELECT COUNT(*) FROM metadata_field
+        WHERE table_code = #{tableCode} AND field_code = #{fieldCode}
+    </select>
+
     <select id="countByTableCode" resultType="Long">
         <choose>
             <when test="includeDisabled != null and includeDisabled == true">

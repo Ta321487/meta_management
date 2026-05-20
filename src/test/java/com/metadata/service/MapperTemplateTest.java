@@ -28,6 +28,7 @@ public class MapperTemplateTest {
         dataModel.put("packageName", "com.test");
         dataModel.put("className", "TestEntity");
         dataModel.put("tableName", "test_table");
+        dataModel.put("businessName", "测试业务系统");
         
         // 创建表信息
         Map<String, Object> table = new HashMap<>();
@@ -46,6 +47,7 @@ public class MapperTemplateTest {
         fieldInfo1.put("fieldType", "BIGINT");
         fieldInfo1.put("isRequired", 1);
         fieldInfo1.put("label", "主键");
+        fieldInfo1.put("formComponent", "primary_key");
         field1.put("field", fieldInfo1);
         field1.put("camelCaseName", "id");
         field1.put("field_has_next", true);
@@ -57,6 +59,7 @@ public class MapperTemplateTest {
         fieldInfo2.put("fieldType", "VARCHAR(100)");
         fieldInfo2.put("isRequired", 1);
         fieldInfo2.put("label", "名称");
+        fieldInfo2.put("formComponent", "input");
         field2.put("field", fieldInfo2);
         field2.put("camelCaseName", "name");
         field2.put("field_has_next", false);

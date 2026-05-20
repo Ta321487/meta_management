@@ -6,19 +6,12 @@
           <span>表管理</span>
           <div>
             <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows || selectedRows.length === 0">批量删除</el-button>
-            <el-button 
-              :type="selectedRows.every(row => row.isEnabled === 1) ? 'warning' : 'success'" 
-              @click="handleBatchToggleEnable(0)" 
-              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.isEnabled === 0)"
+            <el-button
+              :type="batchEnableToggle.type"
+              :disabled="batchEnableToggle.disabled"
+              @click="handleBatchToggleEnable(batchEnableToggle.targetStatus)"
             >
-              批量禁用
-            </el-button>
-            <el-button 
-              type="success" 
-              @click="handleBatchToggleEnable(1)" 
-              :disabled="!selectedRows || selectedRows.length === 0 || selectedRows.every(row => row.isEnabled === 1)"
-            >
-              批量启用
+              {{ batchEnableToggle.label }}
             </el-button>
             <el-button type="primary" @click="handleBatchAssignBusinessSystem" :disabled="!selectedRows || selectedRows.length === 0">批量分配业务系统</el-button>
             <el-button type="primary" @click="handleAdd">新增表</el-button>
@@ -253,6 +246,7 @@ import {
 } from '../api'
 import { applyIdentifierBlur, metadataCodeRules, normalizeFormCodes } from '../utils/identifierInput'
 import { useDialogFormGuard } from '../composables/useUnsavedFormGuard'
+import { resolveBatchEnableToggle } from '../utils/batchEnableToggle'
 
 export default {
   name: 'TableManage',
@@ -264,6 +258,7 @@ export default {
     const formRef = ref(null)
     const tableRef = ref(null)
     const selectedRows = ref([])
+    const batchEnableToggle = computed(() => resolveBatchEnableToggle(selectedRows.value, 'isEnabled'))
     // 分配业务系统相关
     const assignDialogVisible = ref(false)
     const assignFormRef = ref(null)
@@ -767,6 +762,7 @@ export default {
       formRef,
       tableRef,
       selectedRows,
+      batchEnableToggle,
       pagination,
       searchForm,
       ensurePhysicalSubmitting,

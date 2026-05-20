@@ -40,8 +40,9 @@ public class CodegenPreviewMockController {
     public Result<Map<String, Object>> getById(
             @PathVariable String businessCode,
             @PathVariable String entityName,
-            @PathVariable String id) {
-        Map<String, Object> row = CodegenPreviewMockStore.getById(businessCode, entityName, id);
+            @PathVariable String id,
+            @RequestParam(defaultValue = "id") String pkName) {
+        Map<String, Object> row = CodegenPreviewMockStore.getById(businessCode, entityName, id, pkName);
         if (row == null) {
             return Result.error("记录不存在");
         }
@@ -52,8 +53,9 @@ public class CodegenPreviewMockController {
     public Result<Void> add(
             @PathVariable String businessCode,
             @PathVariable String entityName,
+            @RequestParam(defaultValue = "id") String pkName,
             @RequestBody Map<String, Object> body) {
-        CodegenPreviewMockStore.add(businessCode, entityName, body);
+        CodegenPreviewMockStore.add(businessCode, entityName, body, pkName);
         return Result.success();
     }
 
@@ -61,8 +63,9 @@ public class CodegenPreviewMockController {
     public Result<Void> update(
             @PathVariable String businessCode,
             @PathVariable String entityName,
+            @RequestParam(defaultValue = "id") String pkName,
             @RequestBody Map<String, Object> body) {
-        if (!CodegenPreviewMockStore.update(businessCode, entityName, body)) {
+        if (!CodegenPreviewMockStore.update(businessCode, entityName, body, pkName)) {
             return Result.error("更新失败");
         }
         return Result.success();
@@ -72,12 +75,13 @@ public class CodegenPreviewMockController {
     public Result<Void> delete(
             @PathVariable String businessCode,
             @PathVariable String entityName,
+            @RequestParam(defaultValue = "id") String pkName,
             @RequestBody Map<String, Object> params) {
         Object id = params.get("id");
         if (id == null) {
             return Result.error("缺少 id");
         }
-        CodegenPreviewMockStore.delete(businessCode, entityName, id.toString());
+        CodegenPreviewMockStore.delete(businessCode, entityName, id.toString(), pkName);
         return Result.success();
     }
 
@@ -85,10 +89,11 @@ public class CodegenPreviewMockController {
     public Result<Void> batchDelete(
             @PathVariable String businessCode,
             @PathVariable String entityName,
+            @RequestParam(defaultValue = "id") String pkName,
             @RequestBody Map<String, Object> params) {
         Object ids = params.get("ids");
         if (ids instanceof List<?> list) {
-            CodegenPreviewMockStore.batchDelete(businessCode, entityName, list);
+            CodegenPreviewMockStore.batchDelete(businessCode, entityName, list, pkName);
         }
         return Result.success();
     }

@@ -63,6 +63,8 @@
                 v-else-if="fc(field) === 'number'"
                 v-model="form[field.camelCaseName]"
                 style="width: 100%"
+                :precision="numberPrecision(field)"
+                :step="isIntegerField(field) ? 1 : undefined"
               />
               <el-input
                 v-else-if="fc(field) === 'textarea'"
@@ -88,8 +90,14 @@
 import { ref, reactive, computed, watch } from 'vue'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
-import { buildGeneratedFormRules, validateUniqueCombo } from '../../utils/generatedPreviewRules'
+import {
+  buildGeneratedFormRules,
+  isPreviewIntegerField,
+  previewNumberPrecision,
+  validateUniqueCombo
+} from '../../utils/generatedPreviewRules'
 import { createPreviewMockApi } from '../../utils/previewMockApi'
+import { loadPreviewFkOptions } from '../../utils/previewFkOptions'
 import { resolveSwitchMeta, selectOptions } from '../../utils/previewFieldUtils'
 
 function switchMeta(field) {
@@ -107,6 +115,7 @@ const emit = defineEmits(['saved', 'cancel'])
 const formRef = ref(null)
 const form = reactive({})
 const saving = ref(false)
+const fkOptionsMap = reactive({})
 const api = computed(() =>
   createPreviewMockApi(props.mockApiBase, props.formModel.primaryKeyCamelCase)
 )
@@ -120,14 +129,46 @@ const formRules = computed(() =>
 function fc(field) {
   return field.formComponent || field.field?.formComponent || 'input'
 }
+
+function isNumericFormField(field) {
+  const t = (field.fieldType || field.field?.fieldType || '').toLowerCase()
+  return fc(field) === 'number' || /int|decimal|numeric|float|double/.test(t)
+}
+
+function isIntegerField(field) {
+  return isPreviewIntegerField(field)
+}
+
+function numberPrecision(field) {
+  return previewNumberPrecision(field)
+}
+
+function coerceRecordNumericFields(target, fields) {
+  ;(fields || []).forEach(f => {
+    const prop = f.camelCaseName
+    if (!prop || !isNumericFormField(f)) return
+    const v = target[prop]
+    if (v === null || v === undefined || v === '') return
+    const n = Number(v)
+    if (!Number.isNaN(n)) {
+      target[prop] = isIntegerField(f) ? Math.trunc(n) : n
+    }
+  })
+}
 function fieldLabel(field) {
   return field.label || field.field?.label || field.camelCaseName
 }
-function fkOptions() {
-  return [
-    { id: 1, label: '示例-1', value: 1 },
-    { id: 2, label: '示例-2', value: 2 }
-  ]
+function fkOptions(field) {
+  return fkOptionsMap[field.camelCaseName] || []
+}
+
+async function loadAllFkOptions() {
+  const code = props.formModel.businessCode
+  if (!code) return
+  for (const field of formFields.value) {
+    if (!field.isForeignKey) continue
+    fkOptionsMap[field.camelCaseName] = await loadPreviewFkOptions(code, field)
+  }
 }
 
 function initForm() {
@@ -148,10 +189,20 @@ async function loadRecord() {
   initForm()
   if (!props.recordId) return
   const res = await api.value.getById(props.recordId)
-  if (res.code === 200 && res.data) Object.assign(form, res.data)
+  if (res.code === 200 && res.data) {
+    Object.assign(form, res.data)
+    coerceRecordNumericFields(form, formFields.value)
+  }
 }
 
-watch(() => [props.formModel, props.recordId], loadRecord, { immediate: true, deep: true })
+watch(
+  () => [props.formModel, props.recordId],
+  async () => {
+    await loadAllFkOptions()
+    await loadRecord()
+  },
+  { immediate: true, deep: true }
+)
 
 async function submit() {
   await formRef.value.validate(async valid => {
@@ -163,9 +214,15 @@ async function submit() {
     }
     saving.value = true
     try {
-      const pk = props.formModel.primaryKeyCamelCase
-      if (form[pk]) await api.value.update({ ...form })
-      else await api.value.add({ ...form })
+      const pk = props.formModel.primaryKeyCamelCase || 'id'
+      const payload = { ...form }
+      if (props.recordId != null && props.recordId !== '') {
+        payload[pk] = props.recordId
+        payload.id = props.recordId
+        await api.value.update(payload)
+      } else {
+        await api.value.add(payload)
+      }
       ElMessage.success('保存成功（预览 Mock）')
       emit('saved')
     } catch (e) {

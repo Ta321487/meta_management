@@ -31,6 +31,73 @@ export function normalizeOptionItem(o) {
   return { value: v, label: String(o) }
 }
 
+/**
+ * 是否为「状态列」风格校验：IN + options（应用 TINYINT 模板，不应使用 MySQL ENUM 类型）
+ */
+const STATUS_FIELD_TYPES = ['TINYINT', 'INT', 'SMALLINT']
+
+export function isStatusIntegerFieldType(baseFieldType) {
+  return STATUS_FIELD_TYPES.includes(baseFieldType)
+}
+
+/**
+ * 状态值文本 → IN.values + options（格式：0:草稿,1:生效 或 0,1,2）
+ */
+export function parseStatusEntriesString(str) {
+  const s = String(str || '')
+    .replace(/，/g, ',')
+    .trim()
+  if (!s) {
+    return { values: [], options: [] }
+  }
+  const values = []
+  const options = []
+  for (const part of s.split(',').map(p => p.trim()).filter(Boolean)) {
+    const colon = part.indexOf(':')
+    if (colon > 0) {
+      const value = coerceOptionValue(part.slice(0, colon).trim())
+      const label = part.slice(colon + 1).trim()
+      values.push(value)
+      options.push({ value, label: label || String(value) })
+    } else {
+      const value = coerceOptionValue(part)
+      values.push(value)
+      options.push({ value, label: String(part) })
+    }
+  }
+  return { values, options: mergeOptionsWithValues(values, options) }
+}
+
+/** 从校验规则还原为状态值文本 */
+export function formatStatusEntriesFromValidateRule(raw) {
+  const items = resolveFieldOptionItems({ validateRule: raw })
+  if (items.length) {
+    return items
+      .map(o => {
+        const v = o.value
+        const label = o.label != null ? String(o.label) : String(v)
+        if (String(v) === label) {
+          return String(v)
+        }
+        return `${v}:${label}`
+      })
+      .join(',')
+  }
+  const obj = parseValidateRuleObject(raw)
+  if (obj?.operator === 'IN' && Array.isArray(obj.values) && obj.values.length) {
+    return obj.values.map(v => String(v)).join(',')
+  }
+  return ''
+}
+
+export function isStatusStyleValidateRule(raw) {
+  const obj = parseValidateRuleObject(raw)
+  if (!obj || obj.operator !== 'IN' || !Array.isArray(obj.values) || !obj.values.length) {
+    return false
+  }
+  return Array.isArray(obj.options) && obj.options.length > 0
+}
+
 export function parseValidateRuleObject(raw) {
   if (raw == null) return null
   if (typeof raw === 'object' && !Array.isArray(raw)) return raw

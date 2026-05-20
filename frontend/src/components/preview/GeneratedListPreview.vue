@@ -49,9 +49,17 @@
             <span v-else>{{ formatCell(row[col.prop]) }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column :label="'操作'" :width="listModel.hasDetailPage ? 260 : 200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link size="small" @click="$emit('view', row)">查看</el-button>
+            <el-button
+              v-if="listModel.hasDetailPage"
+              type="primary"
+              link
+              size="small"
+              @click="$emit('view', row)"
+            >
+              查看
+            </el-button>
             <el-button type="primary" link size="small" @click="$emit('edit', row)">编辑</el-button>
             <el-button type="danger" link size="small" @click="remove(row)">删除</el-button>
           </template>

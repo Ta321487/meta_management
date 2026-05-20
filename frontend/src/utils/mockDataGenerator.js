@@ -209,6 +209,13 @@ function tryPatternFromRules(vr, rawJson, field) {
     const domains = ['example.com', 'test.com', 'demo.com']
     return `${username}@${domains[Math.floor(Math.random() * domains.length)]}`
   }
+  if (normalizedPattern === '^-?\\d+$' || /^-?\d+$/.test(normalizedPattern)) {
+    return randomInt(1, 999)
+  }
+  if (normalizedPattern === '^-?\\d+(\\.\\d+)?$' || /^-?\d+(\.\d+)?$/.test(normalizedPattern)) {
+    const fieldType = fieldTypeOf(field)
+    return generateNumericInRange(0, 1000, fieldType)
+  }
   return null
 }
 
@@ -222,7 +229,8 @@ function generateNumericInRange(min, max, fieldType) {
   const type = String(fieldType).toLowerCase()
 
   if (type.includes('decimal') || type.includes('numeric') || type.includes('float') || type.includes('double')) {
-    return (Math.random() * (actualMax - actualMin) + actualMin).toFixed(2)
+    const n = Math.random() * (actualMax - actualMin) + actualMin
+    return Number.parseFloat(n.toFixed(4))
   }
   return Math.floor(Math.random() * (actualMax - actualMin + 1)) + actualMin
 }
@@ -331,7 +339,8 @@ export function generateMockValue(field) {
     const prefixes = ['13', '15', '18']
     return `${prefixes[Math.floor(Math.random() * prefixes.length)]}${Math.floor(100000000 + Math.random() * 900000000)}`
   }
-  if (fieldName.includes('code') || fieldName.includes('no')) {
+  // 仅字符串类编码/单号字段走数字串；line_no、order_no 等数值列走上面的 range/类型分支
+  if ((fieldName.includes('code') || fieldName.endsWith('_no')) && isStringFieldType(fieldType)) {
     const n = Math.min(Number(dbLen) || 10, 20)
     return generateRandomDigitString(n)
   }

@@ -61,7 +61,16 @@
           <#elseif field.field.formComponent == "datepicker" || field.field.formComponent == "date">
           <el-date-picker v-model="form.${field.camelCaseName}" type="date" placeholder="请选择日期" style="width: 100%" />
           <#elseif field.field.formComponent == "number">
-          <el-input-number v-model="form.${field.camelCaseName}" style="width: 100%" />
+          <el-input-number
+            v-model="form.${field.camelCaseName}"
+            style="width: 100%"
+            <#if field.numberInteger!false>
+            :precision="0"
+            :step="1"
+            <#elseif field.numberPrecision??>
+            :precision="${field.numberPrecision}"
+            </#if>
+          />
           <#elseif field.field.formComponent == "textarea">
           <el-input v-model="form.${field.camelCaseName}" type="textarea" :rows="4" />
           <#else>
@@ -117,17 +126,42 @@ export default {
         <#if field.field.isRequired == 1>
         { required: true, message: '请输入${field.field.label}', trigger: 'blur' },
         </#if>
-        <#if field.field.fieldType?lower_case?contains("int") || field.field.fieldType?lower_case?contains("decimal") || field.field.fieldType?lower_case?contains("double") || field.field.fieldType?lower_case?contains("float")>
-        { type: 'number', message: '请输入有效的数字', trigger: 'blur' },
+        <#if field.numericFormField!false>
+        { validator: (rule, value, callback) => {
+            if (value === null || value === undefined || value === '') { callback(); return }
+            const n = Number(value)
+            if (Number.isNaN(n) || !Number.isFinite(n)) {
+              callback(new Error('请输入有效的数字'))
+            } else {
+              callback()
+            }
+          }, trigger: 'blur' },
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasPattern!false)>
-        { 
-          pattern: /${field.validationRules.pattern!}/, 
-          message: '${escapeJsString(field.validationRules.patternMessage!"格式不正确")}', 
-          trigger: 'blur' 
-        },
+        <#assign patternKind = field.validationRules.patternKind!"none">
+        <#if patternKind == "integer">
+        { validator: (rule, value, callback) => {
+            if (value === null || value === undefined || value === '') { callback(); return }
+            const n = Number(value)
+            if (Number.isNaN(n) || !Number.isFinite(n) || !Number.isInteger(n)) {
+              callback(new Error('${escapeJsString(field.validationRules.patternMessage!"必须输入整数")}'))
+            } else {
+              callback()
+            }
+          }, trigger: 'blur' },
+        <#elseif patternKind == "custom" || (patternKind != "builtinNumber" && patternKind != "integer")>
+        { validator: (rule, value, callback) => {
+            if (value === null || value === undefined || value === '') { callback(); return }
+            const re = new RegExp('${escapeJsString(field.validationRules.pattern!)}')
+            if (re.test(String(value))) {
+              callback()
+            } else {
+              callback(new Error('${escapeJsString(field.validationRules.patternMessage!"格式不正确")}'))
+            }
+          }, trigger: 'blur' },
         </#if>
-        <#if (field.validationRules?? && field.validationRules.hasLength!false)>
+        </#if>
+        <#if (field.validationRules?? && field.validationRules.hasLength!false) && !(field.numericFormField!false)>
         { 
           <#if field.validationRules?exists && field.validationRules.minLength?exists>min: ${field.validationRules.minLength!0}, </#if>
           <#if field.validationRules?exists && field.validationRules.maxLength?exists>max: ${field.validationRules.maxLength!9999}, </#if>
@@ -137,18 +171,32 @@ export default {
         </#if>
         <#if (field.validationRules?? && field.validationRules.hasRange!false)>
         <#-- hasRange：元数据 min/max 表示数值上下界；字符串长度请用 minLength/maxLength（hasLength） -->
-        { 
-          type: 'number',
-          <#assign minValue = field.validationRules.min!-99999999>
-          <#assign maxValue = field.validationRules.max!99999999>
-          <#if field.validationRules?exists && field.validationRules.min?exists>min: ${minValue}, </#if>
-          <#if field.validationRules?exists && field.validationRules.max?exists>max: ${maxValue}, </#if>
-          <#assign message = field.validationRules.rangeMessage!"数值必须在${minValue}到${maxValue}之间">
-          <#assign message = message?replace("${'$'}{min}", minValue?string)>
-          <#assign message = message?replace("${'$'}{max}", maxValue?string)>
-          message: '${escapeJsString(message)}', 
-          trigger: 'blur' 
-        }
+        <#assign minValue = field.validationRules.min!-99999999>
+        <#assign maxValue = field.validationRules.max!99999999>
+        <#assign rangeMsg = field.validationRules.rangeMessage!field.validationRules.patternMessage!"数值超出范围">
+        <#assign rangeMsg = rangeMsg?replace("${'$'}{min}", minValue?string)>
+        <#assign rangeMsg = rangeMsg?replace("${'$'}{max}", maxValue?string)>
+        { validator: (rule, value, callback) => {
+            if (value === null || value === undefined || value === '') { callback(); return }
+            const n = Number(value)
+            if (Number.isNaN(n) || !Number.isFinite(n)) {
+              callback(new Error('请输入有效的数字'))
+              return
+            }
+            <#if field.validationRules?exists && field.validationRules.min?exists>
+            if (n < ${minValue}) {
+              callback(new Error('${escapeJsString(rangeMsg)}'))
+              return
+            }
+            </#if>
+            <#if field.validationRules?exists && field.validationRules.max?exists>
+            if (n > ${maxValue}) {
+              callback(new Error('${escapeJsString(rangeMsg)}'))
+              return
+            }
+            </#if>
+            callback()
+          }, trigger: 'blur' },
         </#if>
         <#-- 检查是否有跨字段比较规则 -->
         <#if (field.validationRules?? && field.validationRules.hasCrossField!false)>
@@ -253,6 +301,20 @@ export default {
           const res = await ${componentName}Api.getById(id)
           if (res.code === 200 && res.data) {
             Object.assign(form, res.data)
+<#list fields as field>
+<#if field.numericFormField!false>
+            if (form.${field.camelCaseName} != null && form.${field.camelCaseName} !== '') {
+              const n_${field.camelCaseName} = Number(form.${field.camelCaseName})
+              if (!Number.isNaN(n_${field.camelCaseName})) {
+                <#if field.numberInteger!false>
+                form.${field.camelCaseName} = Math.trunc(n_${field.camelCaseName})
+                <#else>
+                form.${field.camelCaseName} = n_${field.camelCaseName}
+                </#if>
+              }
+            }
+</#if>
+</#list>
           }
         } catch (error) {
           ElMessage.error('加载数据失败')

@@ -624,6 +624,11 @@ public class VueCodeGenerator {
         model.put("entityName", CodeGenUtils.convertToEntityName(table.getTableCode()));
         model.put("businessCode", businessCode);
         model.put("menuTitle", resolveMenuTitleForTable(tableCode, businessCode, table));
+        boolean hasDetailPage = tableHasDetailPage(tableCode);
+        model.put("hasDetailPage", hasDetailPage);
+        if (hasDetailPage) {
+            model.put("detailRoutePrefix", resolveDetailRoutePrefix(tableCode, businessCode));
+        }
         return model;
     }
 

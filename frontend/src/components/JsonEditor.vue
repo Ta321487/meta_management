@@ -208,7 +208,7 @@ export default {
       default: '' // 规则类型，用于区分字段管理和业务规则
     }
   },
-  emits: ['update:modelValue', 'error'],
+  emits: ['update:modelValue', 'error', 'example-applied'],
   setup(props, { emit }) {
     const editorContainer = ref(null)
     let editor = null
@@ -1232,7 +1232,9 @@ export default {
           editor.setValue(formattedCode)
           ElMessage.success('示例模板已应用')
         }
-        
+
+        emit('example-applied', { key: selectedExample.value })
+
         // 关闭对话框
         exampleDialogVisible.value = false
         

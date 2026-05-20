@@ -2,6 +2,7 @@ package com.metadata.service.impl;
 
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.JSONObject;
+import com.metadata.common.FieldMigrateBatchRequest;
 import com.metadata.common.FieldMigrateRequest;
 import com.metadata.common.PageRequest;
 import com.metadata.common.PageResult;
@@ -29,6 +30,7 @@ import com.metadata.util.SpringContextUtil;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,6 +80,10 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
 
     @Autowired
     private MetadataSyncService metadataSyncService;
+
+    @Autowired
+    @Lazy
+    private MetadataFieldService metadataFieldService;
 
     /**
      * 从校验规则中提取message字段
@@ -1052,17 +1058,19 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         String targetBc = targetTable.getBusinessCode() != null && !targetTable.getBusinessCode().isEmpty()
                 ? targetTable.getBusinessCode() : bc;
 
-        if (fieldMapper.countByCode(targetTableCode, source.getFieldCode(), targetBc) > 0) {
+        if (fieldMapper.countByTableAndFieldCode(targetTableCode, source.getFieldCode()) > 0) {
             throw BizException.of(AppErrorCodes.FIELD_MIGRATE_TARGET_CONFLICT,
-                    FieldMessages.FIELD_MIGRATE_TARGET_FIELD_CODE_EXISTS);
+                    "目标表「" + targetTableCode + "」已存在字段编码「" + source.getFieldCode()
+                            + "」，无法重复登记（与业务系统编码无关）");
         }
 
-        List<MetadataField> targetFields = fieldMapper.selectByTableCode(targetTableCode, targetBc, true);
+        List<MetadataField> targetFields = fieldMapper.selectByTableCode(targetTableCode, "", true);
         boolean nameConflict = targetFields.stream()
-                .anyMatch(f -> source.getFieldName().equalsIgnoreCase(f.getFieldName()));
+                .anyMatch(f -> source.getFieldName().equalsIgnoreCase(f.getFieldName())
+                        && !source.getFieldCode().equalsIgnoreCase(f.getFieldCode()));
         if (nameConflict) {
             throw BizException.of(AppErrorCodes.FIELD_MIGRATE_TARGET_CONFLICT,
-                    FieldMessages.FIELD_MIGRATE_TARGET_FIELD_NAME_EXISTS);
+                    "目标表「" + targetTableCode + "」已存在物理列名「" + source.getFieldName() + "」");
         }
 
         boolean migrateData = request.getMigrateData() == null || Boolean.TRUE.equals(request.getMigrateData());
@@ -1158,7 +1166,16 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         }
 
         String originalMessage = extractMessageFromValidateRule(targetField.getValidateRule());
-        fieldMapper.insert(targetField);
+        try {
+            fieldMapper.insert(targetField);
+        } catch (DataIntegrityViolationException ex) {
+            String msg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+            if (msg != null && (msg.contains("uk_table_field") || msg.contains("Duplicate entry"))) {
+                throw BizException.of(AppErrorCodes.FIELD_MIGRATE_TARGET_CONFLICT,
+                        "目标表「" + targetTableCode + "」已存在字段编码「" + source.getFieldCode() + "」，无法重复登记");
+            }
+            throw ex;
+        }
         MetadataField latestTarget = fieldMapper.selectByCode(targetTableCode, targetField.getFieldCode(), targetBc);
         if (latestTarget != null) {
             mergeMessageIntoValidateRule(targetField, latestTarget, originalMessage);
@@ -1185,6 +1202,79 @@ public class MetadataFieldServiceImpl implements MetadataFieldService {
         logService.logSuccess("admin", "FIELD_MIGRATE",
                 "字段迁移: " + sourceTableCode + "." + source.getFieldName() + " -> " + targetTableCode);
         return result;
+    }
+
+    @Override
+    public Map<String, Object> migrateFieldBatch(FieldMigrateBatchRequest request) {
+        if (request == null || request.getFieldIds() == null || request.getFieldIds().isEmpty()) {
+            throw BizException.badRequest("请指定要迁移的字段列表");
+        }
+        if (request.getTargetTableCode() == null || request.getTargetTableCode().trim().isEmpty()) {
+            throw BizException.badRequest("请指定目标表");
+        }
+
+        String targetTableCode = request.getTargetTableCode().trim();
+        List<Long> fieldIds = request.getFieldIds().stream().filter(Objects::nonNull).distinct().toList();
+        if (fieldIds.isEmpty()) {
+            throw BizException.badRequest("请指定要迁移的字段列表");
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        int successCount = 0;
+        int failCount = 0;
+
+        for (Long fieldId : fieldIds) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("fieldId", fieldId);
+
+            MetadataField sourcePreview = fieldMapper.selectById(fieldId);
+            if (sourcePreview != null) {
+                item.put("fieldCode", sourcePreview.getFieldCode());
+                item.put("fieldName", sourcePreview.getFieldName());
+                item.put("label", sourcePreview.getLabel());
+            }
+
+            try {
+                FieldMigrateRequest single = toSingleMigrateRequest(request, fieldId);
+                Map<String, Object> oneResult = metadataFieldService.migrateField(single);
+                item.put("success", true);
+                item.put("result", oneResult);
+                successCount++;
+            } catch (BizException e) {
+                item.put("success", false);
+                item.put("message", e.getMessage());
+                item.put("errorCode", e.getCode());
+                failCount++;
+            } catch (Exception e) {
+                item.put("success", false);
+                item.put("message", e.getMessage() != null ? e.getMessage() : "迁移失败");
+                failCount++;
+            }
+            items.add(item);
+        }
+
+        Map<String, Object> batchResult = new LinkedHashMap<>();
+        batchResult.put("targetTableCode", targetTableCode);
+        batchResult.put("total", fieldIds.size());
+        batchResult.put("successCount", successCount);
+        batchResult.put("failCount", failCount);
+        batchResult.put("items", items);
+
+        logService.logSuccess("admin", "FIELD_MIGRATE_BATCH",
+                "批量字段迁移 -> " + targetTableCode + "，成功 " + successCount + "，失败 " + failCount);
+        return batchResult;
+    }
+
+    private static FieldMigrateRequest toSingleMigrateRequest(FieldMigrateBatchRequest batch, Long fieldId) {
+        FieldMigrateRequest single = new FieldMigrateRequest();
+        single.setFieldId(fieldId);
+        single.setTargetTableCode(batch.getTargetTableCode());
+        single.setBusinessCode(batch.getBusinessCode());
+        single.setMigrateData(batch.getMigrateData());
+        single.setRemoveFromSource(batch.getRemoveFromSource());
+        single.setJoinSourceField(batch.getJoinSourceField());
+        single.setJoinTargetField(batch.getJoinTargetField());
+        return single;
     }
 
     private static boolean isPrimaryKeyField(MetadataField field) {
